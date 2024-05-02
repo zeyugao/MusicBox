@@ -11,7 +11,47 @@
 		2D2800962BCE1F20007A55D5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800952BCE1F20007A55D5 /* ContentView.swift */; };
 		2D2800982BCE1F21007A55D5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2D2800972BCE1F21007A55D5 /* Assets.xcassets */; };
 		2D28009B2BCE1F21007A55D5 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2D28009A2BCE1F21007A55D5 /* Preview Assets.xcassets */; };
+		2D2800A32BCF6998007A55D5 /* PlayerControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */; };
+		2D2800CE2BD0CE80007A55D5 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800CD2BD0CE80007A55D5 /* Player.swift */; };
+		2D2800D42BD21F20007A55D5 /* SampleBufferItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800CF2BD21F20007A55D5 /* SampleBufferItem.swift */; };
+		2D2800D52BD21F20007A55D5 /* SampleBufferPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800D02BD21F20007A55D5 /* SampleBufferPlayer.swift */; };
+		2D2800D62BD21F20007A55D5 /* SampleBufferSerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800D12BD21F20007A55D5 /* SampleBufferSerializer.swift */; };
+		2D2800D72BD21F20007A55D5 /* SampleBufferSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800D22BD21F20007A55D5 /* SampleBufferSource.swift */; };
+		2D2800DC2BD21FE9007A55D5 /* NowPlayingCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800D82BD21FE9007A55D5 /* NowPlayingCenter.swift */; };
+		2D2800DD2BD21FE9007A55D5 /* PlaylistItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800D92BD21FE9007A55D5 /* PlaylistItem.swift */; };
+		2D2800DE2BD21FE9007A55D5 /* RemoteCommandCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800DA2BD21FE9007A55D5 /* RemoteCommandCenter.swift */; };
+		2D2800E32BD2202A007A55D5 /* ADTSFormatHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800DF2BD2202A007A55D5 /* ADTSFormatHelper.swift */; };
+		2D2800E42BD2202A007A55D5 /* ADTSHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800E02BD2202A007A55D5 /* ADTSHeader.swift */; };
+		2D2800E52BD2202A007A55D5 /* ADTSSampleBufferSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800E12BD2202A007A55D5 /* ADTSSampleBufferSource.swift */; };
+		2DED51C92BD2816C00F9D181 /* Home.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51C82BD2816C00F9D181 /* Home.swift */; };
+		2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CA2BD2823E00F9D181 /* PlayList.swift */; };
+		2DED51CD2BD2AD7A00F9D181 /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CC2BD2AD7A00F9D181 /* Account.swift */; };
+		2DED51CF2BD3806D00F9D181 /* CloudMusicApi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */; };
+		2DED51D42BD3F13000F9D181 /* NeteaseMusicAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51D02BD3F13000F9D181 /* NeteaseMusicAPI.swift */; };
+		2DED51D52BD3F13000F9D181 /* NMChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51D12BD3F13000F9D181 /* NMChannel.swift */; };
+		2DED51D62BD3F13000F9D181 /* NMStructs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51D22BD3F13000F9D181 /* NMStructs.swift */; };
+		2DED51D92BD3F32A00F9D181 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 2DED51D82BD3F32A00F9D181 /* Alamofire */; };
+		2DED51DE2BD3F39C00F9D181 /* CryptoSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 2DED51DD2BD3F39C00F9D181 /* CryptoSwift */; };
+		2DED51E32BD3F4DD00F9D181 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51E22BD3F4DD00F9D181 /* Log.swift */; };
+		2DED51E62BD3F51B00F9D181 /* CocoaLumberjack in Frameworks */ = {isa = PBXBuildFile; productRef = 2DED51E52BD3F51B00F9D181 /* CocoaLumberjack */; };
+		2DED51E82BD3F51B00F9D181 /* CocoaLumberjackSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 2DED51E72BD3F51B00F9D181 /* CocoaLumberjackSwift */; };
+		2DED51EA2BD3F51B00F9D181 /* CocoaLumberjackSwiftLogBackend in Frameworks */ = {isa = PBXBuildFile; productRef = 2DED51E92BD3F51B00F9D181 /* CocoaLumberjackSwiftLogBackend */; };
+		2DED51EC2BD3F5B400F9D181 /* CodableObjects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51EB2BD3F5B400F9D181 /* CodableObjects.swift */; };
+		2DED51EE2BD3F62100F9D181 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51ED2BD3F62100F9D181 /* Extensions.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		2D2800B42BCFEF74007A55D5 /* Embed Libraries */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Libraries";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		2D2800902BCE1F20007A55D5 /* MusicBox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicBox.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -20,6 +60,28 @@
 		2D2800972BCE1F21007A55D5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2D28009A2BCE1F21007A55D5 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		2D28009C2BCE1F21007A55D5 /* MusicBox.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MusicBox.entitlements; sourceTree = "<group>"; };
+		2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerControlView.swift; sourceTree = "<group>"; };
+		2D2800CD2BD0CE80007A55D5 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
+		2D2800CF2BD21F20007A55D5 /* SampleBufferItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferItem.swift; sourceTree = "<group>"; };
+		2D2800D02BD21F20007A55D5 /* SampleBufferPlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferPlayer.swift; sourceTree = "<group>"; };
+		2D2800D12BD21F20007A55D5 /* SampleBufferSerializer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferSerializer.swift; sourceTree = "<group>"; };
+		2D2800D22BD21F20007A55D5 /* SampleBufferSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferSource.swift; sourceTree = "<group>"; };
+		2D2800D82BD21FE9007A55D5 /* NowPlayingCenter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NowPlayingCenter.swift; sourceTree = "<group>"; };
+		2D2800D92BD21FE9007A55D5 /* PlaylistItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaylistItem.swift; sourceTree = "<group>"; };
+		2D2800DA2BD21FE9007A55D5 /* RemoteCommandCenter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RemoteCommandCenter.swift; sourceTree = "<group>"; };
+		2D2800DF2BD2202A007A55D5 /* ADTSFormatHelper.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSFormatHelper.swift; sourceTree = "<group>"; };
+		2D2800E02BD2202A007A55D5 /* ADTSHeader.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSHeader.swift; sourceTree = "<group>"; };
+		2D2800E12BD2202A007A55D5 /* ADTSSampleBufferSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSSampleBufferSource.swift; sourceTree = "<group>"; };
+		2DED51C82BD2816C00F9D181 /* Home.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Home.swift; sourceTree = "<group>"; };
+		2DED51CA2BD2823E00F9D181 /* PlayList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayList.swift; sourceTree = "<group>"; };
+		2DED51CC2BD2AD7A00F9D181 /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
+		2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudMusicApi.swift; sourceTree = "<group>"; };
+		2DED51D02BD3F13000F9D181 /* NeteaseMusicAPI.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NeteaseMusicAPI.swift; sourceTree = "<group>"; };
+		2DED51D12BD3F13000F9D181 /* NMChannel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NMChannel.swift; sourceTree = "<group>"; };
+		2DED51D22BD3F13000F9D181 /* NMStructs.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NMStructs.swift; sourceTree = "<group>"; };
+		2DED51E22BD3F4DD00F9D181 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
+		2DED51EB2BD3F5B400F9D181 /* CodableObjects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableObjects.swift; sourceTree = "<group>"; };
+		2DED51ED2BD3F62100F9D181 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -27,6 +89,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2DED51D92BD3F32A00F9D181 /* Alamofire in Frameworks */,
+				2DED51E82BD3F51B00F9D181 /* CocoaLumberjackSwift in Frameworks */,
+				2DED51EA2BD3F51B00F9D181 /* CocoaLumberjackSwiftLogBackend in Frameworks */,
+				2DED51E62BD3F51B00F9D181 /* CocoaLumberjack in Frameworks */,
+				2DED51DE2BD3F39C00F9D181 /* CryptoSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -38,6 +105,7 @@
 			children = (
 				2D2800922BCE1F20007A55D5 /* MusicBox */,
 				2D2800912BCE1F20007A55D5 /* Products */,
+				2D2800A42BCFD231007A55D5 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -52,11 +120,21 @@
 		2D2800922BCE1F20007A55D5 /* MusicBox */ = {
 			isa = PBXGroup;
 			children = (
+				2DED51D32BD3F13000F9D181 /* NeteaseMusicAPI */,
+				2DED51C72BD2815800F9D181 /* Content */,
+				2D2800E22BD2202A007A55D5 /* AAC */,
+				2D2800DB2BD21FE9007A55D5 /* General */,
+				2D2800D32BD21F20007A55D5 /* Player */,
 				2D2800932BCE1F20007A55D5 /* MusicBoxApp.swift */,
 				2D2800952BCE1F20007A55D5 /* ContentView.swift */,
 				2D2800972BCE1F21007A55D5 /* Assets.xcassets */,
 				2D28009C2BCE1F21007A55D5 /* MusicBox.entitlements */,
 				2D2800992BCE1F21007A55D5 /* Preview Content */,
+				2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */,
+				2DED51E22BD3F4DD00F9D181 /* Log.swift */,
+				2D2800CD2BD0CE80007A55D5 /* Player.swift */,
+				2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */,
+				2DED51ED2BD3F62100F9D181 /* Extensions.swift */,
 			);
 			path = MusicBox;
 			sourceTree = "<group>";
@@ -69,6 +147,65 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
+		2D2800A42BCFD231007A55D5 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2D2800D32BD21F20007A55D5 /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				2D2800CF2BD21F20007A55D5 /* SampleBufferItem.swift */,
+				2D2800D02BD21F20007A55D5 /* SampleBufferPlayer.swift */,
+				2D2800D12BD21F20007A55D5 /* SampleBufferSerializer.swift */,
+				2D2800D22BD21F20007A55D5 /* SampleBufferSource.swift */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
+		2D2800DB2BD21FE9007A55D5 /* General */ = {
+			isa = PBXGroup;
+			children = (
+				2D2800D82BD21FE9007A55D5 /* NowPlayingCenter.swift */,
+				2D2800D92BD21FE9007A55D5 /* PlaylistItem.swift */,
+				2D2800DA2BD21FE9007A55D5 /* RemoteCommandCenter.swift */,
+			);
+			path = General;
+			sourceTree = "<group>";
+		};
+		2D2800E22BD2202A007A55D5 /* AAC */ = {
+			isa = PBXGroup;
+			children = (
+				2D2800DF2BD2202A007A55D5 /* ADTSFormatHelper.swift */,
+				2D2800E02BD2202A007A55D5 /* ADTSHeader.swift */,
+				2D2800E12BD2202A007A55D5 /* ADTSSampleBufferSource.swift */,
+			);
+			path = AAC;
+			sourceTree = "<group>";
+		};
+		2DED51C72BD2815800F9D181 /* Content */ = {
+			isa = PBXGroup;
+			children = (
+				2DED51C82BD2816C00F9D181 /* Home.swift */,
+				2DED51CA2BD2823E00F9D181 /* PlayList.swift */,
+				2DED51CC2BD2AD7A00F9D181 /* Account.swift */,
+			);
+			path = Content;
+			sourceTree = "<group>";
+		};
+		2DED51D32BD3F13000F9D181 /* NeteaseMusicAPI */ = {
+			isa = PBXGroup;
+			children = (
+				2DED51EB2BD3F5B400F9D181 /* CodableObjects.swift */,
+				2DED51D02BD3F13000F9D181 /* NeteaseMusicAPI.swift */,
+				2DED51D12BD3F13000F9D181 /* NMChannel.swift */,
+				2DED51D22BD3F13000F9D181 /* NMStructs.swift */,
+			);
+			path = NeteaseMusicAPI;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -79,12 +216,20 @@
 				2D28008C2BCE1F20007A55D5 /* Sources */,
 				2D28008D2BCE1F20007A55D5 /* Frameworks */,
 				2D28008E2BCE1F20007A55D5 /* Resources */,
+				2D2800B42BCFEF74007A55D5 /* Embed Libraries */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			name = MusicBox;
+			packageProductDependencies = (
+				2DED51D82BD3F32A00F9D181 /* Alamofire */,
+				2DED51DD2BD3F39C00F9D181 /* CryptoSwift */,
+				2DED51E52BD3F51B00F9D181 /* CocoaLumberjack */,
+				2DED51E72BD3F51B00F9D181 /* CocoaLumberjackSwift */,
+				2DED51E92BD3F51B00F9D181 /* CocoaLumberjackSwiftLogBackend */,
+			);
 			productName = MusicBox;
 			productReference = 2D2800902BCE1F20007A55D5 /* MusicBox.app */;
 			productType = "com.apple.product-type.application";
@@ -101,6 +246,7 @@
 				TargetAttributes = {
 					2D28008F2BCE1F20007A55D5 = {
 						CreatedOnToolsVersion = 15.3;
+						LastSwiftMigration = 1530;
 					};
 				};
 			};
@@ -113,6 +259,11 @@
 				Base,
 			);
 			mainGroup = 2D2800872BCE1F20007A55D5;
+			packageReferences = (
+				2DED51D72BD3F32A00F9D181 /* XCRemoteSwiftPackageReference "Alamofire" */,
+				2DED51DC2BD3F39C00F9D181 /* XCRemoteSwiftPackageReference "CryptoSwift" */,
+				2DED51E42BD3F51B00F9D181 /* XCRemoteSwiftPackageReference "CocoaLumberjack" */,
+			);
 			productRefGroup = 2D2800912BCE1F20007A55D5 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -139,8 +290,30 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2DED51D42BD3F13000F9D181 /* NeteaseMusicAPI.swift in Sources */,
+				2DED51CF2BD3806D00F9D181 /* CloudMusicApi.swift in Sources */,
+				2DED51E32BD3F4DD00F9D181 /* Log.swift in Sources */,
+				2D2800DC2BD21FE9007A55D5 /* NowPlayingCenter.swift in Sources */,
+				2D2800E52BD2202A007A55D5 /* ADTSSampleBufferSource.swift in Sources */,
+				2D2800E32BD2202A007A55D5 /* ADTSFormatHelper.swift in Sources */,
+				2D2800D52BD21F20007A55D5 /* SampleBufferPlayer.swift in Sources */,
+				2DED51D52BD3F13000F9D181 /* NMChannel.swift in Sources */,
+				2DED51CD2BD2AD7A00F9D181 /* Account.swift in Sources */,
 				2D2800962BCE1F20007A55D5 /* ContentView.swift in Sources */,
+				2D2800DE2BD21FE9007A55D5 /* RemoteCommandCenter.swift in Sources */,
+				2D2800DD2BD21FE9007A55D5 /* PlaylistItem.swift in Sources */,
+				2D2800D42BD21F20007A55D5 /* SampleBufferItem.swift in Sources */,
+				2DED51D62BD3F13000F9D181 /* NMStructs.swift in Sources */,
+				2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */,
+				2D2800E42BD2202A007A55D5 /* ADTSHeader.swift in Sources */,
+				2DED51EC2BD3F5B400F9D181 /* CodableObjects.swift in Sources */,
 				2D2800942BCE1F20007A55D5 /* MusicBoxApp.swift in Sources */,
+				2D2800D62BD21F20007A55D5 /* SampleBufferSerializer.swift in Sources */,
+				2DED51EE2BD3F62100F9D181 /* Extensions.swift in Sources */,
+				2D2800CE2BD0CE80007A55D5 /* Player.swift in Sources */,
+				2D2800D72BD21F20007A55D5 /* SampleBufferSource.swift in Sources */,
+				2DED51C92BD2816C00F9D181 /* Home.swift in Sources */,
+				2D2800A32BCF6998007A55D5 /* PlayerControlView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -270,6 +443,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = MusicBox/MusicBox.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -278,16 +452,27 @@
 				DEVELOPMENT_TEAM = WL4FUY6R56;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					/opt/homebrew/Cellar/qt/6.6.2_2/lib,
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/Users/elsa/Code/QCloudMusicApi/build/bin,
+				);
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = me.elsanna.MusicBox;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -297,6 +482,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = MusicBox/MusicBox.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -305,16 +491,26 @@
 				DEVELOPMENT_TEAM = WL4FUY6R56;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					/opt/homebrew/Cellar/qt/6.6.2_2/lib,
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/Users/elsa/Code/QCloudMusicApi/build/bin,
+				);
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = me.elsanna.MusicBox;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -341,6 +537,61 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		2DED51D72BD3F32A00F9D181 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Alamofire/Alamofire.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.9.1;
+			};
+		};
+		2DED51DC2BD3F39C00F9D181 /* XCRemoteSwiftPackageReference "CryptoSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/krzyzanowskim/CryptoSwift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.8.2;
+			};
+		};
+		2DED51E42BD3F51B00F9D181 /* XCRemoteSwiftPackageReference "CocoaLumberjack" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/CocoaLumberjack/CocoaLumberjack";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.8.5;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2DED51D82BD3F32A00F9D181 /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2DED51D72BD3F32A00F9D181 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
+		};
+		2DED51DD2BD3F39C00F9D181 /* CryptoSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2DED51DC2BD3F39C00F9D181 /* XCRemoteSwiftPackageReference "CryptoSwift" */;
+			productName = CryptoSwift;
+		};
+		2DED51E52BD3F51B00F9D181 /* CocoaLumberjack */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2DED51E42BD3F51B00F9D181 /* XCRemoteSwiftPackageReference "CocoaLumberjack" */;
+			productName = CocoaLumberjack;
+		};
+		2DED51E72BD3F51B00F9D181 /* CocoaLumberjackSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2DED51E42BD3F51B00F9D181 /* XCRemoteSwiftPackageReference "CocoaLumberjack" */;
+			productName = CocoaLumberjackSwift;
+		};
+		2DED51E92BD3F51B00F9D181 /* CocoaLumberjackSwiftLogBackend */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2DED51E42BD3F51B00F9D181 /* XCRemoteSwiftPackageReference "CocoaLumberjack" */;
+			productName = CocoaLumberjackSwiftLogBackend;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2D2800882BCE1F20007A55D5 /* Project object */;
 }

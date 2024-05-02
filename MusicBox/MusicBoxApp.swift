@@ -13,5 +13,8 @@ struct MusicBoxApp: App {
         WindowGroup {
             ContentView()
         }
+        .commands {
+            SidebarCommands()
+        }
     }
 }
