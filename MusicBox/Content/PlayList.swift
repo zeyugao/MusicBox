@@ -6,19 +6,24 @@
 //
 
 import Cocoa
+import CoreImage.CIFilterBuiltins
 import CoreMedia
 import Foundation
 import SwiftUI
-import CoreImage.CIFilterBuiltins
 import UniformTypeIdentifiers
 
 class PlaylistDetailModel: ObservableObject {
     @Published var songs: [CloudMusicApi.Song]?
+    var curId: UInt64?
 
     func updatePlaylistDetail(id: UInt64) async {
         if let playlist = await CloudMusicApi.playlist_detail(id: id) {
             let trackIds = playlist.trackIds
             let tracks = playlist.tracks
+
+            if let cur = curId, cur != id {
+                return
+            }
 
             if trackIds.count == tracks.count {
                 DispatchQueue.main.async {
@@ -103,23 +108,25 @@ struct PlayListView: View {
     @State private var selectedItem: CloudMusicApi.Song.ID?
     @State private var sortOrder = [KeyPathComparator(\CloudMusicApi.Song.name)]
 
+    @State private var loadingTask: Task<Void, Never>? = nil
+
     var neteasePlaylist: CloudMusicApi.PlayListItem?
 
     let currencyStyle = Decimal.FormatStyle.Currency(code: "USD")
 
     var body: some View {
-        if let songs = model.songs {
-            Table(of: CloudMusicApi.Song.self, selection: $selectedItem, sortOrder: $sortOrder) {
-                TableColumn("Name", value: \.name)
-                TableColumn("Artist") { song in
-                    Text(song.ar.map(\.name).joined(separator: ", "))
-                }
-                TableColumn("Ablum", value: \.al.name)
-                TableColumn("Duration") { song in
-                    let ret = song.parseDuration()
-                    Text(String(format: "%02d:%02d", ret.minute, ret.second))
-                }.width(max: 60)
-            } rows: {
+        Table(of: CloudMusicApi.Song.self, selection: $selectedItem, sortOrder: $sortOrder) {
+            TableColumn("Name", value: \.name)
+            TableColumn("Artist") { song in
+                Text(song.ar.map(\.name).joined(separator: ", "))
+            }
+            TableColumn("Ablum", value: \.al.name)
+            TableColumn("Duration") { song in
+                let ret = song.parseDuration()
+                Text(String(format: "%02d:%02d", ret.minute, ret.second))
+            }.width(max: 60)
+        } rows: {
+            if let songs = model.songs {
                 ForEach(songs) { song in
                     TableRow(song)
                         .contextMenu {
@@ -137,37 +144,34 @@ struct PlayListView: View {
                         }
                 }
             }
-            .navigationTitle(neteasePlaylist?.name ?? "Playlist")
-            .onChange(of: neteasePlaylist) {
-                if let _ = neteasePlaylist?.id {
-                    model.songs = nil
+        }
+        .navigationTitle(neteasePlaylist?.name ?? "Playlist")
+        .onChange(of: neteasePlaylist) {
+            if let id = neteasePlaylist?.id {
+                model.songs = nil
+
+                model.curId = id
+                loadingTask?.cancel()
+                loadingTask = Task {
+                    await model.updatePlaylistDetail(id: id)
                 }
             }
-            .onChange(of: sortOrder) { _, sortOrder in
-                print(sortOrder)
-                print(sortOrder.count)
-            }
-        } else {
-            HStack(alignment: .center, spacing: 4) {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle())
-                    .scaleEffect(0.5)
-                Text("Loading")
-            }
-            .onAppear {
-                Task {
-                    if let id = neteasePlaylist?.id {
-                        await model.updatePlaylistDetail(id: id)
-                    }
+        }
+        .onChange(of: sortOrder) { _, sortOrder in
+            print(sortOrder)
+            print(sortOrder.count)
+        }
+        .onAppear {
+            loadingTask?.cancel()
+            loadingTask = Task {
+                if let id = neteasePlaylist?.id {
+                    model.curId = id
+                    await model.updatePlaylistDetail(id: id)
                 }
             }
-            .onChange(of: neteasePlaylist) {
-                Task {
-                    if let id = neteasePlaylist?.id {
-                        await model.updatePlaylistDetail(id: id)
-                    }
-                }
-            }
+        }
+        .onDisappear {
+            loadingTask?.cancel()
         }
     }
 }
