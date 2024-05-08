@@ -27,6 +27,7 @@ func loadAsset(url: URL) async -> PlaylistItem? {
         let duration = try await asset.load(.duration)
 
         let newItem = PlaylistItem(
+            id: url.absoluteString,
             url: url, title: title, artist: artist, ext: url.pathExtension,
             duration: duration)
         return newItem
@@ -55,7 +56,11 @@ struct PlayerView: View {
     }
     var body: some View {
         VStack {
-            Text("aaa")
+            Button("Select and Play") {
+                Task {
+                    await selectAndProcessAudioFile()
+                }
+            }
         }
     }
 }

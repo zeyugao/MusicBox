@@ -6,78 +6,116 @@
 //
 
 import AVFoundation
+import Combine
+import CoreImage.CIFilterBuiltins
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct HomeContentView: View {
 
-    @EnvironmentObject var playController: PlayController
+func generateQRCode(str: String, width: CGFloat = 300, height: CGFloat = 300) -> NSImage {
+    guard let data = str.data(using: .utf8, allowLossyConversion: false) else {
+        return NSImage()
+    }
+    let filter = CIFilter(name: "CIQRCodeGenerator")
+    filter?.setValue(data, forKey: "inputMessage")
+    guard let image = filter?.outputImage else { return NSImage() }
 
-    private func selectAndProcessAudioFile() async {
-        let openPanel = NSOpenPanel()
-        openPanel.prompt = "Select Audio File"
-        openPanel.allowsMultipleSelection = false
-        openPanel.canChooseDirectories = false
-        openPanel.canChooseFiles = true
-        openPanel.allowedContentTypes = [UTType.mp3, UTType.audio]
+    let scaleX = width / image.extent.size.width
+    let scaleY = height / image.extent.size.height
+    let transformedImage = image.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
 
-        let result = await openPanel.begin()
-        if result == .OK, let url = openPanel.url {
-            let asset = AVAsset(url: url)
-            do {
-                // Asynchronously load the needed properties
-                let metadataItems = try await asset.load(.commonMetadata)
-                let titleItem = metadataItems.first(where: { $0.commonKey?.rawValue == "title" })
-                let artistItem = metadataItems.first(where: { $0.commonKey?.rawValue == "artist" })
+    let rep = NSCIImageRep(ciImage: transformedImage)
+    let nsImage = NSImage(size: NSSize(width: width, height: height))
+    nsImage.addRepresentation(rep)
+    nsImage.backgroundColor = .clear
+    nsImage.cacheMode = .always
+    return nsImage
+}
 
-                // Fetching values using load method
-                var title = try await titleItem?.load(.value) as? String ?? "Unknown"
-                var artist = try await artistItem?.load(.value) as? String ?? "Unknown"
+class LoginViewModel: ObservableObject {
+    @Published var qrCodeImageURL: URL?
+    @Published var loginMessage: String?
 
-                let duration = try await asset.load(.duration)
+    private func updateLoginMessage(message: String) {
+        DispatchQueue.main.async {
+            self.loginMessage = message
+        }
+    }
 
-                let newItem = PlaylistItem(
-                    url: url, title: title, artist: artist, ext: url.pathExtension,
-                    duration: duration)
-                playController.sampleBufferPlayer.insertItem(newItem, at: 0)
-            } catch {
-                // Handle errors, possibly using an error presenting mechanism in your UI.
-                print("Error loading asset properties: \(error)")
+    func fetchQRCode() async {
+        do {
+            let keyResponse = try await CloudMusicApi.login_qr_key()
+            let url = try await CloudMusicApi.login_qr_create(key: keyResponse)
+            DispatchQueue.main.async {
+                self.qrCodeImageURL = URL(string: url)
+            }
+            try await checkQRCodeStatus(key: keyResponse)
+        } catch {
+            updateLoginMessage(message: error.localizedDescription)
+        }
+    }
+
+    private func checkQRCodeStatus(key: String) async throws {
+        for i in 1...100 {
+            try await Task.sleep(nanoseconds: 1 * 1_000_000_000)
+            let checkRes = try await CloudMusicApi.login_qr_check(key: key)
+            switch checkRes.code {
+            case 803:
+                updateLoginMessage(message: "Login Successful")
+                return
+            default:
+                updateLoginMessage(message: checkRes.message + " (Trial \(i))")
             }
         }
     }
+}
+
+extension URL {
+    func fixSecure() -> URL {
+        var components = URLComponents(url: self, resolvingAgainstBaseURL: false)
+        components?.scheme = "https"
+        return components?.url ?? self
+    }
+}
+
+
+struct HomeContentView: View {
+    @EnvironmentObject var playController: PlayController
+    @StateObject private var loginVM = LoginViewModel()
+    @EnvironmentObject private var userInfo: UserInfo
+
     var body: some View {
         VStack {
-            Text("Home Screen")
-
-            Button(action: {
-                Task {
-                    await self.selectAndProcessAudioFile()
+            if let profile = userInfo.profile {
+                AsyncImage(url: URL(string: profile.avatarUrl.https)) { image in
+                    image.resizable()
+                } placeholder: {
+                    Text("Loading Avatar")
                 }
-            }) {
-                Text("Add to Playlist")
+                .scaledToFit()
+                .frame(width: 200, height: 200)
+                Text(profile.nickname)
+            } else {
+                if let qrCodeImageURL = loginVM.qrCodeImageURL {
+                    Image(
+                        nsImage: generateQRCode(
+                            str: qrCodeImageURL.absoluteString, width: 160, height: 160))
+                }
+
+                if let message = loginVM.loginMessage {
+                    Text(message)
+                }
             }
-
-            Button(action: {
-                Task {
-                    let api = NeteaseMusicAPI()
-
-                    do {
-                        // let result = try await api.loginQrKey()
-                        print(try await api.loginQrKey())
-                        print(try await api.nuserAccount())
-                    } catch {
-                        print("Error")
-                        print(error)
+        }.onAppear {
+            Task {
+                if userInfo.profile == nil {
+                    if let profile = await CloudMusicApi.login_status() {
+                        userInfo.profile = profile
+                    } else {
+                        await loginVM.fetchQRCode()
                     }
                 }
-                //                Task  {
-                // CloudMusicApi.login_qr_key()
-                //                    print(res)
-                //                }
-            }) {
-                Text("Fetch Key")
             }
         }
     }

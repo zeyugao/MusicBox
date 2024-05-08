@@ -404,8 +404,7 @@ class SampleBufferSerializer {
         NotificationCenter.default.post(name: SampleBufferSerializer.currentItemDidChange, object: self)
 
         // Establish a periodic notification, if there is a new item.
-        if let uniqueID = items.first?.uniqueID {
-            
+        if items.first?.uniqueID != nil {
             printLog(component: .serializer, message: "adding periodic observer")
             let periodicInterval = CMTime(value: 1, timescale: 10)
             periodicTimeObserver = renderSynchronizer.addPeriodicTimeObserver(forInterval: periodicInterval,

@@ -3,43 +3,4 @@
    uuid = "2A39357B-0C46-4237-A6ED-F45E1821EB77"
    type = "1"
    version = "2.0">
-   <Breakpoints>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "43EDD52E-442B-4ACC-B431-CA3B6F9FF1B7"
-            shouldBeEnabled = "Yes"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "MusicBox/CloudMusicApi.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "13"
-            endingLineNumber = "13"
-            landmarkName = "doRequest(memberName:data:)"
-            landmarkType = "7">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.AddressBreakpoint">
-         <BreakpointContent
-            uuid = "905A328C-D856-40B5-BAED-672DF7F012B7"
-            shouldBeEnabled = "Yes"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            symbolName = "*0x106a33144">
-            <Locations>
-               <Location
-                  uuid = "905A328C-D856-40B5-BAED-672DF7F012B7 - 38a0b94f64ee52e1"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "invoke"
-                  moduleName = "libQCloudMusicApi.dylib"
-                  usesParentBreakpointCondition = "Yes">
-               </Location>
-            </Locations>
-         </BreakpointContent>
-      </BreakpointProxy>
-   </Breakpoints>
 </Bucket>
