@@ -131,21 +131,21 @@
 		2D2800922BCE1F20007A55D5 /* MusicBox */ = {
 			isa = PBXGroup;
 			children = (
-				2D3A45A52BE86F75006CD909 /* Player.swift */,
-				2DED51C72BD2815800F9D181 /* Content */,
 				2D2800E22BD2202A007A55D5 /* AAC */,
-				2D2800DB2BD21FE9007A55D5 /* General */,
-				2D2800D32BD21F20007A55D5 /* Player */,
-				2D2800932BCE1F20007A55D5 /* MusicBoxApp.swift */,
-				2D2800952BCE1F20007A55D5 /* ContentView.swift */,
 				2D2800972BCE1F21007A55D5 /* Assets.xcassets */,
-				2D28009C2BCE1F21007A55D5 /* MusicBox.entitlements */,
-				2D2800992BCE1F21007A55D5 /* Preview Content */,
-				2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */,
 				2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */,
+				2DED51C72BD2815800F9D181 /* Content */,
+				2D2800952BCE1F20007A55D5 /* ContentView.swift */,
 				2DED51ED2BD3F62100F9D181 /* Extensions.swift */,
-				2D3A45832BE3A90F006CD909 /* QCloudMusicApi.h */,
+				2D2800DB2BD21FE9007A55D5 /* General */,
 				2D3A45812BE3A90E006CD909 /* MusicBox-Bridging-Header.h */,
+				2D28009C2BCE1F21007A55D5 /* MusicBox.entitlements */,
+				2D2800932BCE1F20007A55D5 /* MusicBoxApp.swift */,
+				2D2800D32BD21F20007A55D5 /* Player */,
+				2D3A45A52BE86F75006CD909 /* Player.swift */,
+				2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */,
+				2D2800992BCE1F21007A55D5 /* Preview Content */,
+				2D3A45832BE3A90F006CD909 /* QCloudMusicApi.h */,
 			);
 			path = MusicBox;
 			sourceTree = "<group>";

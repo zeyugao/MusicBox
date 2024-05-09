@@ -412,6 +412,7 @@ class CloudMusicApi {
         if let parsed = ret.asType(Result.self) {
             return parsed.data
         }
+        print(ret.asAny())
         print("song_download_url failed")
         return nil
     }

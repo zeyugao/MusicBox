@@ -42,7 +42,8 @@ class SampleBufferPlayer {
     
     static let currentItemDidChange = Notification.Name("SampleBufferPlayerCurrentItemDidChange")
     static let playbackRateDidChange = Notification.Name("SampleBufferPlayerPlaybackRateDidChange")
-    
+    static let playbackOffsetDidUpdated = Notification.Name("SampleBufferSerializerPlaybackOffsetDidUpdated")
+
     // Private observers.
     private var currentOffsetObserver: NSObjectProtocol!
     private var currentItemObserver: NSObjectProtocol!
@@ -88,6 +89,12 @@ class SampleBufferPlayer {
                                                               object: playbackSerializer,
                                                               queue: .main) { [unowned self] _ in
             notificationCenter.post(name: SampleBufferPlayer.playbackRateDidChange, object: self)
+        }
+
+        playbackRateObserver = notificationCenter.addObserver(forName: SampleBufferSerializer.playbackOffsetDidUpdated,
+                                                              object: playbackSerializer,
+                                                              queue: .main) { [unowned self] _ in
+            notificationCenter.post(name: SampleBufferPlayer.playbackOffsetDidUpdated, object: self)
         }
     }
     

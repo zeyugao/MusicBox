@@ -41,6 +41,7 @@ class SampleBufferSerializer {
     static let currentOffsetDidChange = Notification.Name("SampleBufferSerializerCurrentOffsetDidChange")
     static let currentItemDidChange = Notification.Name("SampleBufferSerializerCurrentItemDidChange")
     static let playbackRateDidChange = Notification.Name("SampleBufferSerializerPlaybackRateDidChange")
+    static let playbackOffsetDidUpdated = Notification.Name("SampleBufferSerializerPlaybackOffsetDidUpdated")
     
     // Private observers.
     private var periodicTimeObserver: Any!
@@ -163,6 +164,11 @@ class SampleBufferSerializer {
         // Make the first item current.
         updateCurrentPlayerItem(at: .zero)
         
+        DispatchQueue.main.async {
+            print("Notify playbackOffsetDidUpdated")
+            NotificationCenter.default.post(name: SampleBufferSerializer.playbackOffsetDidUpdated, object: self)
+        }
+
         // Start providing sample buffers to the audio renderer.
         printLog(component: .serializer, message: "started enqueuing items at enqueuing#0")
         audioRenderer.requestMediaDataWhenReady(on: serializationQueue) {
@@ -455,6 +461,7 @@ class SampleBufferSerializer {
     func resumeQueue() {
         
         serializationQueue.async {
+            guard let _ = self.currentItem?.playlistItem.getUrl() else { return }
             self.resumePlayback()
         }
     }

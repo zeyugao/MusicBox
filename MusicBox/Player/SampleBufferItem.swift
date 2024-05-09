@@ -88,16 +88,16 @@ class SampleBufferItem {
             // Try to create a sample buffer source, if this is the first
             // time a sample buffer has been requested.
             if aacSource == nil && sampleBufferSource == nil {
+                guard let url = playlistItem.getUrl() else { return nil }
+
                 isEnqueued = true
                 if self.testItem {
-                    aacSource = ADTSSampleBufferSource(fileURL: playlistItem.url, fromOffset: startOffset)
+                    aacSource = ADTSSampleBufferSource(fileURL: url, fromOffset: startOffset)
                 } else {
-                    sampleBufferSource = try SampleBufferSource(fileURL: playlistItem.url, fromOffset: startOffset)
+                    sampleBufferSource = try SampleBufferSource(fileURL: url, fromOffset: startOffset)
                 }
                 printLog(.enqueuer, "ID: \(logID) starting buffers at +", startOffset)
             }
-            
-            
             
             if sampleBufferLogCount > 0 {
                 printLog(.enqueuer, "ID: \(logID) enqueuing buffer #\(sampleBufferLogCount) at +", endOffset)

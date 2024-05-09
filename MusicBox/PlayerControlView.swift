@@ -138,11 +138,11 @@ struct PlayerControlView: View {
             Spacer()
 
             VStack {
-                Text("\(playController.song.title)")
+                Text("\(playController.sampleBufferPlayer.currentItem?.title ?? "Title")")
                     .font(.system(size: 12))
                     .lineLimit(1)
                     .padding(.bottom, 2)
-                Text("\(playController.song.artist)")
+                Text("\(playController.sampleBufferPlayer.currentItem?.artist ?? "Artists")")
                     .font(.system(size: 12))
                     .lineLimit(1)
                     .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
@@ -151,6 +151,7 @@ struct PlayerControlView: View {
                         .font(.system(size: 12))
                         .lineLimit(1)
                         .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
+                        .frame(width: 40)
 
                     PlaySliderView()
                         .environmentObject(playController)
@@ -159,6 +160,7 @@ struct PlayerControlView: View {
                         .font(.system(size: 12))
                         .lineLimit(1)
                         .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
+                        .frame(width: 40)
                 }
             }
             .layoutPriority(1)

@@ -41,58 +41,10 @@ class PlaylistDetailModel: ObservableObject {
 }
 
 func loadItem(song: CloudMusicApi.Song, songData: CloudMusicApi.SongData) async -> PlaylistItem? {
-    let fileManager = FileManager.default
-    guard
-        let musicFolder = fileManager.urls(
-            for: .musicDirectory, in: .userDomainMask
-        ).first
-    else {
-        return nil
-    }
-    let appMusicFolder = musicFolder.appendingPathComponent("MusicBox")
-
-    print("appMusicFolder: \(appMusicFolder)")
-
-    // Create the directory if it does not exist
-    if !fileManager.fileExists(atPath: appMusicFolder.path) {
-        do {
-            try fileManager.createDirectory(at: appMusicFolder, withIntermediateDirectories: true)
-        } catch {
-            print("Failed to create directory: \(error)")
-            return nil
-        }
-    }
-
-    // Define the local file path
-    let localFileUrl = appMusicFolder.appendingPathComponent(
-        "\(songData.id).\(songData.type)")
-
-    // Check if file already exists
-    if fileManager.fileExists(atPath: localFileUrl.path) {
-        print("File already exists, no need to download.")
-    } else {
-        // Download the file
-        guard let songDownloadUrl = URL(string: songData.url.https) else {
-            return nil
-        }
-
-        do {
-            // TODO: Streaming
-            print("Downloading file from \(songData.url) to \(localFileUrl)")
-
-            let (data, _) = try await URLSession.shared.data(from: songDownloadUrl)
-            try data.write(to: localFileUrl)
-        } catch {
-            print("Error downloading or saving the file: \(error)")
-            return nil
-        }
-    }
-
-    print("Playing  \(localFileUrl)")
-
+    guard let url = URL(string: songData.url.https) else { return nil }
     let newItem = PlaylistItem(
         id: String(songData.id),
-        url: localFileUrl,
+        url: url,
         title: song.name,
         artist: song.ar.map(\.name).joined(separator: ", "),
         ext: songData.type,
@@ -156,6 +108,9 @@ struct PlayListView: View {
                     await model.updatePlaylistDetail(id: id)
                 }
             }
+        }
+        .onChange(of: selectedItem) { _, id in
+            print(id)
         }
         .onChange(of: sortOrder) { _, sortOrder in
             print(sortOrder)

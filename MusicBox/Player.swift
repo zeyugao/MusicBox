@@ -10,19 +10,10 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct Song2 {
-    var title: String
-    var artist: String
-    var thumbnail: Image
-}
-
-class PlayController: ObservableObject {
+class PlayController: ObservableObject, RemoteCommandHandler {
     let sampleBufferPlayer = SampleBufferPlayer()
 
     @Published var isPlaying: Bool = false
-
-    @Published var song: Song2 = Song2(
-        title: "Song Title", artist: "Artist", thumbnail: Image(systemName: "music.note"))
 
     @Published var playedSecond: Double = 0.0
     @Published var duration: Double = 0.0
@@ -33,15 +24,50 @@ class PlayController: ObservableObject {
     private var currentOffsetObserver: NSObjectProtocol!
     private var currentItemObserver: NSObjectProtocol!
     private var playbackRateObserver: NSObjectProtocol!
+    private var playbackOffsetChangeObserver: NSObjectProtocol!
 
     func togglePlayPause() {
         isPlaying.toggle()  // 切换播放状态
         if isPlaying {
-            sampleBufferPlayer.play()
+            startPlaying()
         } else {
-            sampleBufferPlayer.pause()
+            stopPlaying()
         }
         updateCurrentPlaybackInfo()
+    }
+
+    func stopPlaying() {
+        sampleBufferPlayer.pause()
+        isPlaying = false
+        NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
+    }
+
+    func startPlaying() {
+        RemoteCommandCenter.handleRemoteCommands(using: self)
+        sampleBufferPlayer.play()
+        isPlaying = true
+        NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
+    }
+
+    func performRemoteCommand(_ command: RemoteCommand) {
+        switch command {
+        case .play:
+            startPlaying()
+        case .pause:
+            stopPlaying()
+        case .nextTrack:
+            //    nextTrack()
+            break
+        case .previousTrack:
+            // previousTrack()
+            break
+        case .skipForward(let distance):
+            seekByOffset(offset: distance)
+        case .skipBackward(let distance):
+            seekByOffset(offset: -distance)
+        case .changePlaybackPosition(let offset):
+            seekToOffset(offset: offset)
+        }
     }
 
     func seekToOffset(offset: Double) {
@@ -49,14 +75,21 @@ class PlayController: ObservableObject {
         playedSecond = offset
         let offset = CMTime(seconds: offset, preferredTimescale: 10)
         sampleBufferPlayer.seekToOffset(offset)
-        
+        updateCurrentPlaybackInfo()
+    }
+
+    func seekByOffset(offset: Double) {
+        isUpdatingOffset = true
+        let newPlayedSecond = playedSecond + offset
+        let offset = CMTime(seconds: newPlayedSecond, preferredTimescale: 10)
+        sampleBufferPlayer.seekToOffset(offset)
         updateCurrentPlaybackInfo()
     }
 
     private func updateCurrentPlaybackInfo() {
         NowPlayingCenter.handlePlaybackChange(
             playing: sampleBufferPlayer.isPlaying, rate: sampleBufferPlayer.rate,
-            position: sampleBufferPlayer.currentItemEndOffset?.seconds ?? 0,
+            position: self.playedSecond,
             duration: sampleBufferPlayer.currentItem?.duration.seconds ?? 0)
     }
 
@@ -68,14 +101,14 @@ class PlayController: ObservableObject {
             object: sampleBufferPlayer,
             queue: .main
         ) { [unowned self] notification in
+            let offset =
+                (notification.userInfo?[SampleBufferPlayer.currentOffsetKey] as? NSValue)?
+                .timeValue.seconds
             if !isUpdatingOffset {
-                let offset =
-                    (notification.userInfo?[SampleBufferPlayer.currentOffsetKey] as? NSValue)?
-                    .timeValue.seconds
+                // Avoid updating the offset if it is being changed by the user.
                 self.playedSecond = offset ?? 0.0
-                
-//                updateCurrentPlaybackInfo()
             }
+            updateCurrentPlaybackInfo()
         }
 
         currentItemObserver = notificationCenter.addObserver(
@@ -83,13 +116,14 @@ class PlayController: ObservableObject {
             object: sampleBufferPlayer,
             queue: .main
         ) { [unowned self] _ in
-            if let currentItem = sampleBufferPlayer.currentItem {
+            if let currentItem = sampleBufferPlayer.currentItem,
+                let currentItemIndex = sampleBufferPlayer.currentItemIndex
+            {
                 let duration = currentItem.duration.seconds
                 self.duration = duration
 
-                self.song = Song2(
-                    title: currentItem.title, artist: currentItem.artist,
-                    thumbnail: Image(systemName: "music.note"))
+                NowPlayingCenter.handleItemChange(
+                    item: currentItem, index: currentItemIndex, count: sampleBufferPlayer.itemCount)
             }
         }
 
@@ -100,7 +134,18 @@ class PlayController: ObservableObject {
         ) { [unowned self] _ in
             isUpdatingOffset = false
             self.isPlaying = sampleBufferPlayer.isPlaying
-            
+
+            updateCurrentPlaybackInfo()
+        }
+
+        playbackOffsetChangeObserver = notificationCenter.addObserver(
+            forName: SampleBufferPlayer.playbackOffsetDidUpdated,
+            object: sampleBufferPlayer,
+            queue: .main
+        ) { [unowned self] _ in
+            isUpdatingOffset = false
+            self.isPlaying = sampleBufferPlayer.isPlaying
+
             updateCurrentPlaybackInfo()
         }
     }
