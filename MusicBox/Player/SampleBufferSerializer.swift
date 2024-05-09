@@ -165,7 +165,6 @@ class SampleBufferSerializer {
         updateCurrentPlayerItem(at: .zero)
         
         DispatchQueue.main.async {
-            print("Notify playbackOffsetDidUpdated")
             NotificationCenter.default.post(name: SampleBufferSerializer.playbackOffsetDidUpdated, object: self)
         }
 

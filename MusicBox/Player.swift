@@ -18,6 +18,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     @Published var playedSecond: Double = 0.0
     @Published var duration: Double = 0.0
 
+    var lastUpdatedSecond: Int = 0
+
     var isUpdatingOffset: Bool = false
 
     // Private notification observers.
@@ -104,9 +106,17 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             let offset =
                 (notification.userInfo?[SampleBufferPlayer.currentOffsetKey] as? NSValue)?
                 .timeValue.seconds
+            // Avoid updating the offset if it is being changed by the user.
             if !isUpdatingOffset {
-                // Avoid updating the offset if it is being changed by the user.
-                self.playedSecond = offset ?? 0.0
+                if let offset = offset {
+                    let newOffset = Int(offset)
+                    if newOffset != lastUpdatedSecond {
+                        lastUpdatedSecond = newOffset
+                        DispatchQueue.main.async {
+                            self.playedSecond = Double(self.lastUpdatedSecond)
+                        }
+                    }
+                }
             }
             updateCurrentPlaybackInfo()
         }
