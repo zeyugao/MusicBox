@@ -67,8 +67,51 @@ func loadItem(song: CloudMusicApi.Song) -> PlaylistItem {
     return newItem
 }
 
-struct PlayListView: View {
+struct TableContextMenu: View {
     @EnvironmentObject var playController: PlayController
+
+    var song: CloudMusicApi.Song
+
+    init(song: CloudMusicApi.Song) {
+        self.song = song
+    }
+
+    var body: some View {
+        Button("Play") {
+            let newItem = loadItem(song: song)
+            let _ = playController.addItemAndPlay(newItem)
+            playController.startPlaying()
+        }
+        Button("Add to Playlist") {
+            let newItem = loadItem(song: song)
+            let _ = playController.addItemToPlaylist(newItem)
+        }
+    }
+}
+
+struct PlayAllButton: View {
+    @EnvironmentObject var playController: PlayController
+
+    var songs: [CloudMusicApi.Song]
+
+    var body: some View {
+        Button(action: {
+            for song in songs {
+                let newItem = loadItem(song: song)
+                let _ = playController.addItemToPlaylist(newItem)
+            }
+            playController.startPlaying()
+        }) {
+            Image(systemName: "play.circle")
+                .resizable()
+                .frame(width: 16, height: 16)
+        }
+        .buttonStyle(BorderlessButtonStyle())
+        .help("Play All")
+    }
+}
+
+struct PlayListView: View {
     @StateObject var model = PlaylistDetailModel()
 
     @State private var selectedItem: CloudMusicApi.Song.ID?
@@ -128,34 +171,14 @@ struct PlayListView: View {
                 ForEach(songs) { song in
                     TableRow(song)
                         .contextMenu {
-                            Button("Play") {
-                                let newItem = loadItem(song: song)
-                                let _ = playController.addItemAndPlay(newItem)
-                                playController.startPlaying()
-                            }
-                            Button("Add to Playlist") {
-                                let newItem = loadItem(song: song)
-                                let _ = playController.addItemToPlaylist(newItem)
-                            }
+                            TableContextMenu(song: song)
                         }
                 }
             }
         }
         .navigationTitle(neteasePlaylist?.name ?? "Playlist")
         .toolbar {
-            Button(action: {
-                for song in model.songs ?? [] {
-                    let newItem = loadItem(song: song)
-                    let _ = playController.addItemToPlaylist(newItem)
-                }
-                playController.startPlaying()
-            }) {
-                Image(systemName: "play.fill")
-                    .resizable()
-                    .frame(width: 16, height: 16)
-            }
-            .buttonStyle(BorderlessButtonStyle())
-            .help("Play All")
+            PlayAllButton(songs: model.songs ?? [])
         }
         .onChange(of: neteasePlaylist) {
             if let id = neteasePlaylist?.id {
