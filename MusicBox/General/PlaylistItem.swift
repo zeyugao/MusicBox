@@ -90,8 +90,13 @@ class PlaylistItem: Identifiable {
     /// The duration of the audio file.
     let duration: CMTime
 
+    var artworkUrl: URL?
+
     /// Initializes a valid item.
-    init(id: String, url: URL?, title: String, artist: String, ext: String?, duration: CMTime) {
+    init(
+        id: String, url: URL?, title: String, artist: String, ext: String?, duration: CMTime,
+        artworkUrl: URL?
+    ) {
         self.id = id
         self.url = url
         self.title = title
@@ -99,6 +104,7 @@ class PlaylistItem: Identifiable {
         self.ext = ext
         self.duration = duration
         self.error = nil
+        self.artworkUrl = artworkUrl
     }
 
     func isUrlReady() -> Bool {
@@ -110,11 +116,34 @@ class PlaylistItem: Identifiable {
 
     func getUrl() -> URL? {
         return runBlocking {
-            return await getUrlForPlayer()
+            async let fileUrl = getUrlAsync()
+            async let artworkUrl = getArtworkAsync()
+            let (file, _) = (await fileUrl, await artworkUrl)
+
+            return file
         }
     }
 
-    private func downloadFile(url: URL) async -> URL? {
+    func getArtwork() -> URL? {
+        return runBlocking {
+            return await getArtworkAsync()
+        }
+    }
+
+    func getArtworkAsync() async -> URL? {
+        if let artworkUrl = self.artworkUrl {
+            if isLocalURL(artworkUrl) {
+                return artworkUrl
+            } else {
+                let localPath = await downloadFile(
+                    url: artworkUrl, ext: artworkUrl.pathExtension)
+                return localPath
+            }
+        }
+        return nil
+    }
+
+    private func downloadFile(url: URL, ext: String) async -> URL? {
         let fileManager = FileManager.default
         guard
             let musicFolder = fileManager.urls(
@@ -134,10 +163,6 @@ class PlaylistItem: Identifiable {
                 print("Failed to create directory: \(error)")
                 return nil
             }
-        }
-
-        guard let ext = self.ext else {
-            return nil
         }
 
         // Define the local file path
@@ -161,21 +186,23 @@ class PlaylistItem: Identifiable {
         return localFileUrl
     }
 
-    func getUrlForPlayer() async -> URL? {
+    func getUrlAsync() async -> URL? {
         if let url = self.url {
             if isLocalURL(url) {
                 return self.url
             } else {
-                self.url = await downloadFile(url: url)
-                return self.url
+                if let ext = self.ext {
+                    self.url = await downloadFile(url: url, ext: ext)
+                    return self.url
+                }
             }
         } else {
             if let id = UInt64(self.id) {
                 if let songData = await CloudMusicApi.song_url_v1(id: [id]) {
                     let songData = songData[0]
                     self.ext = songData.type
-                    if let url = URL(string: songData.url.https) {
-                        self.url = await downloadFile(url: url)
+                    if let url = URL(string: songData.url.https), let ext = self.ext {
+                        self.url = await downloadFile(url: url, ext: ext)
                         return self.url
                     }
                 }

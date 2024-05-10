@@ -29,7 +29,7 @@ func loadAsset(url: URL) async -> PlaylistItem? {
         let newItem = PlaylistItem(
             id: url.absoluteString,
             url: url, title: title, artist: artist, ext: url.pathExtension,
-            duration: duration)
+            duration: duration, artworkUrl: nil)
         return newItem
     } catch {
         print("Error loading asset properties: \(error)")

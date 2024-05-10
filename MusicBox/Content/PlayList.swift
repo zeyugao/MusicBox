@@ -48,7 +48,8 @@ func loadItem(song: CloudMusicApi.Song, songData: CloudMusicApi.SongData) async 
         title: song.name,
         artist: song.ar.map(\.name).joined(separator: ", "),
         ext: songData.type,
-        duration: CMTime(value: songData.time, timescale: 1000)
+        duration: CMTime(value: songData.time, timescale: 1000),
+        artworkUrl: URL(string: song.al.picUrl.https)
     )
     return newItem
 }
@@ -60,7 +61,8 @@ func loadItem(song: CloudMusicApi.Song) -> PlaylistItem {
         title: song.name,
         artist: song.ar.map(\.name).joined(separator: ", "),
         ext: nil,
-        duration: CMTime(value: song.dt, timescale: 1000)
+        duration: CMTime(value: song.dt, timescale: 1000),
+        artworkUrl: URL(string: song.al.picUrl.https)
     )
     return newItem
 }

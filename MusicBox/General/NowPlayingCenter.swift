@@ -5,6 +5,7 @@ Abstract:
 Class `NowPlaying` interacts with MPNowPlayingInfoCenter.
 */
 
+import AppKit
 import MediaPlayer
 
 class NowPlayingCenter {
@@ -26,6 +27,16 @@ class NowPlayingCenter {
             nowPlayingInfo[MPNowPlayingInfoPropertyIsLiveStream] = false
             nowPlayingInfo[MPMediaItemPropertyTitle] = currentItem.title
             nowPlayingInfo[MPMediaItemPropertyArtist] = currentItem.artist
+
+            if let artworkUrl = currentItem.getArtwork(),
+                let imageData = try? Data(contentsOf: artworkUrl),
+                let image = NSImage(data: imageData)
+            {
+                let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in
+                    return image
+                }
+                nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
+            }
 
             nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackQueueIndex] = index
             nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackQueueCount] = count
