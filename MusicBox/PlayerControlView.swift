@@ -37,7 +37,6 @@ struct PlaySliderView: View {
     @EnvironmentObject var playController: PlayController
     @State private var isEditing: Bool = false
     @State private var targetValue: Double = 0.0
-    //    @State private var shouldSyncOffset: Bool = false
 
     var body: some View {
         Slider(

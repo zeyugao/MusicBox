@@ -35,13 +35,13 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         } else {
             stopPlaying()
         }
-        updateCurrentPlaybackInfo()
     }
 
     func stopPlaying() {
         sampleBufferPlayer.pause()
         isPlaying = false
         NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
+        updateCurrentPlaybackInfo()
     }
 
     func startPlaying() {
@@ -49,6 +49,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         sampleBufferPlayer.play()
         isPlaying = true
         NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
+        updateCurrentPlaybackInfo()
     }
 
     func performRemoteCommand(_ command: RemoteCommand) {
