@@ -93,7 +93,7 @@ class CloudMusicApi {
 
         let alia: [String]
 
-        let dt: UInt64  // 歌曲时长
+        let dt: Int64  // 歌曲时长
 
         let hr: Quality?  // Hi-Res质量文件信息
         let sq: Quality?  // 无损质量文件信息
@@ -105,7 +105,7 @@ class CloudMusicApi {
 
         let pc: CloudMusic?
 
-        func parseDuration() -> (minute: UInt64, second: UInt64) {
+        func parseDuration() -> (minute: Int64, second: Int64) {
             let second = dt / 1000
             let minute = second / 60
             return (minute, second % 60)
@@ -390,6 +390,29 @@ class CloudMusicApi {
             return parsed.songs
         }
         print("song_detail failed")
+        return nil
+    }
+
+    static func song_url_v1(id: [UInt64], level: String = "jymaster") async -> [SongData]? {
+        guard
+            let ret = try? await doRequest(
+                memberName: "song_url_v1",
+                data: [
+                    "id": id.map { String($0) }.joined(separator: ","),
+                    "level": level,
+                ])
+        else { return nil }
+
+        struct Result: Decodable {
+            let code: Int
+            let data: [SongData]
+        }
+
+        if let parsed = ret.asType(Result.self) {
+            return parsed.data
+        }
+        print(ret.asAny() ?? "")
+        print("song_url_v1 failed")
         return nil
     }
 

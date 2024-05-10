@@ -106,14 +106,21 @@ struct PlayerControlView: View {
                     }
                     .buttonStyle(PlayControlButtonStyle())
 
-                    Button(action: {
-                        playController.togglePlayPause()
-                    }) {
-                        Image(systemName: playController.isPlaying ? "pause.fill" : "play.fill")
-                            .resizable()
+                    if playController.isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
                             .frame(width: 20, height: 20)
+                    } else {
+                        Button(action: {
+                            playController.togglePlayPause()
+                        }) {
+                            Image(systemName: playController.isPlaying ? "pause.fill" : "play.fill")
+                                .resizable()
+                                .frame(width: 20, height: 20)
+                        }
+                        .buttonStyle(PlayControlButtonStyle())
+                        .frame(width: 20, height: 20)
                     }
-                    .buttonStyle(PlayControlButtonStyle())
 
                     Button(action: {
                         playController.nextTrack()

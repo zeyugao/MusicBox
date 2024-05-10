@@ -39,6 +39,7 @@ class SampleBufferPlayer {
     static let currentOffsetDidChange = Notification.Name("SampleBufferPlayerCurrentOffsetDidChange")
     
     static let currentOffsetKey = "SampleBufferPlayerCurrentOffsetKey"
+    static let isLoadingKey = "SampleBufferPlayerisLoadingKey"
     
     static let currentItemDidChange = Notification.Name("SampleBufferPlayerCurrentItemDidChange")
     static let playbackRateDidChange = Notification.Name("SampleBufferPlayerPlaybackRateDidChange")
@@ -87,8 +88,12 @@ class SampleBufferPlayer {
         
         playbackRateObserver = notificationCenter.addObserver(forName: SampleBufferSerializer.playbackRateDidChange,
                                                               object: playbackSerializer,
-                                                              queue: .main) { [unowned self] _ in
-            notificationCenter.post(name: SampleBufferPlayer.playbackRateDidChange, object: self)
+                                                              queue: .main) { [unowned self] notification in
+            var userInfo = [:]
+            if let isLoading = notification.userInfo? [SampleBufferSerializer.isLoadingKey] as? Bool {
+                userInfo[SampleBufferPlayer.isLoadingKey] = isLoading
+            }
+            notificationCenter.post(name: SampleBufferPlayer.playbackRateDidChange, object: self, userInfo: userInfo)
         }
 
         playbackRateObserver = notificationCenter.addObserver(forName: SampleBufferSerializer.playbackOffsetDidUpdated,

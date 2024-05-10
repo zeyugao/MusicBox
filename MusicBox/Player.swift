@@ -20,6 +20,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     @Published var isShuffling = false
 
+    @Published var isLoading = false
+
     var lastUpdatedSecond: Int = 0
 
     var isUpdatingOffset: Bool = false
@@ -199,11 +201,14 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             forName: SampleBufferPlayer.playbackRateDidChange,
             object: sampleBufferPlayer,
             queue: .main
-        ) { [unowned self] _ in
-            isUpdatingOffset = false
+        ) { [unowned self] notification in
             self.isPlaying = sampleBufferPlayer.isPlaying
-
             updateCurrentPlaybackInfo()
+            isUpdatingOffset = false
+
+            if let isLoading = notification.userInfo?[SampleBufferPlayer.isLoadingKey] as? Bool {
+                self.isLoading = isLoading
+            }
         }
 
         playbackOffsetChangeObserver = notificationCenter.addObserver(

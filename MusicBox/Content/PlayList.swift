@@ -53,6 +53,18 @@ func loadItem(song: CloudMusicApi.Song, songData: CloudMusicApi.SongData) async 
     return newItem
 }
 
+func loadItem(song: CloudMusicApi.Song) -> PlaylistItem {
+    let newItem = PlaylistItem(
+        id: String(song.id),
+        url: nil,
+        title: song.name,
+        artist: song.ar.map(\.name).joined(separator: ", "),
+        ext: nil,
+        duration: CMTime(value: song.dt, timescale: 1000)
+    )
+    return newItem
+}
+
 struct PlayListView: View {
     @EnvironmentObject var playController: PlayController
     @StateObject var model = PlaylistDetailModel()
@@ -84,23 +96,15 @@ struct PlayListView: View {
                         .contextMenu {
                             Button("Play") {
                                 Task {
-                                    if let songData = await CloudMusicApi.song_download_url(
-                                        id: song.id),
-                                        let newItem = await loadItem(song: song, songData: songData)
-                                    {
-                                        let _ = playController.addItemAndPlay(newItem)
-                                        playController.startPlaying()
-                                    }
+                                    let newItem = loadItem(song: song)
+                                    let _ = playController.addItemAndPlay(newItem)
+                                    playController.startPlaying()
                                 }
                             }
                             Button("Add to Playlist") {
                                 Task {
-                                    if let songData = await CloudMusicApi.song_download_url(
-                                        id: song.id),
-                                        let newItem = await loadItem(song: song, songData: songData)
-                                    {
-                                        let _ = playController.addItemToPlaylist(newItem)
-                                    }
+                                    let newItem = loadItem(song: song)
+                                    let _ = playController.addItemToPlaylist(newItem)
                                 }
                             }
                         }
@@ -108,6 +112,17 @@ struct PlayListView: View {
             }
         }
         .navigationTitle(neteasePlaylist?.name ?? "Playlist")
+        .toolbar {
+            Button(action: {
+
+            }) {
+                Image(systemName: "play.fill")
+                    .resizable()
+                    .frame(width: 16, height: 16)
+            }
+            .buttonStyle(BorderlessButtonStyle())
+            .help("Play All")
+        }
         .onChange(of: neteasePlaylist) {
             if let id = neteasePlaylist?.id {
                 model.songs = nil

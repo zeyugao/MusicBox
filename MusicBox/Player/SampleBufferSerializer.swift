@@ -37,6 +37,7 @@ class SampleBufferSerializer {
     
     // Notifications for playback events.
     static let currentOffsetKey = "SampleBufferSerializerCurrentOffsetKey"
+    static let isLoadingKey = "SampleBufferSerializerisLoadingKey"
 
     static let currentOffsetDidChange = Notification.Name("SampleBufferSerializerCurrentOffsetDidChange")
     static let currentItemDidChange = Notification.Name("SampleBufferSerializerCurrentItemDidChange")
@@ -332,6 +333,16 @@ class SampleBufferSerializer {
         printLog(component: .enqueuer, message: "providing more data for item #\(enqueuingIndex), ID: \(currentItem.logID)")
 
         while audioRenderer.isReadyForMoreMediaData {
+            let playlistItem = currentItem.playlistItem
+            if !playlistItem.isUrlReady() {
+                let rate = renderSynchronizer.rate
+                renderSynchronizer.rate = 0
+                NotificationCenter.default.post(name: SampleBufferSerializer.playbackRateDidChange, object: self, userInfo: [SampleBufferSerializer.isLoadingKey: true])
+                guard let _ = playlistItem.getUrl() else { return }
+                renderSynchronizer.rate = rate
+                NotificationCenter.default.post(name: SampleBufferSerializer.playbackRateDidChange, object: self, userInfo: [SampleBufferSerializer.isLoadingKey: false])
+            }
+            
             //serializationQueue.suspend()
             // Use the current sample buffer item until it runs out of media data.
             if let sampleBuffer = currentItem.nextSampleBuffer() {
@@ -460,7 +471,6 @@ class SampleBufferSerializer {
     func resumeQueue() {
         
         serializationQueue.async {
-            guard let _ = self.currentItem?.playlistItem.getUrl() else { return }
             self.resumePlayback()
         }
     }
