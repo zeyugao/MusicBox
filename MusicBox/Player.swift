@@ -10,6 +10,12 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum LoopMode {
+    case once
+    case shuffle
+    case sequence
+}
+
 class PlayController: ObservableObject, RemoteCommandHandler {
     let sampleBufferPlayer = SampleBufferPlayer()
 
@@ -18,7 +24,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     @Published var playedSecond: Double = 0.0
     @Published var duration: Double = 0.0
 
-    @Published var isShuffling = false
+    @Published var loopMode: LoopMode = .sequence
 
     @Published var isLoading = false
 
@@ -49,6 +55,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     func startPlaying() {
+        guard sampleBufferPlayer.itemCount > 0 else { return }
         RemoteCommandCenter.handleRemoteCommands(using: self)
         sampleBufferPlayer.play()
         isPlaying = true
@@ -79,7 +86,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     func nextTrack() {
         let offset =
-            if isShuffling {
+            if loopMode == .shuffle {
                 Int.random(in: 0..<sampleBufferPlayer.itemCount)
             } else {
                 1
@@ -89,7 +96,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     func previousTrack() {
         let offset =
-            if isShuffling {
+            if loopMode == .shuffle {
                 Int.random(in: 0..<sampleBufferPlayer.itemCount)
             } else {
                 -1
@@ -186,14 +193,23 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             object: sampleBufferPlayer,
             queue: .main
         ) { [unowned self] _ in
-            if let currentItem = sampleBufferPlayer.currentItem,
-                let currentItemIndex = sampleBufferPlayer.currentItemIndex
-            {
+            NowPlayingCenter.handleItemChange(
+                item: sampleBufferPlayer.currentItem,
+                index: sampleBufferPlayer.currentItemIndex ?? 0,
+                count: sampleBufferPlayer.itemCount)
+
+            if let currentItem = sampleBufferPlayer.currentItem {
                 let duration = currentItem.duration.seconds
                 self.duration = duration
-
-                NowPlayingCenter.handleItemChange(
-                    item: currentItem, index: currentItemIndex, count: sampleBufferPlayer.itemCount)
+            } else {
+                switch loopMode {
+                case .once:
+                    self.stopPlaying()
+                case .sequence:
+                    self.startPlaying()
+                case .shuffle:
+                    self.nextTrack()
+                }
             }
         }
 
