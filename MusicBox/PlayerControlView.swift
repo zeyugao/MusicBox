@@ -83,116 +83,148 @@ struct PlayerControlView: View {
     }
 
     var body: some View {
-        HStack(spacing: 16) {
-            HStack(spacing: 32) {
-                Button(action: {
-                    playController.isShuffling.toggle()
-                }) {
-                    Image(systemName: "shuffle")
-                        .resizable()
-                        .foregroundColor(playController.isShuffling ? .blue : .black)
-                        .frame(width: 16, height: 16)
-                }
-                .buttonStyle(BorderlessButtonStyle())
-                .foregroundColor(.primary)
-
-                HStack(spacing: 24) {
-                    Button(action: {
-                        playController.previousTrack()
-                    }) {
-                        Image(systemName: "backward.fill")
+        GeometryReader { geometry in
+            let height = geometry.size.height
+            HStack(spacing: 16) {
+                if let currentItem = playController.sampleBufferPlayer.currentItem,
+                    let url = currentItem.getArtwork()
+                {
+                    AsyncImage(url: url) { image in
+                        image.resizable()
+                    } placeholder: {
+                        Image(systemName: "music.note")
                             .resizable()
-                            .frame(width: 16, height: 16)
+                            .scaledToFit()
+                            .frame(width: 30, height: 30)
+                            .padding()
+                            .frame(width: height, height: height)
+                            .background(Color.gray.opacity(0.2))
                     }
-                    .buttonStyle(PlayControlButtonStyle())
+                    .scaledToFit()
+                } else {
+                    Image(systemName: "music.note")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 30, height: 30)
+                        .padding()
+                        .frame(width: height, height: height)
+                        .background(Color.gray.opacity(0.2))
+                }
 
-                    if playController.isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .frame(width: 20, height: 20)
-                    } else {
+                HStack(spacing: 32) {
+
+                    HStack(spacing: 24) {
                         Button(action: {
-                            playController.togglePlayPause()
+                            playController.previousTrack()
                         }) {
-                            Image(systemName: playController.isPlaying ? "pause.fill" : "play.fill")
+                            Image(systemName: "backward.fill")
                                 .resizable()
-                                .frame(width: 20, height: 20)
+                                .frame(width: 16, height: 16)
                         }
                         .buttonStyle(PlayControlButtonStyle())
-                        .frame(width: 20, height: 20)
-                    }
 
-                    Button(action: {
-                        playController.nextTrack()
-                    }) {
-                        Image(systemName: "forward.fill")
-                            .resizable()
-                            .frame(width: 16, height: 16)
+                        if playController.isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .frame(width: 20, height: 20)
+                        } else {
+                            Button(action: {
+                                playController.togglePlayPause()
+                            }) {
+                                Image(
+                                    systemName: playController.isPlaying
+                                        ? "pause.fill" : "play.fill"
+                                )
+                                .resizable()
+                                .frame(width: 20, height: 20)
+                            }
+                            .buttonStyle(PlayControlButtonStyle())
+                            .frame(width: 20, height: 20)
+                        }
+
+                        Button(action: {
+                            playController.nextTrack()
+                        }) {
+                            Image(systemName: "forward.fill")
+                                .resizable()
+                                .frame(width: 16, height: 16)
+                        }
+                        .buttonStyle(PlayControlButtonStyle())
                     }
-                    .buttonStyle(PlayControlButtonStyle())
                 }
+                .padding(.leading, 16)
 
-                // Button(action: {}) {
-                //     Image(systemName: "repeat")
-                //         .resizable()
-                //         .frame(width: 16, height: 16)
-                // }
-                // .buttonStyle(BorderlessButtonStyle())
-                // .foregroundColor(.primary)
-            }
-            .padding(.leading, 16)
+                Spacer()
 
-            Spacer()
-
-            VStack {
-                Text("\(playController.sampleBufferPlayer.currentItem?.title ?? "Title")")
-                    .font(.system(size: 12))
-                    .lineLimit(1)
-                    .padding(.bottom, 2)
-                Text("\(playController.sampleBufferPlayer.currentItem?.artist ?? "Artists")")
-                    .font(.system(size: 12))
-                    .lineLimit(1)
-                    .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
-                HStack {
-                    Text(secondsToMinutesAndSeconds(seconds: playController.playedSecond))
+                VStack {
+                    Text("\(playController.sampleBufferPlayer.currentItem?.title ?? "Title")")
+                        .font(.system(size: 12))
+                        .lineLimit(1)
+                        .padding(.bottom, 1)
+                    Text("\(playController.sampleBufferPlayer.currentItem?.artist ?? "Artists")")
                         .font(.system(size: 12))
                         .lineLimit(1)
                         .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
-                        .frame(width: 40)
+                        .padding(.bottom, -2)
+                    HStack {
+                        Text(secondsToMinutesAndSeconds(seconds: playController.playedSecond))
+                            .font(.system(size: 12))
+                            .lineLimit(1)
+                            .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
+                            .frame(width: 40)
 
-                    PlaySliderView()
-                        .environmentObject(playController)
+                        PlaySliderView()
+                            .environmentObject(playController)
 
-                    Text(secondsToMinutesAndSeconds(seconds: playController.duration))
-                        .font(.system(size: 12))
-                        .lineLimit(1)
-                        .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
-                        .frame(width: 40)
-                }
-            }
-            .layoutPriority(1)
-            .frame(minWidth: 300)
-
-            Spacer()
-
-            HStack(spacing: 32) {
-                HStack {
-                    Slider(
-                        value: .constant(0.5)
-                    ) {
-                    } minimumValueLabel: {
-                        Image(systemName: "speaker.fill")
-                    } maximumValueLabel: {
-                        Image(systemName: "speaker.3.fill")
+                        Text(secondsToMinutesAndSeconds(seconds: playController.duration))
+                            .font(.system(size: 12))
+                            .lineLimit(1)
+                            .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
+                            .frame(width: 40)
                     }
-                    .frame(width: 100)
-                    .controlSize(.mini)
-                    .tint(Color(red: 0.678, green: 0.678, blue: 0.678))
                 }
-            }
+                .layoutPriority(1)
+                .frame(minWidth: 300)
+                // .padding(.vertical, 16)
 
+                Spacer()
+
+                Button(action: {
+                    playController.loopMode =
+                        playController.loopMode == .once
+                        ? .sequence : (playController.loopMode == .sequence ? .shuffle : .once)
+                }) {
+                    Image(
+                        systemName: playController.loopMode == .once
+                            ? "repeat.1"
+                            : (playController.loopMode == .sequence ? "repeat" : "shuffle")
+                    )
+                    .resizable()
+                    .frame(width: 16, height: 16)
+                }
+                .buttonStyle(PlayControlButtonStyle())
+                .foregroundColor(.primary)
+                .padding(.trailing, 16)
+
+                HStack(spacing: 32) {
+                    HStack {
+                        Slider(
+                            value: .constant(0.5)
+                        ) {
+                        } minimumValueLabel: {
+                            Image(systemName: "speaker.fill")
+                        } maximumValueLabel: {
+                            Image(systemName: "speaker.3.fill")
+                        }
+                        .frame(width: 100)
+                        .controlSize(.mini)
+                        .tint(Color(red: 0.678, green: 0.678, blue: 0.678))
+                    }
+                }
+                .padding(.trailing, 32)
+
+            }
         }
-        .padding()
     }
 }
 
