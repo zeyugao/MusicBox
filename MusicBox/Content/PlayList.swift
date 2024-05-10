@@ -80,7 +80,39 @@ struct PlayListView: View {
 
     var body: some View {
         Table(of: CloudMusicApi.Song.self, selection: $selectedItem, sortOrder: $sortOrder) {
-            TableColumn("Name", value: \.name)
+            TableColumn("Name") { song in
+                HStack {
+                    Text(song.name)
+
+                    if let _ = song.pc {
+                        Spacer()
+                        Image(systemName: "cloud")
+                            .resizable()
+                            .frame(width: 18, height: 12)
+                            .help("Cloud")
+                    } else {
+                        if song.fee == .vip
+                            || song.fee == .album
+                        {
+                            Spacer()
+                            Image(systemName: "dollarsign.circle")
+                                .resizable()
+                                .frame(width: 16, height: 16)
+                                .help("Need buy")
+                                .padding(.horizontal, 1)
+                                .frame(width: 18, height: 16)
+                        } else if song.fee == .trial {
+                            Spacer()
+                            Image(systemName: "gift")
+                                .resizable()
+                                .frame(width: 16, height: 16)
+                                .help("Trial")
+                                .padding(.horizontal, 1)
+                                .frame(width: 18, height: 16)
+                        }
+                    }
+                }
+            }
             TableColumn("Artist") { song in
                 Text(song.ar.map(\.name).joined(separator: ", "))
             }
@@ -95,17 +127,13 @@ struct PlayListView: View {
                     TableRow(song)
                         .contextMenu {
                             Button("Play") {
-                                Task {
-                                    let newItem = loadItem(song: song)
-                                    let _ = playController.addItemAndPlay(newItem)
-                                    playController.startPlaying()
-                                }
+                                let newItem = loadItem(song: song)
+                                let _ = playController.addItemAndPlay(newItem)
+                                playController.startPlaying()
                             }
                             Button("Add to Playlist") {
-                                Task {
-                                    let newItem = loadItem(song: song)
-                                    let _ = playController.addItemToPlaylist(newItem)
-                                }
+                                let newItem = loadItem(song: song)
+                                let _ = playController.addItemToPlaylist(newItem)
                             }
                         }
                 }
@@ -114,7 +142,11 @@ struct PlayListView: View {
         .navigationTitle(neteasePlaylist?.name ?? "Playlist")
         .toolbar {
             Button(action: {
-
+                for song in model.songs ?? [] {
+                    let newItem = loadItem(song: song)
+                    let _ = playController.addItemToPlaylist(newItem)
+                }
+                playController.startPlaying()
             }) {
                 Image(systemName: "play.fill")
                     .resizable()

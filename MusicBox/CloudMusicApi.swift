@@ -84,6 +84,19 @@ class CloudMusicApi {
         let uid: UInt64
     }
 
+    enum Fee: Int, Decodable {
+        case free = 0  // 免费或无版权
+        case vip = 1  // VIP 歌曲
+        case album = 4  // 购买专辑
+        case trial = 8  // 非会员可免费播放低音质，会员可播放高音质及下载
+    }
+
+    enum OriginCoverType: Int, Decodable {
+        case unknown = 0
+        case origin = 1
+        case cover = 2
+    }
+
     struct Song: Decodable, Identifiable {
         let name: String
         let id: UInt64
@@ -92,6 +105,11 @@ class CloudMusicApi {
         let ar: [Artist]
 
         let alia: [String]
+
+        let fee: Fee
+        let originCoverType: OriginCoverType
+
+        let mv: UInt64  // MV id
 
         let dt: Int64  // 歌曲时长
 
