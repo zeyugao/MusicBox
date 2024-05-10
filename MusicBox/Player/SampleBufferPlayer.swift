@@ -211,7 +211,7 @@ class SampleBufferPlayer {
     }
     
     /// Inserts a single item into the playlist.
-    func insertItem(_ newItem: PlaylistItem, at index: Int) {
+    func insertItem(_ newItem: PlaylistItem, at index: Int, continuePlaying: Bool = true) {
         
         playbackSerializer.printLog(component: .player, message: "inserting item at playlist#\(index)")
         atomicitySemaphore.wait()
@@ -224,8 +224,10 @@ class SampleBufferPlayer {
             playlist.currentIndex = currentIndex + 1
         }
 
-        // Let the current item continue playing.
-        continueWithCurrentItems()
+        if continuePlaying {
+            // Let the current item continue playing.
+            continueWithCurrentItems()
+        }
     }
     
     /// Moves a single item within the playlist.

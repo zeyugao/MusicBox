@@ -88,8 +88,18 @@ struct PlayListView: View {
                                         id: song.id),
                                         let newItem = await loadItem(song: song, songData: songData)
                                     {
-                                        playController.sampleBufferPlayer.insertItem(newItem, at: 0)
-                                        playController.togglePlayPause()
+                                        let _ = playController.addItemAndPlay(newItem)
+                                        playController.startPlaying()
+                                    }
+                                }
+                            }
+                            Button("Add to Playlist") {
+                                Task {
+                                    if let songData = await CloudMusicApi.song_download_url(
+                                        id: song.id),
+                                        let newItem = await loadItem(song: song, songData: songData)
+                                    {
+                                        let _ = playController.addItemToPlaylist(newItem)
                                     }
                                 }
                             }
@@ -108,9 +118,6 @@ struct PlayListView: View {
                     await model.updatePlaylistDetail(id: id)
                 }
             }
-        }
-        .onChange(of: selectedItem) { _, id in
-            print(id)
         }
         .onChange(of: sortOrder) { _, sortOrder in
             print(sortOrder)

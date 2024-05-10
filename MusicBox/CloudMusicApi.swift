@@ -404,7 +404,6 @@ class CloudMusicApi {
         else { return nil }
 
         struct Result: Decodable {
-            //            let data: [String: String]
             let code: Int
             let data: SongData
         }
@@ -412,7 +411,7 @@ class CloudMusicApi {
         if let parsed = ret.asType(Result.self) {
             return parsed.data
         }
-        print(ret.asAny())
+        print(ret.asAny() ?? "")
         print("song_download_url failed")
         return nil
     }

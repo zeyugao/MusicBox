@@ -50,7 +50,7 @@ struct PlayerView: View {
         let result = await openPanel.begin()
         if result == .OK, let url = openPanel.url {
             if let newItem = await loadAsset(url: url) {
-                playController.sampleBufferPlayer.insertItem(newItem, at: 0)
+                playController.addItemAndPlay(newItem)
                 playController.startPlaying()
             }
         }

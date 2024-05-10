@@ -85,28 +85,27 @@ struct PlayerControlView: View {
     var body: some View {
         HStack(spacing: 16) {
             HStack(spacing: 32) {
-                Button(action: {}) {
+                Button(action: {
+                    playController.isShuffling.toggle()
+                }) {
                     Image(systemName: "shuffle")
                         .resizable()
+                        .foregroundColor(playController.isShuffling ? .blue : .black)
                         .frame(width: 16, height: 16)
                 }
                 .buttonStyle(BorderlessButtonStyle())
                 .foregroundColor(.primary)
 
                 HStack(spacing: 24) {
-                    Button(action: {}) {
+                    Button(action: {
+                        playController.previousTrack()
+                    }) {
                         Image(systemName: "backward.fill")
                             .resizable()
                             .frame(width: 16, height: 16)
                     }
                     .buttonStyle(PlayControlButtonStyle())
 
-                    //   Button(action: {}) {
-                    //     Image(systemName: "play.fill")
-                    //       .resizable()
-                    //       .frame(width: 20, height: 20)
-                    //   }
-                    //   .buttonStyle(PlayControlButtonStyle())
                     Button(action: {
                         playController.togglePlayPause()
                     }) {
@@ -116,7 +115,9 @@ struct PlayerControlView: View {
                     }
                     .buttonStyle(PlayControlButtonStyle())
 
-                    Button(action: {}) {
+                    Button(action: {
+                        playController.nextTrack()
+                    }) {
                         Image(systemName: "forward.fill")
                             .resizable()
                             .frame(width: 16, height: 16)
@@ -124,13 +125,13 @@ struct PlayerControlView: View {
                     .buttonStyle(PlayControlButtonStyle())
                 }
 
-                Button(action: {}) {
-                    Image(systemName: "repeat")
-                        .resizable()
-                        .frame(width: 16, height: 16)
-                }
-                .buttonStyle(BorderlessButtonStyle())
-                .foregroundColor(.primary)
+                // Button(action: {}) {
+                //     Image(systemName: "repeat")
+                //         .resizable()
+                //         .frame(width: 16, height: 16)
+                // }
+                // .buttonStyle(BorderlessButtonStyle())
+                // .foregroundColor(.primary)
             }
             .padding(.leading, 16)
 

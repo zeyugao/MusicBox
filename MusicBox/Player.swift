@@ -18,6 +18,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     @Published var playedSecond: Double = 0.0
     @Published var duration: Double = 0.0
 
+    @Published var isShuffling = false
+
     var lastUpdatedSecond: Int = 0
 
     var isUpdatingOffset: Bool = false
@@ -59,10 +61,10 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         case .pause:
             stopPlaying()
         case .nextTrack:
-            //    nextTrack()
+            nextTrack()
             break
         case .previousTrack:
-            // previousTrack()
+            previousTrack()
             break
         case .skipForward(let distance):
             seekByOffset(offset: distance)
@@ -70,6 +72,35 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             seekByOffset(offset: -distance)
         case .changePlaybackPosition(let offset):
             seekToOffset(offset: offset)
+        }
+    }
+
+    func nextTrack() {
+        let offset =
+            if isShuffling {
+                Int.random(in: 0..<sampleBufferPlayer.itemCount)
+            } else {
+                1
+            }
+        seekItemByOffset(offset: offset)
+    }
+
+    func previousTrack() {
+        let offset =
+            if isShuffling {
+                Int.random(in: 0..<sampleBufferPlayer.itemCount)
+            } else {
+                -1
+            }
+        seekItemByOffset(offset: offset)
+    }
+
+    func seekItemByOffset(offset: Int) {
+        if let currentItemIndex = sampleBufferPlayer.currentItemIndex {
+            let totalCnt = sampleBufferPlayer.itemCount
+            let offset = (offset + totalCnt) % totalCnt
+            let newItemIndex = ((currentItemIndex + offset) + totalCnt) % totalCnt
+            sampleBufferPlayer.seekToItem(at: newItemIndex)
         }
     }
 
@@ -87,6 +118,32 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         let offset = CMTime(seconds: newPlayedSecond, preferredTimescale: 10)
         sampleBufferPlayer.seekToOffset(offset)
         updateCurrentPlaybackInfo()
+    }
+
+    private func findIdIndex(_ id: String) -> Int {
+        let items = sampleBufferPlayer.items
+        for (index, item) in items.enumerated() {
+            if item.id == id {
+                return index
+            }
+        }
+        return -1
+    }
+
+    func addItemToPlaylist(_ item: PlaylistItem, continuePlaying: Bool = true) -> Int {
+        var idIdx = findIdIndex(item.id)
+        if idIdx == -1 {
+            let totalCnt = sampleBufferPlayer.itemCount
+            sampleBufferPlayer.insertItem(item, at: totalCnt, continuePlaying: continuePlaying)
+            idIdx = totalCnt
+        }
+        return idIdx
+    }
+
+    func addItemAndPlay(_ item: PlaylistItem) -> Int {
+        let idIdx = addItemToPlaylist(item, continuePlaying: false)
+        sampleBufferPlayer.seekToItem(at: idIdx)
+        return idIdx
     }
 
     private func updateCurrentPlaybackInfo() {
