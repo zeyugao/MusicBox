@@ -51,6 +51,7 @@ struct PlayerView: View {
         if result == .OK, let url = openPanel.url {
             if let newItem = await loadAsset(url: url) {
                 playController.sampleBufferPlayer.insertItem(newItem, at: 0)
+                playController.startPlaying()
             }
         }
     }

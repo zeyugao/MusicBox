@@ -14,15 +14,13 @@ private final class RunBlocking<T, Failure: Error> {
 
 extension RunBlocking where Failure == Never {
     func runBlocking(_ operation: @Sendable @escaping () async -> T) -> T {
+        let semaphore = DispatchSemaphore(value: 0)
         Task {
             let task = Task(operation: operation)
             self.value = await task.result
+            semaphore.signal()
         }
-        DispatchQueue.global().sync {
-            while value == nil {
-                RunLoop.current.run(mode: .default, before: .distantFuture)
-            }
-        }
+        semaphore.wait()
         switch value {
         case let .success(value):
             return value
@@ -34,15 +32,13 @@ extension RunBlocking where Failure == Never {
 
 extension RunBlocking where Failure == Error {
     func runBlocking(_ operation: @Sendable @escaping () async throws -> T) throws -> T {
+        let semaphore = DispatchSemaphore(value: 0)
         Task {
             let task = Task(operation: operation)
             value = await task.result
+            semaphore.signal()
         }
-        DispatchQueue.global().sync {
-            while value == nil {
-                RunLoop.current.run(mode: .default, before: .distantFuture)
-            }
-        }
+        semaphore.wait()
         switch value {
         case let .success(value):
             return value
@@ -105,15 +101,14 @@ struct PlaylistItem: Identifiable {
     }
 
     func getUrl() -> URL? {
-        let result = runBlocking {
+        return runBlocking {
             return await getUrlForPlayer()
         }
-        return result
     }
 
     func getUrlForPlayer() async -> URL? {
         if isLocalURL(url) {
-            return url
+            return self.url
         } else {
             let fileManager = FileManager.default
             guard
