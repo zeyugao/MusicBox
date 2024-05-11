@@ -195,10 +195,6 @@ struct PlayListView: View {
             }
         }
         .onChange(of: sortOrder) { prevSortOrder, sortOrder in
-            if sortOrder.count > 1 {
-                self.sortOrder.removeLast()
-            }
-
             if prevSortOrder.count >= 1, self.sortOrder.count >= 1,
                 prevSortOrder[0].keyPath == self.sortOrder[0].keyPath,
                 self.sortOrder[0].order == .forward
@@ -245,6 +241,6 @@ struct PlayListView: View {
         }
 
         isSorted = true
-        model.applySorting(by: sortOrder)
+        model.applySorting(by: [sortOrder[0]])
     }
 }
