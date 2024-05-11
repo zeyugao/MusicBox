@@ -13,6 +13,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 class PlaylistDetailModel: ObservableObject {
+    var originalSongs: [CloudMusicApi.Song]?
     @Published var songs: [CloudMusicApi.Song]?
     var curId: UInt64?
 
@@ -26,11 +27,13 @@ class PlaylistDetailModel: ObservableObject {
             }
 
             if trackIds.count == tracks.count {
+                self.originalSongs = tracks
                 DispatchQueue.main.async {
                     self.songs = tracks
                 }
             } else {
                 if let playlist = await CloudMusicApi.song_detail(ids: trackIds) {
+                    self.originalSongs = playlist
                     DispatchQueue.main.async {
                         self.songs = playlist
                     }
@@ -38,15 +41,25 @@ class PlaylistDetailModel: ObservableObject {
             }
         }
     }
+
+    func applySorting(by sortOrder: [KeyPathComparator<CloudMusicApi.Song>]) {
+        guard let originalSongs = originalSongs else { return }
+        songs = originalSongs.sorted(using: sortOrder)
+    }
+
+    func resetSorting() {
+        songs = originalSongs
+    }
 }
 
 func loadItem(song: CloudMusicApi.Song, songData: CloudMusicApi.SongData) async -> PlaylistItem? {
     guard let url = URL(string: songData.url.https) else { return nil }
     let newItem = PlaylistItem(
-        id: String(songData.id),
+        id: songData.id,
         url: url,
         title: song.name,
         artist: song.ar.map(\.name).joined(separator: ", "),
+        albumId: song.al.id,
         ext: songData.type,
         duration: CMTime(value: songData.time, timescale: 1000),
         artworkUrl: URL(string: song.al.picUrl.https)
@@ -56,10 +69,11 @@ func loadItem(song: CloudMusicApi.Song, songData: CloudMusicApi.SongData) async 
 
 func loadItem(song: CloudMusicApi.Song) -> PlaylistItem {
     let newItem = PlaylistItem(
-        id: String(song.id),
+        id: song.id,
         url: nil,
         title: song.name,
         artist: song.ar.map(\.name).joined(separator: ", "),
+        albumId: song.al.id,
         ext: nil,
         duration: CMTime(value: song.dt, timescale: 1000),
         artworkUrl: URL(string: song.al.picUrl.https)
@@ -115,17 +129,21 @@ struct PlayListView: View {
     @StateObject var model = PlaylistDetailModel()
 
     @State private var selectedItem: CloudMusicApi.Song.ID?
-    @State private var sortOrder = [KeyPathComparator(\CloudMusicApi.Song.name)]
-
+    @State private var sortOrder = [KeyPathComparator<CloudMusicApi.Song>]()
     @State private var loadingTask: Task<Void, Never>? = nil
+    @State private var isSorted = false
 
     var neteasePlaylist: CloudMusicApi.PlayListItem?
 
     let currencyStyle = Decimal.FormatStyle.Currency(code: "USD")
 
     var body: some View {
-        Table(of: CloudMusicApi.Song.self, selection: $selectedItem, sortOrder: $sortOrder) {
-            TableColumn("Name") { song in
+        Table(
+            of: CloudMusicApi.Song.self,
+            selection: $selectedItem,
+            sortOrder: $sortOrder
+        ) {
+            TableColumn("Tile", value: \.name) { song in
                 HStack {
                     Text(song.name)
 
@@ -158,11 +176,11 @@ struct PlayListView: View {
                     }
                 }
             }
-            TableColumn("Artist") { song in
+            TableColumn("Artist", value: \.ar[0].name) { song in
                 Text(song.ar.map(\.name).joined(separator: ", "))
             }
             TableColumn("Ablum", value: \.al.name)
-            TableColumn("Duration") { song in
+            TableColumn("Duration", value: \.dt) { song in
                 let ret = song.parseDuration()
                 Text(String(format: "%02d:%02d", ret.minute, ret.second))
             }.width(max: 60)
@@ -175,6 +193,23 @@ struct PlayListView: View {
                         }
                 }
             }
+        }
+        .onChange(of: sortOrder) { prevSortOrder, sortOrder in
+            print(".onChange(of: sortOrder)")
+            if sortOrder.count > 1 {
+                self.sortOrder.removeLast()
+            }
+
+            if prevSortOrder.count >= 1, self.sortOrder.count >= 1,
+                prevSortOrder[0].keyPath == self.sortOrder[0].keyPath,
+                self.sortOrder[0].order == .forward
+            {
+                self.sortOrder.removeAll()
+            }
+
+            print(self.sortOrder)
+
+            handleSortChange(sortOrder: self.sortOrder)
         }
         .navigationTitle(neteasePlaylist?.name ?? "Playlist")
         .toolbar {
@@ -191,10 +226,6 @@ struct PlayListView: View {
                 }
             }
         }
-        .onChange(of: sortOrder) { _, sortOrder in
-            print(sortOrder)
-            print(sortOrder.count)
-        }
         .onAppear {
             loadingTask?.cancel()
             loadingTask = Task {
@@ -207,5 +238,17 @@ struct PlayListView: View {
         .onDisappear {
             loadingTask?.cancel()
         }
+    }
+
+    private func handleSortChange(sortOrder: [KeyPathComparator<CloudMusicApi.Song>]) {
+        guard !sortOrder.isEmpty else {
+            print("Reset")
+            model.resetSorting()
+            isSorted = false
+            return
+        }
+
+        isSorted = true
+        model.applySorting(by: sortOrder)
     }
 }

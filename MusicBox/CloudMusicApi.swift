@@ -483,4 +483,20 @@ class CloudMusicApi {
         print("playlist_track_all failed")
         return nil
     }
+
+    static func scrobble(id: UInt64, sourceid: UInt64, time: Int64) async {
+        guard
+            let res = try? await doRequest(
+                memberName: "scrobble",
+                data: [
+                    "id": id,
+                    "sourceid": sourceid,
+                    "time": time,
+                ])
+        else {
+            print("scrobble failed")
+            return
+        }
+        print(res.asAny() ?? "scrobble")
+    }
 }

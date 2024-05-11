@@ -32,6 +32,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     var isUpdatingOffset: Bool = false
 
+    var scrobbled: Bool = false
+
     // Private notification observers.
     private var currentOffsetObserver: NSObjectProtocol!
     private var currentItemObserver: NSObjectProtocol!
@@ -129,7 +131,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         updateCurrentPlaybackInfo()
     }
 
-    private func findIdIndex(_ id: String) -> Int {
+    private func findIdIndex(_ id: UInt64) -> Int {
         let items = sampleBufferPlayer.items
         for (index, item) in items.enumerated() {
             if item.id == id {
@@ -155,7 +157,24 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         return idIdx
     }
 
+    private func doScrobble() {
+        if let currentItem = sampleBufferPlayer.currentItem {
+            if playedSecond / currentItem.duration.seconds > 0.75 {
+                if !scrobbled {
+                    Task {
+                        await CloudMusicApi.scrobble(
+                            id: currentItem.id, sourceid: currentItem.albumId,
+                            time: Int64(duration))
+                        scrobbled = true
+                    }
+                }
+            }
+        }
+    }
+
     private func updateCurrentPlaybackInfo() {
+        doScrobble()
+
         NowPlayingCenter.handlePlaybackChange(
             playing: sampleBufferPlayer.isPlaying, rate: sampleBufferPlayer.rate,
             position: self.playedSecond,
@@ -197,6 +216,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 item: sampleBufferPlayer.currentItem,
                 index: sampleBufferPlayer.currentItemIndex ?? 0,
                 count: sampleBufferPlayer.itemCount)
+
+            scrobbled = false
 
             if let currentItem = sampleBufferPlayer.currentItem {
                 let duration = currentItem.duration.seconds

@@ -27,8 +27,10 @@ func loadAsset(url: URL) async -> PlaylistItem? {
         let duration = try await asset.load(.duration)
 
         let newItem = PlaylistItem(
-            id: url.absoluteString,
-            url: url, title: title, artist: artist, ext: url.pathExtension,
+            id: 0,
+            url: url, title: title, artist: artist,
+            albumId: 0,
+            ext: url.pathExtension,
             duration: duration, artworkUrl: nil)
         return newItem
     } catch {

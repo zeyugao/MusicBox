@@ -70,7 +70,7 @@ func isRemoteURL(_ url: URL) -> Bool {
 }
 
 class PlaylistItem: Identifiable {
-    let id: String
+    let id: UInt64
 
     /// URL of the local file containing the track's audio.
     var url: URL?
@@ -90,11 +90,14 @@ class PlaylistItem: Identifiable {
     /// The duration of the audio file.
     let duration: CMTime
 
+    let albumId: UInt64
+
     var artworkUrl: URL?
 
     /// Initializes a valid item.
     init(
-        id: String, url: URL?, title: String, artist: String, ext: String?, duration: CMTime,
+        id: UInt64, url: URL?, title: String, artist: String, albumId: UInt64, ext: String?,
+        duration: CMTime,
         artworkUrl: URL?
     ) {
         self.id = id
@@ -102,6 +105,7 @@ class PlaylistItem: Identifiable {
         self.title = title
         self.artist = artist
         self.ext = ext
+        self.albumId = albumId
         self.duration = duration
         self.error = nil
         self.artworkUrl = artworkUrl
@@ -135,9 +139,9 @@ class PlaylistItem: Identifiable {
             if isLocalURL(artworkUrl) {
                 return artworkUrl
             } else {
-                let localPath = await downloadFile(
+                self.artworkUrl = await downloadFile(
                     url: artworkUrl, ext: artworkUrl.pathExtension)
-                return localPath
+                return self.artworkUrl
             }
         }
         return nil
@@ -197,14 +201,12 @@ class PlaylistItem: Identifiable {
                 }
             }
         } else {
-            if let id = UInt64(self.id) {
-                if let songData = await CloudMusicApi.song_url_v1(id: [id]) {
-                    let songData = songData[0]
-                    self.ext = songData.type
-                    if let url = URL(string: songData.url.https), let ext = self.ext {
-                        self.url = await downloadFile(url: url, ext: ext)
-                        return self.url
-                    }
+            if let songData = await CloudMusicApi.song_url_v1(id: [id]) {
+                let songData = songData[0]
+                self.ext = songData.type
+                if let url = URL(string: songData.url.https), let ext = self.ext {
+                    self.url = await downloadFile(url: url, ext: ext)
+                    return self.url
                 }
             }
         }

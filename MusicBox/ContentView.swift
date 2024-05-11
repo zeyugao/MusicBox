@@ -9,17 +9,6 @@ import Combine
 import Foundation
 import SwiftUI
 
-//class PlaylistItemTest: Identifiable {
-//    let id = UUID()
-//    let name: String
-//    var children: [PlaylistItemTest]?
-//
-//    init(name: String, children: [PlaylistItemTest]? = nil) {
-//        self.name = name
-//        self.children = children
-//    }
-//}
-
 class UserInfo: ObservableObject {
     @Published var profile: CloudMusicApi.Profile?
     @Published var playlists: [CloudMusicApi.PlayListItem] = []
@@ -45,7 +34,7 @@ struct ContentView: View {
                             ) {
                                 Label("Home", systemImage: "house.fill")
                             }.tag("Home")
-                            
+
                             NavigationLink(
                                 destination: PlayerView()
                                     .environmentObject(playController)
@@ -53,7 +42,7 @@ struct ContentView: View {
                             ) {
                                 Label("Player", systemImage: "dot.radiowaves.left.and.right")
                             }.tag("Player")
-                            
+
                             NavigationLink(
                                 destination: NowPlayingView()
                                     .environmentObject(playController)
