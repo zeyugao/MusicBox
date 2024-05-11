@@ -143,7 +143,7 @@ struct PlayListView: View {
             selection: $selectedItem,
             sortOrder: $sortOrder
         ) {
-            TableColumn("Tile", value: \.name) { song in
+            TableColumn("Title", value: \.name) { song in
                 HStack {
                     Text(song.name)
 
@@ -195,7 +195,6 @@ struct PlayListView: View {
             }
         }
         .onChange(of: sortOrder) { prevSortOrder, sortOrder in
-            print(".onChange(of: sortOrder)")
             if sortOrder.count > 1 {
                 self.sortOrder.removeLast()
             }
@@ -206,8 +205,6 @@ struct PlayListView: View {
             {
                 self.sortOrder.removeAll()
             }
-
-            print(self.sortOrder)
 
             handleSortChange(sortOrder: self.sortOrder)
         }
@@ -242,7 +239,6 @@ struct PlayListView: View {
 
     private func handleSortChange(sortOrder: [KeyPathComparator<CloudMusicApi.Song>]) {
         guard !sortOrder.isEmpty else {
-            print("Reset")
             model.resetSorting()
             isSorted = false
             return
