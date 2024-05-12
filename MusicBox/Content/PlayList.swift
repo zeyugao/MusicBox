@@ -142,10 +142,45 @@ struct PlayAllButton: View {
 struct PlayListView: View {
     @StateObject var model = PlaylistDetailModel()
 
+    @EnvironmentObject private var userInfo: UserInfo
+
     @State private var selectedItem: CloudMusicApi.Song.ID?
     @State private var sortOrder = [KeyPathComparator<CloudMusicApi.Song>]()
     @State private var loadingTask: Task<Void, Never>? = nil
     @State private var isSorted = false
+
+    func uploadCloud(songId: UInt64, url: URL) async {
+        if let metadata = await loadMetadata(url: url) {
+            if let privateSongId = await CloudMusicApi.cloud(
+                filePath: url,
+                songName: metadata.title,
+                artist: metadata.artist,
+                album: metadata.album
+            ) {
+                await CloudMusicApi.cloud_match(
+                    userId: userInfo.profile?.userId ?? 0,
+                    songId: privateSongId,
+                    adjustSongId: songId
+                )
+            }
+        }
+    }
+
+    func selectFile() async -> URL? {
+        let openPanel = NSOpenPanel()
+        openPanel.prompt = "Select Audio File"
+        openPanel.allowsMultipleSelection = false
+        openPanel.canChooseDirectories = false
+        openPanel.canChooseFiles = true
+        openPanel.allowedContentTypes = [UTType.mp3, UTType.audio]
+
+        let result = await openPanel.begin()
+
+        if result == .OK, let url = openPanel.url {
+            return url
+        }
+        return nil
+    }
 
     var neteasePlaylist: CloudMusicApi.PlayListItem?
 
@@ -209,6 +244,14 @@ struct PlayListView: View {
                     TableRow(song)
                         .contextMenu {
                             TableContextMenu(song: song)
+
+                            Button("Upload to Cloud") {
+                                Task {
+                                    if let url = await selectFile() {
+                                        await uploadCloud(songId: song.id, url: url)
+                                    }
+                                }
+                            }
                         }
                 }
             }

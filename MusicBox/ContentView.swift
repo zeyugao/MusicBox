@@ -70,31 +70,22 @@ struct ContentView: View {
                             ) {
                                 Label("Now Playing", systemImage: "dot.radiowaves.left.and.right")
                             }.tag("Now Playing")
+
+                            NavigationLink(
+                                destination: PlayerView()
+                                    .environmentObject(playController)
+                                    .navigationTitle("Debug")
+                            ) {
+                                Label("Debug", systemImage: "skew")
+                            }.tag("Debug")
                         }
-
-                        // Section(header: Text("Library")) {
-                        //     NavigationLink(destination: Text("Recently Added View")) {
-                        //         Label("Recently Added", systemImage: "clock.fill")
-                        //     }.tag("Recently Added")
-
-                        //     NavigationLink(destination: Text("Artists View")) {
-                        //         Label("Artists", systemImage: "music.mic")
-                        //     }.tag("Artists")
-
-                        //     NavigationLink(destination: Text("Albums View")) {
-                        //         Label("Albums", systemImage: "rectangle.stack.fill")
-                        //     }.tag("Albums")
-
-                        //     NavigationLink(destination: Text("Songs View")) {
-                        //         Label("Songs", systemImage: "music.note.list")
-                        //     }.tag("Songs")
-                        // }
 
                         Section(header: Text("Created Playlists")) {
                             ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
                                 NavigationLink(
                                     destination: PlayListView(neteasePlaylist: playlist)
                                         .environmentObject(playController)
+                                        .environmentObject(userInfo)
                                 ) {
                                     Label(playlist.name, systemImage: "music.note.list")
                                 }
@@ -139,7 +130,9 @@ struct ContentView: View {
         )
         .onAppear {
             Task {
-                if let profile = loadDecodableState(forKey: "profile", type: CloudMusicApi.Profile.self) {
+                if let profile = loadDecodableState(
+                    forKey: "profile", type: CloudMusicApi.Profile.self)
+                {
                     userInfo.profile = profile
                 }
 

@@ -12,36 +12,57 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
-func loadAsset(url: URL) async -> PlaylistItem? {
+func loadMetadata(url: URL) async -> (
+    title: String, artist: String, duration: CMTime, album: String
+)? {
     let asset = AVAsset(url: url)
     do {
         // Asynchronously load the needed properties
         let metadataItems = try await asset.load(.commonMetadata)
         let titleItem = metadataItems.first(where: { $0.commonKey?.rawValue == "title" })
         let artistItem = metadataItems.first(where: { $0.commonKey?.rawValue == "artist" })
+        let albumItem = metadataItems.first(where: { $0.commonKey?.rawValue == "albumTitle" })
 
         // Fetching values using load method
         let title = try await titleItem?.load(.value) as? String ?? "Unknown"
         let artist = try await artistItem?.load(.value) as? String ?? "Unknown"
+        let album = try await albumItem?.load(.value) as? String ?? "Unknown"
 
         let duration = try await asset.load(.duration)
 
-        let newItem = PlaylistItem(
-            id: 0,
-            url: url, title: title, artist: artist,
-            albumId: 0,
-            ext: url.pathExtension,
-            duration: duration, artworkUrl: nil)
-        return newItem
+        return (title, artist, duration, album)
     } catch {
         print("Error loading asset properties: \(error)")
     }
     return nil
 }
+
+func loadAsset(url: URL) async -> PlaylistItem? {
+    if let metadata = await loadMetadata(url: url) {
+        let newItem = PlaylistItem(
+            id: 0,
+            url: url, title: metadata.title, artist: metadata.artist,
+            albumId: 0,
+            ext: url.pathExtension,
+            duration: metadata.duration, artworkUrl: nil)
+        return newItem
+    }
+    return nil
+}
+
 struct PlayerView: View {
     @EnvironmentObject var playController: PlayController
 
     private func selectAndProcessAudioFile() async {
+        if let url = await selectFile() {
+            if let newItem = await loadAsset(url: url) {
+                let _ = playController.addItemAndPlay(newItem)
+                playController.startPlaying()
+            }
+        }
+    }
+
+    func selectFile() async -> URL? {
         let openPanel = NSOpenPanel()
         openPanel.prompt = "Select Audio File"
         openPanel.allowsMultipleSelection = false
@@ -50,18 +71,41 @@ struct PlayerView: View {
         openPanel.allowedContentTypes = [UTType.mp3, UTType.audio]
 
         let result = await openPanel.begin()
+
         if result == .OK, let url = openPanel.url {
-            if let newItem = await loadAsset(url: url) {
-                let _ = playController.addItemAndPlay(newItem)
-                playController.startPlaying()
+            return url
+        }
+        return nil
+    }
+
+    private func uploadCloud() async {
+        if let url = await selectFile() {
+            if let metadata = await loadMetadata(url: url) {
+                if let privateSongId = await CloudMusicApi.cloud(
+                    filePath: url,
+                    songName: metadata.title,
+                    artist: metadata.artist,
+                    album: metadata.album
+                ) {
+                    // await CloudMusicApi.cloud_match(
+
+                    // )
+                }
             }
         }
     }
+
     var body: some View {
         VStack {
             Button("Select and Play") {
                 Task {
                     await selectAndProcessAudioFile()
+                }
+            }
+
+            Button("Upload to Cloud") {
+                Task {
+                    await uploadCloud()
                 }
             }
         }

@@ -499,4 +499,69 @@ class CloudMusicApi {
             return
         }
     }
+
+    static func cloud(filePath: URL, songName: String?, artist: String?, album: String?) async
+        -> UInt64?
+    {
+        guard
+            let data = try? Data(contentsOf: filePath).base64EncodedString()
+        else {
+            print("cloud failed to read file")
+            return nil
+        }
+
+        let filename = filePath.lastPathComponent
+
+        let p =
+            [
+                "dataAsBase64": 1,
+                "songFile": [
+                    "data": data,
+                    "name": filename,
+                ],
+                "songName": songName ?? filename,
+                "artist": artist ?? "未知专辑",
+                "album": album ?? "未知艺术家",
+            ] as [String: Any]
+
+        guard
+            let res = try? await doRequest(
+                memberName: "cloud", data: p)
+        else {
+            print("cloud failed")
+            return nil
+        }
+
+        print(res.asAny() ?? "No data")
+
+        struct PrivateCloud: Decodable {
+            let songId: UInt64
+        }
+
+        struct Result: Decodable {
+            let privateCloud: PrivateCloud
+        }
+
+        if let parsed = res.asType(Result.self) {
+            return parsed.privateCloud.songId
+        }
+        return nil
+    }
+
+    static func cloud_match(userId: UInt64, songId: UInt64, adjustSongId: UInt64) async {
+        guard
+            let res = try? await doRequest(
+                memberName: "cloud_match",
+                data: [
+                    "uid": userId,
+                    "sid": songId,
+                    "asid": adjustSongId,
+                ])
+        else {
+            print("cloud_match failed")
+            return
+        }
+
+        print(res.asAny() ?? "No data")
+    }
 }
