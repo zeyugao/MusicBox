@@ -148,8 +148,15 @@ struct PlayListView: View {
     @State private var sortOrder = [KeyPathComparator<CloudMusicApi.Song>]()
     @State private var loadingTask: Task<Void, Never>? = nil
     @State private var isSorted = false
+    @State private var isLoading = false
+
+    var neteasePlaylist: CloudMusicApi.PlayListItem?
+
+    let currencyStyle = Decimal.FormatStyle.Currency(code: "USD")
 
     func uploadCloud(songId: UInt64, url: URL) async {
+        isLoading = true
+        defer { isLoading = false }
         if let metadata = await loadMetadata(url: url) {
             if let privateSongId = await CloudMusicApi.cloud(
                 filePath: url,
@@ -162,6 +169,8 @@ struct PlayListView: View {
                     songId: privateSongId,
                     adjustSongId: songId
                 )
+                updatePlaylist()
+                return
             }
         }
     }
@@ -182,116 +191,131 @@ struct PlayListView: View {
         return nil
     }
 
-    var neteasePlaylist: CloudMusicApi.PlayListItem?
-
-    let currencyStyle = Decimal.FormatStyle.Currency(code: "USD")
-
     var body: some View {
-        Table(
-            of: CloudMusicApi.Song.self,
-            selection: $selectedItem,
-            sortOrder: $sortOrder
-        ) {
-            TableColumn("Title", value: \.name) { song in
-                HStack {
-                    Text(song.name)
+        ZStack {
+            Table(
+                of: CloudMusicApi.Song.self,
+                selection: $selectedItem,
+                sortOrder: $sortOrder
+            ) {
+                TableColumn("Title", value: \.name) { song in
+                    HStack {
+                        Text(song.name)
 
-                    if let alia = song.tns?.first ?? song.alia.first {
-                        Text("( \(alia) )")
-                            .foregroundColor(.secondary)
-                    }
+                        if let alia = song.tns?.first ?? song.alia.first {
+                            Text("( \(alia) )")
+                                .foregroundColor(.secondary)
+                        }
 
-                    if let _ = song.pc {
-                        Spacer()
-                        Image(systemName: "cloud")
-                            .resizable()
-                            .frame(width: 18, height: 12)
-                            .help("Cloud")
-                    } else {
-                        if song.fee == .vip
-                            || song.fee == .album
-                        {
+                        if let _ = song.pc {
                             Spacer()
-                            Image(systemName: "dollarsign.circle")
+                            Image(systemName: "cloud")
                                 .resizable()
-                                .frame(width: 16, height: 16)
-                                .help("Need buy")
-                                .padding(.horizontal, 1)
-                                .frame(width: 18, height: 16)
-                        } else if song.fee == .trial {
-                            Spacer()
-                            Image(systemName: "gift")
-                                .resizable()
-                                .frame(width: 16, height: 16)
-                                .help("Trial")
-                                .padding(.horizontal, 1)
-                                .frame(width: 18, height: 16)
+                                .frame(width: 18, height: 12)
+                                .help("Cloud")
+                        } else {
+                            if song.fee == .vip
+                                || song.fee == .album
+                            {
+                                Spacer()
+                                Image(systemName: "dollarsign.circle")
+                                    .resizable()
+                                    .frame(width: 16, height: 16)
+                                    .help("Need buy")
+                                    .padding(.horizontal, 1)
+                                    .frame(width: 18, height: 16)
+                            } else if song.fee == .trial {
+                                Spacer()
+                                Image(systemName: "gift")
+                                    .resizable()
+                                    .frame(width: 16, height: 16)
+                                    .help("Trial")
+                                    .padding(.horizontal, 1)
+                                    .frame(width: 18, height: 16)
+                            }
                         }
                     }
+                }.width(min: 500)
+                TableColumn("Artist", value: \.ar[0].name) { song in
+                    Text(song.ar.map(\.name).joined(separator: ", "))
                 }
-            }.width(min: 500)
-            TableColumn("Artist", value: \.ar[0].name) { song in
-                Text(song.ar.map(\.name).joined(separator: ", "))
-            }
-            TableColumn("Ablum", value: \.al.name)
-            TableColumn("Duration", value: \.dt) { song in
-                let ret = song.parseDuration()
-                Text(String(format: "%02d:%02d", ret.minute, ret.second))
-            }.width(max: 60)
-        } rows: {
-            if let songs = model.songs {
-                ForEach(songs) { song in
-                    TableRow(song)
-                        .contextMenu {
-                            TableContextMenu(song: song)
+                TableColumn("Ablum", value: \.al.name)
+                TableColumn("Duration", value: \.dt) { song in
+                    let ret = song.parseDuration()
+                    Text(String(format: "%02d:%02d", ret.minute, ret.second))
+                }.width(max: 60)
+            } rows: {
+                if let songs = model.songs {
+                    ForEach(songs) { song in
+                        TableRow(song)
+                            .contextMenu {
+                                TableContextMenu(song: song)
 
-                            Button("Upload to Cloud") {
-                                Task {
-                                    if let url = await selectFile() {
+                                Button("Upload to Cloud") {
+                                    Task {
+                                        if let url = await selectFile() {
+                                            await uploadCloud(songId: song.id, url: url)
+                                        }
+                                    }
+                                }
+                            }
+                            .dropDestination(for: URL.self) { urls in
+                                if let url = urls.first {
+                                    Task {
                                         await uploadCloud(songId: song.id, url: url)
                                     }
                                 }
                             }
-                        }
+                    }
                 }
             }
-        }
-        .onChange(of: sortOrder) { prevSortOrder, sortOrder in
-            if prevSortOrder.count >= 1, self.sortOrder.count >= 1,
-                prevSortOrder[0].keyPath == self.sortOrder[0].keyPath,
-                self.sortOrder[0].order == .forward
-            {
-                self.sortOrder.removeAll()
+            .onChange(of: sortOrder) { prevSortOrder, sortOrder in
+                if prevSortOrder.count >= 1, self.sortOrder.count >= 1,
+                    prevSortOrder[0].keyPath == self.sortOrder[0].keyPath,
+                    self.sortOrder[0].order == .forward
+                {
+                    self.sortOrder.removeAll()
+                }
+
+                handleSortChange(sortOrder: self.sortOrder)
             }
-
-            handleSortChange(sortOrder: self.sortOrder)
-        }
-        .navigationTitle(neteasePlaylist?.name ?? "Playlist")
-        .toolbar {
-            PlayAllButton(songs: model.songs ?? [])
-        }
-        .onChange(of: neteasePlaylist) {
-            if let id = neteasePlaylist?.id {
-                model.songs = nil
-
-                model.curId = id
+            .navigationTitle(neteasePlaylist?.name ?? "Playlist")
+            .toolbar {
+                PlayAllButton(songs: model.songs ?? [])
+            }
+            .onChange(of: neteasePlaylist) {
+                updatePlaylist()
+            }
+            .onAppear {
+                updatePlaylist()
+            }
+            .onDisappear {
                 loadingTask?.cancel()
-                loadingTask = Task {
-                    await model.updatePlaylistDetail(id: id)
-                }
+            }
+
+            if isLoading {
+                ProgressView()
+                    .colorInvert()
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .controlSize(.small)
+                    .frame(width: 48, height: 48)
+                    .background(Color.black.opacity(0.75))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
             }
         }
-        .onAppear {
+    }
+
+    private func updatePlaylist() {
+        if let id = neteasePlaylist?.id {
+            isLoading = true
+            model.songs = nil
+
+            model.curId = id
             loadingTask?.cancel()
             loadingTask = Task {
-                if let id = neteasePlaylist?.id {
-                    model.curId = id
-                    await model.updatePlaylistDetail(id: id)
-                }
+                await model.updatePlaylistDetail(id: id)
+                isLoading = false
             }
-        }
-        .onDisappear {
-            loadingTask?.cancel()
         }
     }
 
