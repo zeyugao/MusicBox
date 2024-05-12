@@ -161,6 +161,11 @@ struct PlayListView: View {
                 HStack {
                     Text(song.name)
 
+                    if let alia = song.tns?.first ?? song.alia.first {
+                        Text("( \(alia) )")
+                            .foregroundColor(.secondary)
+                    }
+
                     if let _ = song.pc {
                         Spacer()
                         Image(systemName: "cloud")
@@ -189,7 +194,7 @@ struct PlayListView: View {
                         }
                     }
                 }
-            }
+            }.width(min: 500)
             TableColumn("Artist", value: \.ar[0].name) { song in
                 Text(song.ar.map(\.name).joined(separator: ", "))
             }

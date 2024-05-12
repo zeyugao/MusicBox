@@ -105,6 +105,7 @@ class CloudMusicApi {
         let ar: [Artist]
 
         let alia: [String]
+        let tns: [String]?
 
         let fee: Fee
         let originCoverType: OriginCoverType
@@ -497,6 +498,5 @@ class CloudMusicApi {
             print("scrobble failed")
             return
         }
-        print(res.asAny() ?? "scrobble")
     }
 }

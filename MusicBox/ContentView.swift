@@ -134,6 +134,7 @@ struct ContentView: View {
                         alignment: .top
                     )
                     .background(Color.white)
+                    .frame(minWidth: 800)
             }
         )
         .onAppear {
