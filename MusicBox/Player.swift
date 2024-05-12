@@ -10,7 +10,7 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
-enum LoopMode {
+enum LoopMode: Int {
     case once
     case shuffle
     case sequence
@@ -18,6 +18,9 @@ enum LoopMode {
 
 class PlayController: ObservableObject, RemoteCommandHandler {
     let sampleBufferPlayer = SampleBufferPlayer()
+
+    private let savedCurrentPlaylistKey = "CurrentPlaylist"
+    private let savedCurrentPlayingItemIndexKey = "CurrentPlayingItemIndex"
 
     @Published var isPlaying: Bool = false
 
@@ -141,14 +144,106 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         return -1
     }
 
-    func addItemToPlaylist(_ item: PlaylistItem, continuePlaying: Bool = true) -> Int {
+    func addItemToPlaylist(
+        _ item: PlaylistItem, continuePlaying: Bool = true, shouldSaveState: Bool = false
+    ) -> Int {
         var idIdx = findIdIndex(item.id)
         if idIdx == -1 {
             let totalCnt = sampleBufferPlayer.itemCount
             sampleBufferPlayer.insertItem(item, at: totalCnt, continuePlaying: continuePlaying)
             idIdx = totalCnt
         }
+        if shouldSaveState {
+            saveState()
+        }
         return idIdx
+    }
+
+    func replacePlaylist(
+        _ items: [PlaylistItem], continuePlaying: Bool = true, shouldSaveState: Bool = true
+    ) {
+        sampleBufferPlayer.replaceItems(with: items)
+        if continuePlaying {
+            startPlaying()
+        }
+        if shouldSaveState {
+            saveState()
+        }
+    }
+
+    func addItemsToPlaylist(
+        _ items: [PlaylistItem], continuePlaying: Bool = true, shouldSaveState: Bool = true
+    ) {
+        for item in items {
+            let _ = addItemToPlaylist(
+                item, continuePlaying: continuePlaying, shouldSaveState: false)
+        }
+        if continuePlaying {
+            startPlaying()
+        }
+        if shouldSaveState {
+            saveState()
+        }
+    }
+
+    private func savePlaylist() {
+        let items = sampleBufferPlayer.items
+        saveEncodableState(forKey: savedCurrentPlaylistKey, data: items)
+    }
+
+    private func saveCurrentPlayingItemIndex() {
+        UserDefaults.standard.set(
+            sampleBufferPlayer.currentItemIndex, forKey: savedCurrentPlayingItemIndexKey)
+        print("Current item saved")
+    }
+
+    private func loadCurrentPlayingItemIndex() {
+        if let savedIndex = UserDefaults.standard.object(forKey: savedCurrentPlayingItemIndexKey)
+            as? Int
+        {
+            sampleBufferPlayer.seekToItem(at: savedIndex)
+        }
+    }
+
+    func saveLoopMode() {
+        UserDefaults.standard.set(
+            loopMode.rawValue, forKey: "LoopMode")
+    }
+
+    private func saveMisc() {
+        saveLoopMode()
+    }
+
+    private func loadMisc() {
+        let loopMode = UserDefaults.standard.integer(forKey: "LoopMode")
+        print("rawValue: \(loopMode)")
+        self.loopMode = LoopMode(rawValue: loopMode) ?? .sequence
+    }
+
+    func saveState() {
+        saveMisc()
+        savePlaylist()
+        saveCurrentPlayingItemIndex()
+    }
+
+    func loadState(continuePlaying: Bool = true) {
+        if let playlist = loadDecodableState(
+            forKey: savedCurrentPlaylistKey, type: [PlaylistItem].self)
+        {
+            replacePlaylist(
+                playlist, continuePlaying: continuePlaying, shouldSaveState: false)
+            print("Playlist loaded")
+        } else {
+            print("Failed to load playlist")
+        }
+
+        loadCurrentPlayingItemIndex()
+
+        loadMisc()
+    }
+
+    func clearPlaylist() {
+        sampleBufferPlayer.replaceItems(with: [])
     }
 
     func addItemAndPlay(_ item: PlaylistItem) -> Int {
@@ -218,6 +313,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 count: sampleBufferPlayer.itemCount)
 
             scrobbled = false
+
+            saveCurrentPlayingItemIndex()
 
             if let currentItem = sampleBufferPlayer.currentItem {
                 let duration = currentItem.duration.seconds

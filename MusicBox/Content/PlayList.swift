@@ -110,10 +110,10 @@ struct PlayAllButton: View {
 
     var body: some View {
         Button(action: {
-            for song in songs {
-                let newItem = loadItem(song: song)
-                let _ = playController.addItemToPlaylist(newItem)
+            let newItems = songs.map { song in
+                loadItem(song: song)
             }
+            let _ = playController.replacePlaylist(newItems, continuePlaying: false)
             playController.startPlaying()
         }) {
             Image(systemName: "play.circle")
@@ -122,6 +122,20 @@ struct PlayAllButton: View {
         }
         .buttonStyle(BorderlessButtonStyle())
         .help("Play All")
+
+        Button(action: {
+            let newItems = songs.map { song in
+                loadItem(song: song)
+            }
+            let _ = playController.addItemsToPlaylist(newItems)
+            playController.startPlaying()
+        }) {
+            Image(systemName: "plus.circle")
+                .resizable()
+                .frame(width: 16, height: 16)
+        }
+        .buttonStyle(BorderlessButtonStyle())
+        .help("Add All to Playlist")
     }
 }
 

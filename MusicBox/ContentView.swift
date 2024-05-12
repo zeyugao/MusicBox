@@ -9,6 +9,28 @@ import Combine
 import Foundation
 import SwiftUI
 
+enum DisplayContentType {
+    case userinfo
+    case playlist
+}
+
+func loadDecodableState<T: Decodable>(forKey: String, type: T.Type) -> T? {
+    if let savedData = UserDefaults.standard.object(forKey: forKey)
+        as? Data
+    {
+        let decoder = JSONDecoder()
+        return try? decoder.decode(type, from: savedData)
+    }
+    return nil
+}
+
+func saveEncodableState<T: Encodable>(forKey: String, data: T) {
+    let encoder = JSONEncoder()
+    if let encoded = try? encoder.encode(data) {
+        UserDefaults.standard.set(encoded, forKey: forKey)
+    }
+}
+
 class UserInfo: ObservableObject {
     @Published var profile: CloudMusicApi.Profile?
     @Published var playlists: [CloudMusicApi.PlayListItem] = []
@@ -16,7 +38,7 @@ class UserInfo: ObservableObject {
 
 struct ContentView: View {
     @StateObject var playController = PlayController()
-    @State private var selection: String = "Home"
+    @State private var selection: String?  // = "Now Playing"
     @StateObject private var userInfo = UserInfo()
 
     var body: some View {
@@ -24,25 +46,23 @@ struct ContentView: View {
             alignment: Alignment(horizontal: .trailing, vertical: .bottom),
             content: {
                 NavigationSplitView {
+                    AccountHeaderView()
+                        .environmentObject(userInfo)
                     List(selection: $selection) {
-                        Section(header: Text("Apple Music")) {
-                            NavigationLink(
-                                destination: HomeContentView()
-                                    .environmentObject(playController)
-                                    .environmentObject(userInfo)
-                                    .navigationTitle("Home")
-                            ) {
-                                Label("Home", systemImage: "house.fill")
-                            }.tag("Home")
+                        if userInfo.profile == nil {
+                            Section(header: Text("Account")) {
+                                NavigationLink(
+                                    destination: LoginView()
+                                        .environmentObject(playController)
+                                        .navigationTitle("Login")
+                                ) {
+                                    Label(
+                                        "Login", systemImage: "person.crop.circle")
+                                }.tag("Login")
+                            }
+                        }
 
-                            NavigationLink(
-                                destination: PlayerView()
-                                    .environmentObject(playController)
-                                    .navigationTitle("Player")
-                            ) {
-                                Label("Player", systemImage: "dot.radiowaves.left.and.right")
-                            }.tag("Player")
-
+                        Section(header: Text("Music")) {
                             NavigationLink(
                                 destination: NowPlayingView()
                                     .environmentObject(playController)
@@ -52,23 +72,23 @@ struct ContentView: View {
                             }.tag("Now Playing")
                         }
 
-                        Section(header: Text("Library")) {
-                            NavigationLink(destination: Text("Recently Added View")) {
-                                Label("Recently Added", systemImage: "clock.fill")
-                            }.tag("Recently Added")
+                        // Section(header: Text("Library")) {
+                        //     NavigationLink(destination: Text("Recently Added View")) {
+                        //         Label("Recently Added", systemImage: "clock.fill")
+                        //     }.tag("Recently Added")
 
-                            NavigationLink(destination: Text("Artists View")) {
-                                Label("Artists", systemImage: "music.mic")
-                            }.tag("Artists")
+                        //     NavigationLink(destination: Text("Artists View")) {
+                        //         Label("Artists", systemImage: "music.mic")
+                        //     }.tag("Artists")
 
-                            NavigationLink(destination: Text("Albums View")) {
-                                Label("Albums", systemImage: "rectangle.stack.fill")
-                            }.tag("Albums")
+                        //     NavigationLink(destination: Text("Albums View")) {
+                        //         Label("Albums", systemImage: "rectangle.stack.fill")
+                        //     }.tag("Albums")
 
-                            NavigationLink(destination: Text("Songs View")) {
-                                Label("Songs", systemImage: "music.note.list")
-                            }.tag("Songs")
-                        }
+                        //     NavigationLink(destination: Text("Songs View")) {
+                        //         Label("Songs", systemImage: "music.note.list")
+                        //     }.tag("Songs")
+                        // }
 
                         Section(header: Text("Created Playlists")) {
                             ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
@@ -118,13 +138,29 @@ struct ContentView: View {
         )
         .onAppear {
             Task {
+                if let profile = loadDecodableState(forKey: "profile", type: CloudMusicApi.Profile.self) {
+                    userInfo.profile = profile
+                }
+
+                if let playlists = loadDecodableState(
+                    forKey: "playlists", type: [CloudMusicApi.PlayListItem].self)
+                {
+                    userInfo.playlists = playlists
+                }
+
                 if let profile = await CloudMusicApi.login_status() {
                     userInfo.profile = profile
+                    saveEncodableState(forKey: "profile", data: profile)
 
                     if let playlists = try? await CloudMusicApi.user_playlist(uid: profile.userId) {
                         userInfo.playlists = playlists
+                        saveEncodableState(forKey: "playlists", data: playlists)
                     }
                 }
+            }
+
+            Task {
+                playController.loadState(continuePlaying: false)
             }
         }
     }

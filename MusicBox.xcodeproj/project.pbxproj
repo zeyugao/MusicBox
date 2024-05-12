@@ -30,11 +30,11 @@
 		2D3A45A22BE3C591006CD909 /* libqopensslbackend.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2D3A459F2BE3C591006CD909 /* libqopensslbackend.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		2D3A45A62BE86F75006CD909 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45A52BE86F75006CD909 /* Player.swift */; };
 		2D3A45A82BE916C8006CD909 /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45A72BE916C8006CD909 /* NowPlaying.swift */; };
-		2DED51C92BD2816C00F9D181 /* Home.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51C82BD2816C00F9D181 /* Home.swift */; };
 		2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CA2BD2823E00F9D181 /* PlayList.swift */; };
 		2DED51CD2BD2AD7A00F9D181 /* Play.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CC2BD2AD7A00F9D181 /* Play.swift */; };
 		2DED51CF2BD3806D00F9D181 /* CloudMusicApi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */; };
 		2DED51EE2BD3F62100F9D181 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51ED2BD3F62100F9D181 /* Extensions.swift */; };
+		2DFB58D72BF0744100D488F4 /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFB58D62BF0744100D488F4 /* Account.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -89,11 +89,11 @@
 		2D3A459F2BE3C591006CD909 /* libqopensslbackend.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = libqopensslbackend.dylib; path = ../QCloudMusicApi/6.7.0/macos/plugins/tls/libqopensslbackend.dylib; sourceTree = "<group>"; };
 		2D3A45A52BE86F75006CD909 /* Player.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		2D3A45A72BE916C8006CD909 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
-		2DED51C82BD2816C00F9D181 /* Home.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Home.swift; sourceTree = "<group>"; };
 		2DED51CA2BD2823E00F9D181 /* PlayList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayList.swift; sourceTree = "<group>"; };
 		2DED51CC2BD2AD7A00F9D181 /* Play.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Play.swift; sourceTree = "<group>"; };
 		2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudMusicApi.swift; sourceTree = "<group>"; };
 		2DED51ED2BD3F62100F9D181 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
+		2DFB58D62BF0744100D488F4 /* Account.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -200,7 +200,7 @@
 		2DED51C72BD2815800F9D181 /* Content */ = {
 			isa = PBXGroup;
 			children = (
-				2DED51C82BD2816C00F9D181 /* Home.swift */,
+				2DFB58D62BF0744100D488F4 /* Account.swift */,
 				2D3A45A72BE916C8006CD909 /* NowPlaying.swift */,
 				2DED51CA2BD2823E00F9D181 /* PlayList.swift */,
 				2DED51CC2BD2AD7A00F9D181 /* Play.swift */,
@@ -304,8 +304,8 @@
 				2D2800D62BD21F20007A55D5 /* SampleBufferSerializer.swift in Sources */,
 				2DED51EE2BD3F62100F9D181 /* Extensions.swift in Sources */,
 				2D2800D72BD21F20007A55D5 /* SampleBufferSource.swift in Sources */,
-				2DED51C92BD2816C00F9D181 /* Home.swift in Sources */,
 				2D2800A32BCF6998007A55D5 /* PlayerControlView.swift in Sources */,
+				2DFB58D72BF0744100D488F4 /* Account.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

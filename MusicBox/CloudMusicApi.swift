@@ -32,13 +32,13 @@ extension Data {
 }
 
 class CloudMusicApi {
-    struct Profile: Decodable {
+    struct Profile: Codable {
         let avatarUrl: String
         let nickname: String
         let userId: UInt64
     }
 
-    struct PlayListItem: Identifiable, Decodable, Equatable {
+    struct PlayListItem: Identifiable, Codable, Equatable {
         static func == (lhs: CloudMusicApi.PlayListItem, rhs: CloudMusicApi.PlayListItem) -> Bool {
             return lhs.id == rhs.id
         }

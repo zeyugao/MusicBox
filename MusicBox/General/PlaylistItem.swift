@@ -69,7 +69,7 @@ func isRemoteURL(_ url: URL) -> Bool {
     return ["http", "https", "ftp"].contains(scheme)
 }
 
-class PlaylistItem: Identifiable {
+class PlaylistItem: Identifiable, Codable {
     let id: UInt64
 
     /// URL of the local file containing the track's audio.
@@ -109,6 +109,38 @@ class PlaylistItem: Identifiable {
         self.duration = duration
         self.error = nil
         self.artworkUrl = artworkUrl
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, url, title, artist, ext, duration, albumId, artworkUrl
+    }
+
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UInt64.self, forKey: .id)
+        url = try container.decodeIfPresent(URL.self, forKey: .url)
+        title = try container.decode(String.self, forKey: .title)
+        artist = try container.decode(String.self, forKey: .artist)
+        ext = try container.decodeIfPresent(String.self, forKey: .ext)
+        let seconds = try container.decode(Double.self, forKey: .duration)
+        duration = CMTime(seconds: seconds, preferredTimescale: 1)
+        albumId = try container.decode(UInt64.self, forKey: .albumId)
+        artworkUrl = try container.decodeIfPresent(URL.self, forKey: .artworkUrl)
+        error = nil  // This should be handled according to your application logic
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(url, forKey: .url)
+        try container.encode(title, forKey: .title)
+        try container.encode(artist, forKey: .artist)
+        try container.encodeIfPresent(ext, forKey: .ext)
+        // Encode CMTime as a Double representing total seconds
+        let durationSeconds = CMTimeGetSeconds(duration)
+        try container.encode(durationSeconds, forKey: .duration)
+        try container.encode(albumId, forKey: .albumId)
+        try container.encodeIfPresent(artworkUrl, forKey: .artworkUrl)
     }
 
     func isUrlReady() -> Bool {

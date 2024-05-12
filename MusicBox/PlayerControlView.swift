@@ -91,6 +91,8 @@ struct PlayerControlView: View {
                 {
                     AsyncImage(url: url) { image in
                         image.resizable()
+                            .scaledToFit()
+                            .frame(width: height, height: height)
                     } placeholder: {
                         Image(systemName: "music.note")
                             .resizable()
@@ -100,7 +102,6 @@ struct PlayerControlView: View {
                             .frame(width: height, height: height)
                             .background(Color.gray.opacity(0.2))
                     }
-                    .scaledToFit()
                 } else {
                     Image(systemName: "music.note")
                         .resizable()
@@ -193,6 +194,7 @@ struct PlayerControlView: View {
                     playController.loopMode =
                         playController.loopMode == .once
                         ? .sequence : (playController.loopMode == .sequence ? .shuffle : .once)
+                    playController.saveLoopMode()
                 }) {
                     Image(
                         systemName: playController.loopMode == .once
