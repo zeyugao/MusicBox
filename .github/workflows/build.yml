@@ -15,6 +15,7 @@ jobs:
       BUILD_TYPE: Release
       BUILD_PATH: build
       QT_VERSION: 6.7.0
+      archiveName: MusicBox
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +29,6 @@ jobs:
           install-deps: 'true'
           cache: 'true'
           aqtversion: '==3.1.*'
-          archiveName: MusicBox
       - name: Fetch QCloudMusicApi
         run: |
           git clone --recurse-submodules --depth=1 https://github.com/s12mmm3/QCloudMusicApi.git ../QCloudMusicApi \
