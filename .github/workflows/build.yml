@@ -32,9 +32,10 @@ jobs:
         run: |
           git clone --recurse-submodules --depth=1 https://github.com/s12mmm3/QCloudMusicApi.git ../QCloudMusicApi \
           && cd ../QCloudMusicApi \
-          && cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_PREFIX_PATH=$(pwd)/../Qt/${{ env.QT_VERSION }}/macos/lib/cmake \
-          && cmake --build build -j \
-          && cd build && ln -s ${{ env.BUILD_TYPE }}/bin bin
+          && cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_PREFIX_PATH=(pwd)/../Qt/6.7.0/macos/lib/cmake -GXcode -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" ONLY_ACTIVE_ARCH=NO \
+          && cd build \
+          && xcodebuild -project QCloudMusicApiProject.xcodeproj -target QCloudMusicApi build -configuration ${{ env.BUILD_TYPE }} \
+          && ln -s ${{ env.BUILD_TYPE }}/bin bin
       - name: Build
         run: |
-          xcodebuild -project MusicBox.xcodeproj -scheme MusicBox build -configuration Release CONFIGURATION_BUILD_DIR=$(pwd)/build CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM=""
+          xcodebuild -project MusicBox.xcodeproj -scheme MusicBox build -configuration ${{ env.BUILD_TYPE }} CONFIGURATION_BUILD_DIR=$(pwd)/build CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM="" ONLY_ACTIVE_ARCH=NO
