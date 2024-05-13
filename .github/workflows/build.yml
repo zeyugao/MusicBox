@@ -37,4 +37,4 @@ jobs:
           && cd build && ln -s ${{ env.BUILD_TYPE }}/bin bin
       - name: Build
         run: |
-          xcodebuild -project MusicBox.xcodeproj -scheme MusicBox build -configuration Release CONFIGURATION_BUILD_DIR=$(pwd)/build
+          xcodebuild -project MusicBox.xcodeproj -scheme MusicBox build -configuration Release CONFIGURATION_BUILD_DIR=$(pwd)/build CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM=""
