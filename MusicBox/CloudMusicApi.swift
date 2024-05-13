@@ -487,7 +487,7 @@ class CloudMusicApi {
 
     static func scrobble(id: UInt64, sourceid: UInt64, time: Int64) async {
         guard
-            let res = try? await doRequest(
+            let _ = try? await doRequest(
                 memberName: "scrobble",
                 data: [
                     "id": id,

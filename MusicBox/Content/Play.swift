@@ -112,7 +112,7 @@ struct PlayerView: View {
     private func uploadCloud() async {
         if let url = await selectFile() {
             if let metadata = await loadMetadata(url: url) {
-                if let privateSongId = await CloudMusicApi.cloud(
+                if let _ = await CloudMusicApi.cloud(
                     filePath: url,
                     songName: metadata.title,
                     artist: metadata.artist,
