@@ -104,12 +104,11 @@ struct ContentView: View {
                     }
                     .listStyle(SidebarListStyle())
                     .frame(minWidth: 200, idealWidth: 250)
+                    .toolbar(removing: .sidebarToggle)
                 } detail: {
                     Text("Hello")
                 }
                 .navigationTitle("Home")
-                .toolbar {
-                }
                 .searchable(text: .constant(""), prompt: "Search")
                 .padding(.bottom, 80)
 
