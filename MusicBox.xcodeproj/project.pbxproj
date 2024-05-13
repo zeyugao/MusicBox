@@ -108,8 +108,8 @@
 		2DFB58D62BF0744100D488F4 /* Account.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
 		2DFB58D82BF1B8EC00D488F4 /* QtCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtCore.framework; path = ../Qt/6.7.0/macos/lib/QtCore.framework; sourceTree = "<group>"; };
 		2DFB58DB2BF1B90000D488F4 /* QtNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtNetwork.framework; path = ../Qt/6.7.0/macos/lib/QtNetwork.framework; sourceTree = "<group>"; };
-		2DFB58DE2BF24D7600D488F4 /* libssl.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libssl.1.1.dylib; path = ../QCloudMusicApi/build/Debug/bin/libssl.1.1.dylib; sourceTree = "<group>"; };
-		2DFB58DF2BF24D7600D488F4 /* libcrypto.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libcrypto.1.1.dylib; path = ../QCloudMusicApi/build/Debug/bin/libcrypto.1.1.dylib; sourceTree = "<group>"; };
+		2DFB58DE2BF24D7600D488F4 /* libssl.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libssl.1.1.dylib; path = ../QCloudMusicApi/build/bin/libssl.1.1.dylib; sourceTree = "<group>"; };
+		2DFB58DF2BF24D7600D488F4 /* libcrypto.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libcrypto.1.1.dylib; path = ../QCloudMusicApi/build/bin/libcrypto.1.1.dylib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
