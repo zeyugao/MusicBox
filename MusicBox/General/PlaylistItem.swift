@@ -179,7 +179,7 @@ class PlaylistItem: Identifiable, Codable {
         return nil
     }
 
-    private func downloadFile(url: URL, ext: String) async -> URL? {
+    private func getMusicBoxFolder() -> URL? {
         let fileManager = FileManager.default
         guard
             let musicFolder = fileManager.urls(
@@ -200,11 +200,34 @@ class PlaylistItem: Identifiable, Codable {
                 return nil
             }
         }
+        return appMusicFolder
+    }
+
+    private func getCachedMusicFile(id: UInt64) -> URL? {
+        guard let appMusicFolder = getMusicBoxFolder() else {
+            return nil
+        }
+
+        let exts = ["mp3", "MP3", "flac", "FLAC"]
+        for ext in exts {
+            let localFileUrl = appMusicFolder.appendingPathComponent("\(id).\(ext)")
+            if FileManager.default.fileExists(atPath: localFileUrl.path) {
+                return localFileUrl
+            }
+        }
+        return nil
+    }
+
+    private func downloadFile(url: URL, ext: String) async -> URL? {
+        guard let appMusicFolder = getMusicBoxFolder() else {
+            return nil
+        }
 
         // Define the local file path
         let localFileUrl = appMusicFolder.appendingPathComponent(
             "\(self.id).\(ext)")
 
+        let fileManager = FileManager.default
         // Check if file already exists
         if fileManager.fileExists(atPath: localFileUrl.path) {
             print("File already exists, no need to download.")
@@ -233,6 +256,10 @@ class PlaylistItem: Identifiable, Codable {
                 }
             }
         } else {
+            if let cachedFile = getCachedMusicFile(id: id) {
+                self.url = cachedFile
+                return self.url
+            }
             if let songData = await CloudMusicApi.song_url_v1(id: [id]) {
                 let songData = songData[0]
                 self.ext = songData.type
@@ -242,7 +269,7 @@ class PlaylistItem: Identifiable, Codable {
                 }
             }
         }
-        print("Failed to get URL for player.s")
+        print("Failed to get URL")
         return nil
     }
 }
