@@ -127,6 +127,15 @@ struct ContentView: View {
                     .frame(minWidth: 800)
             }
         )
+        .onKeyPress { press in
+            if press.characters == " " {
+                DispatchQueue.main.async {
+                    playController.togglePlayPause()
+                }
+                return .handled
+            }
+            return .ignored
+        }
         .onAppear {
             Task {
                 if let profile = loadDecodableState(
