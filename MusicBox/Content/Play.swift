@@ -50,8 +50,39 @@ func loadAsset(url: URL) async -> PlaylistItem? {
     return nil
 }
 
+struct AddArticleView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @State var title: String = ""
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text("Add a new article")
+                .font(.title)
+            TextField(text: $title, prompt: Text("Title of the article")) {
+                Text("Title")
+            }
+
+            HStack {
+                Button("Cancel") {
+                    // Cancel saving and dismiss.
+                    dismiss()
+                }
+                Spacer()
+                Button("Confirm") {
+                    // Save the article and dismiss.
+                    dismiss()
+                }
+            }
+        }
+        .padding(20)
+        .frame(width: 300, height: 200)
+    }
+}
 struct PlayerView: View {
     @EnvironmentObject var playController: PlayController
+
+    @State var presentAddArticleSheet = false
 
     private func selectAndProcessAudioFile() async {
         if let url = await selectFile() {
@@ -107,6 +138,14 @@ struct PlayerView: View {
                 Task {
                     await uploadCloud()
                 }
+            }
+
+            Button("Add Article") {
+                presentAddArticleSheet.toggle()
+            }.sheet(
+                isPresented: $presentAddArticleSheet
+            ) {
+                AddArticleView()
             }
         }
     }
