@@ -39,6 +39,10 @@
 		2DFB58DA2BF1B8EC00D488F4 /* QtCore.framework in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2DFB58D82BF1B8EC00D488F4 /* QtCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2DFB58DC2BF1B90000D488F4 /* QtNetwork.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DFB58DB2BF1B90000D488F4 /* QtNetwork.framework */; };
 		2DFB58DD2BF1B90000D488F4 /* QtNetwork.framework in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2DFB58DB2BF1B90000D488F4 /* QtNetwork.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		2DFB58E02BF24D7600D488F4 /* libssl.1.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DFB58DE2BF24D7600D488F4 /* libssl.1.1.dylib */; };
+		2DFB58E12BF24D7600D488F4 /* libssl.1.1.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2DFB58DE2BF24D7600D488F4 /* libssl.1.1.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		2DFB58E22BF24D7600D488F4 /* libcrypto.1.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DFB58DF2BF24D7600D488F4 /* libcrypto.1.1.dylib */; };
+		2DFB58E32BF24D7600D488F4 /* libcrypto.1.1.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2DFB58DF2BF24D7600D488F4 /* libcrypto.1.1.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -49,7 +53,9 @@
 			dstSubfolderSpec = 10;
 			files = (
 				2DFB58DD2BF1B90000D488F4 /* QtNetwork.framework in Embed Libraries */,
+				2DFB58E12BF24D7600D488F4 /* libssl.1.1.dylib in Embed Libraries */,
 				2DFB58DA2BF1B8EC00D488F4 /* QtCore.framework in Embed Libraries */,
+				2DFB58E32BF24D7600D488F4 /* libcrypto.1.1.dylib in Embed Libraries */,
 				2D3A45912BE3C3A6006CD909 /* libQCloudMusicApi.dylib in Embed Libraries */,
 			);
 			name = "Embed Libraries";
@@ -90,9 +96,9 @@
 		2D3A45812BE3A90E006CD909 /* MusicBox-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "MusicBox-Bridging-Header.h"; sourceTree = "<group>"; };
 		2D3A45832BE3A90F006CD909 /* QCloudMusicApi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = QCloudMusicApi.h; sourceTree = "<group>"; };
 		2D3A45852BE3A9E1006CD909 /* libQCloudMusicApi.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libQCloudMusicApi.dylib; path = ../QCloudMusicApi/build/bin/libQCloudMusicApi.dylib; sourceTree = "<group>"; };
-		2D3A459D2BE3C591006CD909 /* libqcertonlybackend.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = libqcertonlybackend.dylib; path = ../QCloudMusicApi/6.7.0/macos/plugins/tls/libqcertonlybackend.dylib; sourceTree = "<group>"; };
-		2D3A459E2BE3C591006CD909 /* libqsecuretransportbackend.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = libqsecuretransportbackend.dylib; path = ../QCloudMusicApi/6.7.0/macos/plugins/tls/libqsecuretransportbackend.dylib; sourceTree = "<group>"; };
-		2D3A459F2BE3C591006CD909 /* libqopensslbackend.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = libqopensslbackend.dylib; path = ../QCloudMusicApi/6.7.0/macos/plugins/tls/libqopensslbackend.dylib; sourceTree = "<group>"; };
+		2D3A459D2BE3C591006CD909 /* libqcertonlybackend.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = libqcertonlybackend.dylib; path = ../Qt/6.7.0/macos/plugins/tls/libqcertonlybackend.dylib; sourceTree = "<group>"; };
+		2D3A459E2BE3C591006CD909 /* libqsecuretransportbackend.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = libqsecuretransportbackend.dylib; path = ../Qt/6.7.0/macos/plugins/tls/libqsecuretransportbackend.dylib; sourceTree = "<group>"; };
+		2D3A459F2BE3C591006CD909 /* libqopensslbackend.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = libqopensslbackend.dylib; path = ../Qt/6.7.0/macos/plugins/tls/libqopensslbackend.dylib; sourceTree = "<group>"; };
 		2D3A45A52BE86F75006CD909 /* Player.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		2D3A45A72BE916C8006CD909 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		2DED51CA2BD2823E00F9D181 /* PlayList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayList.swift; sourceTree = "<group>"; };
@@ -100,8 +106,10 @@
 		2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudMusicApi.swift; sourceTree = "<group>"; };
 		2DED51ED2BD3F62100F9D181 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		2DFB58D62BF0744100D488F4 /* Account.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
-		2DFB58D82BF1B8EC00D488F4 /* QtCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtCore.framework; path = ../QCloudMusicApi/6.7.0/macos/lib/QtCore.framework; sourceTree = "<group>"; };
-		2DFB58DB2BF1B90000D488F4 /* QtNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtNetwork.framework; path = ../QCloudMusicApi/6.7.0/macos/lib/QtNetwork.framework; sourceTree = "<group>"; };
+		2DFB58D82BF1B8EC00D488F4 /* QtCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtCore.framework; path = ../Qt/6.7.0/macos/lib/QtCore.framework; sourceTree = "<group>"; };
+		2DFB58DB2BF1B90000D488F4 /* QtNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtNetwork.framework; path = ../Qt/6.7.0/macos/lib/QtNetwork.framework; sourceTree = "<group>"; };
+		2DFB58DE2BF24D7600D488F4 /* libssl.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libssl.1.1.dylib; path = ../QCloudMusicApi/build/Debug/bin/libssl.1.1.dylib; sourceTree = "<group>"; };
+		2DFB58DF2BF24D7600D488F4 /* libcrypto.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libcrypto.1.1.dylib; path = ../QCloudMusicApi/build/Debug/bin/libcrypto.1.1.dylib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,7 +118,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				2DFB58DC2BF1B90000D488F4 /* QtNetwork.framework in Frameworks */,
+				2DFB58E02BF24D7600D488F4 /* libssl.1.1.dylib in Frameworks */,
 				2DFB58D92BF1B8EC00D488F4 /* QtCore.framework in Frameworks */,
+				2DFB58E22BF24D7600D488F4 /* libcrypto.1.1.dylib in Frameworks */,
 				2D3A45902BE3C3A6006CD909 /* libQCloudMusicApi.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -171,6 +181,8 @@
 		2D2800A42BCFD231007A55D5 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				2DFB58DF2BF24D7600D488F4 /* libcrypto.1.1.dylib */,
+				2DFB58DE2BF24D7600D488F4 /* libssl.1.1.dylib */,
 				2DFB58DB2BF1B90000D488F4 /* QtNetwork.framework */,
 				2DFB58D82BF1B8EC00D488F4 /* QtCore.framework */,
 				2D3A45852BE3A9E1006CD909 /* libQCloudMusicApi.dylib */,
@@ -458,7 +470,7 @@
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					/Users/elsa/Code/QCloudMusicApi/6.7.0/macos/lib,
+					"$(SRCROOT)/../Qt/6.7.0/macos/lib",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
@@ -469,7 +481,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					/Users/elsa/Code/QCloudMusicApi/build/bin,
+					"$(SRCROOT)/../QCloudMusicApi/build/bin",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "";
@@ -498,7 +510,7 @@
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					/Users/elsa/Code/QCloudMusicApi/6.7.0/macos/lib,
+					"$(SRCROOT)/../Qt/6.7.0/macos/lib",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
@@ -509,7 +521,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					/Users/elsa/Code/QCloudMusicApi/build/bin,
+					"$(SRCROOT)/../QCloudMusicApi/build/bin",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "";
