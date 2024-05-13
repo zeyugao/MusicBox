@@ -1,4 +1,4 @@
-name: Xcode - Example
+name: Xcode - Build
 
 on:
   push:
@@ -11,20 +11,30 @@ jobs:
     name: Build
     runs-on: macos-latest
 
+    env:
+      BUILD_TYPE: Release
+      BUILD_PATH: build
+      QT_VERSION: 6.7.0
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set Default Scheme
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: mac
+          target: desktop
+          arch: clang_64
+          install-deps: 'true'
+          cache: 'true'
+          aqtversion: '==3.1.*'
+      - name: Fetch QCloudMusicApi
         run: |
-          scheme_list=$(xcodebuild -list -json | tr -d "\n")
-          default=$(echo $scheme_list | ruby -e "require 'json'; puts JSON.parse(STDIN.gets)['project']['targets'][0]")
-          echo $default | cat >default
-          echo Using default scheme: $default
+          git clone --recurse-submodules --depth=1 https://github.com/s12mmm3/QCloudMusicApi.git ../QCloudMusicApi \
+          && cd ../QCloudMusicApi \
+          && cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_PREFIX_PATH=$(pwd)/../Qt/${{ env.QT_VERSION }}/macos/lib/cmake \
+          && cmake --build build -j \
+          && cd build && ln -s ${{ env.BUILD_TYPE }}/bin bin
       - name: Build
-        env:
-          scheme: ${{ 'default' }}
         run: |
-          if [ $scheme = default ]; then scheme=$(cat default); fi
-          if [ "`ls -A | grep -i \\.xcworkspace\$`" ]; then filetype_parameter="workspace" && file_to_build="`ls -A | grep -i \\.xcworkspace\$`"; else filetype_parameter="project" && file_to_build="`ls -A | grep -i \\.xcodeproj\$`"; fi
-          file_to_build=`echo $file_to_build | awk '{$1=$1;print}'`
-          xcodebuild clean build analyze -scheme "$scheme" -"$filetype_parameter" "$file_to_build" | xcpretty && exit ${PIPESTATUS[0]}
+          xcodebuild -project MusicBox.xcodeproj -scheme MusicBox build -configuration Release CONFIGURATION_BUILD_DIR=(pwd)/build
