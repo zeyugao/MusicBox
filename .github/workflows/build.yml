@@ -28,6 +28,7 @@ jobs:
           install-deps: 'true'
           cache: 'true'
           aqtversion: '==3.1.*'
+          archiveName: MusicBox
       - name: Fetch QCloudMusicApi
         run: |
           git clone --recurse-submodules --depth=1 https://github.com/s12mmm3/QCloudMusicApi.git ../QCloudMusicApi \
@@ -39,3 +40,7 @@ jobs:
       - name: Build
         run: |
           xcodebuild -project MusicBox.xcodeproj -scheme MusicBox build -configuration ${{ env.BUILD_TYPE }} CONFIGURATION_BUILD_DIR=$(pwd)/build CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM="" ONLY_ACTIVE_ARCH=NO
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.archiveName }}
+          path: ${{ github.workspace }}/build
