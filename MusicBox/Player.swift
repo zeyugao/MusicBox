@@ -216,7 +216,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     private func loadMisc() {
         let loopMode = UserDefaults.standard.integer(forKey: "LoopMode")
-        print("rawValue: \(loopMode)")
         self.loopMode = LoopMode(rawValue: loopMode) ?? .sequence
     }
 

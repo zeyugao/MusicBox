@@ -33,6 +33,7 @@ func saveEncodableState<T: Encodable>(forKey: String, data: T) {
 
 class UserInfo: ObservableObject {
     @Published var profile: CloudMusicApi.Profile?
+    @Published var likelist: Set<UInt64> = []
     @Published var playlists: [CloudMusicApi.PlayListItem] = []
 }
 
@@ -95,7 +96,9 @@ struct ContentView: View {
                         Section(header: Text("Favored Playlists")) {
                             ForEach(userInfo.playlists.filter { $0.subscribed }) { playlist in
                                 NavigationLink(
-                                    destination: Text("Favored Playlist Detail View")
+                                    destination: PlayListView(neteasePlaylist: playlist)
+                                        .environmentObject(playController)
+                                        .environmentObject(userInfo)
                                 ) {
                                     Label(playlist.name, systemImage: "music.note.list")
                                 }
@@ -150,6 +153,12 @@ struct ContentView: View {
                     userInfo.playlists = playlists
                 }
 
+                if let likelist = loadDecodableState(
+                    forKey: "likelist", type: Set<UInt64>.self)
+                {
+                    userInfo.likelist = likelist
+                }
+
                 if let profile = await CloudMusicApi.login_status() {
                     userInfo.profile = profile
                     saveEncodableState(forKey: "profile", data: profile)
@@ -157,6 +166,11 @@ struct ContentView: View {
                     if let playlists = try? await CloudMusicApi.user_playlist(uid: profile.userId) {
                         userInfo.playlists = playlists
                         saveEncodableState(forKey: "playlists", data: playlists)
+                    }
+
+                    if let likelist = await CloudMusicApi.likelist(userId: profile.userId) {
+                        userInfo.likelist = Set(likelist)
+                        saveEncodableState(forKey: "likelist", data: userInfo.likelist)
                     }
                 }
             }

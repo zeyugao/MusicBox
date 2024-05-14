@@ -564,4 +564,48 @@ class CloudMusicApi {
 
         print(res.asAny() ?? "No data")
     }
+
+    static func likelist(userId: UInt64) async -> [UInt64]? {
+        guard
+            let res = try? await doRequest(
+                memberName: "likelist",
+                data: [
+                    "uid": userId
+                ])
+        else {
+            print("likelist failed")
+            return nil
+        }
+
+        struct Result: Decodable {
+            let ids: [UInt64]
+        }
+
+        if let parsed = res.asType(Result.self) {
+            return parsed.ids
+        }
+        return nil
+    }
+
+    static func like(id: UInt64, like: Bool) async -> Bool {
+        guard
+            let res = try? await doRequest(
+                memberName: "like",
+                data: [
+                    "id": id,
+                    "like": like ? "true" : "false",
+                ])
+        else {
+            print("like failed")
+            return false
+        }
+
+        struct Result: Decodable {
+            let code: Int
+        }
+        if let parsed = res.asType(Result.self) {
+            return parsed.code == 200
+        }
+        return false
+    }
 }

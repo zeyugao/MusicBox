@@ -198,6 +198,29 @@ struct PlayListView: View {
                 selection: $selectedItem,
                 sortOrder: $sortOrder
             ) {
+                TableColumn("") { song in
+                    Button(action: {
+                        let favored = (userInfo.likelist.contains(song.id))
+                        Task {
+                            if await CloudMusicApi.like(id: song.id, like: !favored) {
+                                if favored {
+                                    userInfo.likelist.remove(song.id)
+                                } else {
+                                    userInfo.likelist.insert(song.id)
+                                }
+                            }
+                        }
+                    }) {
+                        let favored = (userInfo.likelist.contains(song.id))
+                        Image(systemName: favored ? "heart.fill" : "heart")
+                            .resizable()
+                            .frame(width: 16, height: 14)
+                            .help(favored ? "Unfavor" : "Favor")
+                            .padding(.trailing, 4)
+                    }
+                }
+                .width(16)
+
                 TableColumn("Title", value: \.name) { song in
                     HStack {
                         Text(song.name)
@@ -235,15 +258,20 @@ struct PlayListView: View {
                             }
                         }
                     }
-                }.width(min: 500)
+                }
+                .width(min: 500)
+
                 TableColumn("Artist", value: \.ar[0].name) { song in
                     Text(song.ar.map(\.name).joined(separator: ", "))
                 }
+
                 TableColumn("Ablum", value: \.al.name)
+
                 TableColumn("Duration", value: \.dt) { song in
                     let ret = song.parseDuration()
                     Text(String(format: "%02d:%02d", ret.minute, ret.second))
-                }.width(max: 60)
+                }
+                .width(max: 60)
             } rows: {
                 if let songs = model.songs {
                     ForEach(songs) { song in
