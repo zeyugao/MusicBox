@@ -397,7 +397,7 @@ class CloudMusicApi {
             let ret = try? await doRequest(
                 memberName: "song_detail",
                 data: [
-                    "id": ids.map { String($0) }.joined(separator: ",")
+                    "ids": ids.map { String($0) }.joined(separator: ",")
                 ])
         else { return nil }
 
