@@ -69,6 +69,73 @@ func isRemoteURL(_ url: URL) -> Bool {
     return ["http", "https", "ftp"].contains(scheme)
 }
 
+func downloadFile(url: URL, savePath: URL, ext: String) async -> URL? {
+    let fileManager = FileManager.default
+    // Check if file already exists
+    if fileManager.fileExists(atPath: savePath.path) {
+        print("File already exists, no need to download.")
+    } else {
+        do {
+            // TODO: Streaming
+            print("Downloading file from \(url) to \(savePath)")
+            let (data, _) = try await URLSession.shared.data(from: url)
+            try data.write(to: savePath)
+        } catch {
+            print("Error downloading or saving the file: \(error)")
+            return nil
+        }
+    }
+    return savePath
+}
+
+func getCachedMusicFile(id: UInt64) -> URL? {
+    guard let appMusicFolder = getMusicBoxFolder() else {
+        return nil
+    }
+
+    let exts = ["mp3", "MP3", "flac", "FLAC"]
+    for ext in exts {
+        let localFileUrl = appMusicFolder.appendingPathComponent("\(id).\(ext)")
+        if FileManager.default.fileExists(atPath: localFileUrl.path) {
+            return localFileUrl
+        }
+    }
+    return nil
+}
+
+func getMusicBoxFolder() -> URL? {
+    let fileManager = FileManager.default
+    guard
+        let musicFolder = fileManager.urls(
+            for: .musicDirectory, in: .userDomainMask
+        ).first
+    else {
+        return nil
+    }
+    let appMusicFolder = musicFolder.appendingPathComponent("MusicBox")
+
+    // Create the directory if it does not exist
+    if !fileManager.fileExists(atPath: appMusicFolder.path) {
+        do {
+            try fileManager.createDirectory(
+                at: appMusicFolder, withIntermediateDirectories: true)
+        } catch {
+            print("Failed to create directory: \(error)")
+            return nil
+        }
+    }
+    return appMusicFolder
+}
+
+func downloadMusicFile(url: URL, id: UInt64, ext: String) async -> URL? {
+    guard let appMusicFolder = getMusicBoxFolder() else {
+        return nil
+    }
+
+    let localFileUrl = appMusicFolder.appendingPathComponent("\(id).\(ext)")
+    return await downloadFile(url: url, savePath: localFileUrl, ext: ext)
+}
+
 class PlaylistItem: Identifiable, Codable {
     let id: UInt64
 
@@ -171,78 +238,12 @@ class PlaylistItem: Identifiable, Codable {
             if isLocalURL(artworkUrl) {
                 return artworkUrl
             } else {
-                self.artworkUrl = await downloadFile(
-                    url: artworkUrl, ext: artworkUrl.pathExtension)
+                self.artworkUrl = await downloadMusicFile(
+                    url: artworkUrl, id: id, ext: artworkUrl.pathExtension)
                 return self.artworkUrl
             }
         }
         return nil
-    }
-
-    private func getMusicBoxFolder() -> URL? {
-        let fileManager = FileManager.default
-        guard
-            let musicFolder = fileManager.urls(
-                for: .musicDirectory, in: .userDomainMask
-            ).first
-        else {
-            return nil
-        }
-        let appMusicFolder = musicFolder.appendingPathComponent("MusicBox")
-
-        // Create the directory if it does not exist
-        if !fileManager.fileExists(atPath: appMusicFolder.path) {
-            do {
-                try fileManager.createDirectory(
-                    at: appMusicFolder, withIntermediateDirectories: true)
-            } catch {
-                print("Failed to create directory: \(error)")
-                return nil
-            }
-        }
-        return appMusicFolder
-    }
-
-    private func getCachedMusicFile(id: UInt64) -> URL? {
-        guard let appMusicFolder = getMusicBoxFolder() else {
-            return nil
-        }
-
-        let exts = ["mp3", "MP3", "flac", "FLAC"]
-        for ext in exts {
-            let localFileUrl = appMusicFolder.appendingPathComponent("\(id).\(ext)")
-            if FileManager.default.fileExists(atPath: localFileUrl.path) {
-                return localFileUrl
-            }
-        }
-        return nil
-    }
-
-    private func downloadFile(url: URL, ext: String) async -> URL? {
-        guard let appMusicFolder = getMusicBoxFolder() else {
-            return nil
-        }
-
-        // Define the local file path
-        let localFileUrl = appMusicFolder.appendingPathComponent(
-            "\(self.id).\(ext)")
-
-        let fileManager = FileManager.default
-        // Check if file already exists
-        if fileManager.fileExists(atPath: localFileUrl.path) {
-            print("File already exists, no need to download.")
-        } else {
-            do {
-                // TODO: Streaming
-                print("Downloading file from \(url) to \(localFileUrl)")
-                let (data, _) = try await URLSession.shared.data(from: url)
-                try data.write(to: localFileUrl)
-            } catch {
-                print("Error downloading or saving the file: \(error)")
-                return nil
-            }
-        }
-        return localFileUrl
     }
 
     func getUrlAsync() async -> URL? {
@@ -251,7 +252,7 @@ class PlaylistItem: Identifiable, Codable {
                 return self.url
             } else {
                 if let ext = self.ext {
-                    self.url = await downloadFile(url: url, ext: ext)
+                    self.url = await downloadMusicFile(url: url, id: id, ext: ext)
                     return self.url
                 }
             }
@@ -264,7 +265,7 @@ class PlaylistItem: Identifiable, Codable {
                 let songData = songData[0]
                 self.ext = songData.type
                 if let url = URL(string: songData.url.https), let ext = self.ext {
-                    self.url = await downloadFile(url: url, ext: ext)
+                    self.url = await downloadMusicFile(url: url, id: id, ext: ext)
                     return self.url
                 }
             }
