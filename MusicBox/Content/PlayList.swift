@@ -118,7 +118,7 @@ struct PlayAllButton: View {
         }) {
             Image(systemName: "play.circle")
                 .resizable()
-                .frame(width: 18, height: 18)
+                .frame(width: 16, height: 16)
         }
         .buttonStyle(BorderlessButtonStyle())
         .help("Play All")
@@ -132,7 +132,7 @@ struct PlayAllButton: View {
         }) {
             Image(systemName: "plus.circle")
                 .resizable()
-                .frame(width: 18, height: 18)
+                .frame(width: 16, height: 16)
         }
         .buttonStyle(BorderlessButtonStyle())
         .help("Add All to Playlist")
@@ -172,47 +172,61 @@ struct DownloadAllButton: View {
     @State private var canceledDownloadAllSong = false
     @State private var downloadProgress: Double = 0.0
 
+    @State private var downloading = false
+
     @State private var text: String = "Downloading"
 
     var songs: [CloudMusicApi.Song]
 
     var body: some View {
         Button(action: {
-            presentDownloadAllSongDialog = true
+            if downloading {
+                presentDownloadAllSongDialog.toggle()
+                return
+            }
+            downloading = true
 
             Task {
                 let totalCnt = songs.count
 
                 for (idx, song) in songs.enumerated() {
                     text = "Downloading \(idx + 1) / \(totalCnt)"
-                    if let _ = getCachedMusicFile(id: song.id) {
-                    } else {
-                        if let songData = await CloudMusicApi.song_url_v1(id: [song.id]) {
-                            let songData = songData[0]
-                            let ext = songData.type
-                            if let url = URL(string: songData.url.https) {
-                                let _ = await downloadMusicFile(url: url, id: song.id, ext: ext)
-                            }
-                        }
-                    }
+                     if let _ = getCachedMusicFile(id: song.id) {
+                     } else {
+                         if let songData = await CloudMusicApi.song_url_v1(id: [song.id]) {
+                             let songData = songData[0]
+                             let ext = songData.type
+                             if let url = URL(string: songData.url.https) {
+                                 let _ = await downloadMusicFile(url: url, id: song.id, ext: ext)
+                             }
+                         }
+                     }
 
                     downloadProgress = Double(idx + 1) / Double(totalCnt)
 
                     if canceledDownloadAllSong {
                         break
-                    } 
+                    }
                 }
                 canceledDownloadAllSong = false
                 presentDownloadAllSongDialog = false
+                downloading = false
             }
         }) {
-            Image(systemName: "arrow.down.circle")
-                .resizable()
-                .frame(width: 18, height: 18)
-                .help("Download All")
+            if downloading {
+                ProgressView(value: downloadProgress)
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .controlSize(.small)
+                    .help("Downloading")
+            } else {
+                Image(systemName: "arrow.down.circle")
+                    .resizable()
+                    .frame(width: 16, height: 16)
+                    .help("Download All")
+            }
         }
         .buttonStyle(BorderlessButtonStyle())
-        .sheet(
+        .popover(
             isPresented: $presentDownloadAllSongDialog
         ) {
             DownloadProgressDialog(
