@@ -43,6 +43,7 @@
 		2DFB58E12BF24D7600D488F4 /* libssl.1.1.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2DFB58DE2BF24D7600D488F4 /* libssl.1.1.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		2DFB58E22BF24D7600D488F4 /* libcrypto.1.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DFB58DF2BF24D7600D488F4 /* libcrypto.1.1.dylib */; };
 		2DFB58E32BF24D7600D488F4 /* libcrypto.1.1.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2DFB58DF2BF24D7600D488F4 /* libcrypto.1.1.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		2DFB58E52BF5997B00D488F4 /* PlayingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFB58E42BF5997B00D488F4 /* PlayingDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -110,6 +111,7 @@
 		2DFB58DB2BF1B90000D488F4 /* QtNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtNetwork.framework; path = ../Qt/6.7.0/macos/lib/QtNetwork.framework; sourceTree = "<group>"; };
 		2DFB58DE2BF24D7600D488F4 /* libssl.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libssl.1.1.dylib; path = ../QCloudMusicApi/build/bin/libssl.1.1.dylib; sourceTree = "<group>"; };
 		2DFB58DF2BF24D7600D488F4 /* libcrypto.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libcrypto.1.1.dylib; path = ../QCloudMusicApi/build/bin/libcrypto.1.1.dylib; sourceTree = "<group>"; };
+		2DFB58E42BF5997B00D488F4 /* PlayingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayingDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -164,6 +166,7 @@
 				2D2800D32BD21F20007A55D5 /* Player */,
 				2D3A45A52BE86F75006CD909 /* Player.swift */,
 				2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */,
+				2DFB58E42BF5997B00D488F4 /* PlayingDetailView.swift */,
 				2D2800992BCE1F21007A55D5 /* Preview Content */,
 				2D3A45832BE3A90F006CD909 /* QCloudMusicApi.h */,
 			);
@@ -320,6 +323,7 @@
 				2D2800962BCE1F20007A55D5 /* ContentView.swift in Sources */,
 				2D3A45A62BE86F75006CD909 /* Player.swift in Sources */,
 				2D2800DE2BD21FE9007A55D5 /* RemoteCommandCenter.swift in Sources */,
+				2DFB58E52BF5997B00D488F4 /* PlayingDetailView.swift in Sources */,
 				2D2800DD2BD21FE9007A55D5 /* PlaylistItem.swift in Sources */,
 				2D2800D42BD21F20007A55D5 /* SampleBufferItem.swift in Sources */,
 				2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */,

@@ -42,14 +42,16 @@ struct ContentView: View {
     @State private var selection: String?  // = "Now Playing"
     @StateObject private var userInfo = UserInfo()
 
+    @State private var showPlayDetail = false
+
     var body: some View {
         ZStack(
             alignment: Alignment(horizontal: .trailing, vertical: .bottom),
             content: {
                 NavigationSplitView {
-                    AccountHeaderView()
-                        .environmentObject(userInfo)
                     List(selection: $selection) {
+                        AccountHeaderView()
+                            .environmentObject(userInfo)
                         if userInfo.profile == nil {
                             Section(header: Text("Account")) {
                                 NavigationLink(
@@ -115,7 +117,7 @@ struct ContentView: View {
                 .searchable(text: .constant(""), prompt: "Search")
                 .padding(.bottom, 80)
 
-                PlayerControlView()
+                PlayerControlView(showPlayDetail: $showPlayDetail)
                     .environmentObject(playController)
                     .frame(height: 80)
                     .overlay(
@@ -128,6 +130,9 @@ struct ContentView: View {
                     )
                     .background(Color.white)
                     .frame(minWidth: 800)
+                // .fullScreenCover(isPresented: $showPlayDetail) {
+                //     PlayingDetailView()
+                // }
             }
         )
         .onKeyPress { press in

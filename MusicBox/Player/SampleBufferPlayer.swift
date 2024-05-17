@@ -58,6 +58,8 @@ class SampleBufferPlayer {
     
     // The serialized playback logic that executes on the serialization queue.
     private var playbackSerializer: SampleBufferSerializer!
+
+    private var loopMode: LoopMode = .sequence
     
     /// Initializes a sample buffer player.
     init() {
@@ -279,7 +281,14 @@ class SampleBufferPlayer {
         
         // Start playing the requested items.
         playlist.currentIndex = currentIndex
-        let playbackItems = Array(playlist.items [currentIndex ..< playlist.items.count])
+        var playbackItems = Array(playlist.items [currentIndex ..< playlist.items.count])
+
+        if self.loopMode == .shuffle {
+            // shuffle the playbackItems except the first item
+            let firstItem = playbackItems.removeFirst()
+            playbackItems.shuffle()
+            playbackItems.insert(firstItem, at: 0)
+        }
         
         playbackSerializer.restartQueue(with: playbackItems, atOffset: offset)
     }
@@ -291,9 +300,20 @@ class SampleBufferPlayer {
         guard let currentIndex = playlist.currentIndex else { stopCurrentItems(); return }
 
         // Continue playing with a list of items to play starting from the current item.
-        let playbackItems = Array(playlist.items [currentIndex ..< playlist.items.count])
+        var playbackItems = Array(playlist.items [currentIndex ..< playlist.items.count])
+
+        if self.loopMode == .shuffle {
+            // shuffle the playbackItems except the first item
+            let firstItem = playbackItems.removeFirst()
+            playbackItems.shuffle()
+            playbackItems.insert(firstItem, at: 0)
+        }
         
         playbackSerializer.continueQueue(with: playbackItems)
+    }
+
+    func setLoopMode(_ loopMode: LoopMode) {
+        self.loopMode = loopMode
     }
 
     /// The index of the current item, if any.

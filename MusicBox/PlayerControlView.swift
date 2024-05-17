@@ -74,6 +74,7 @@ struct PlaySliderView: View {
 
 struct PlayerControlView: View {
     @EnvironmentObject var playController: PlayController
+    @Binding var showPlayDetail: Bool
 
     func secondsToMinutesAndSeconds(seconds: Double) -> String {
         let seconds_int = Int(seconds)
@@ -101,6 +102,9 @@ struct PlayerControlView: View {
                             .padding()
                             .frame(width: height, height: height)
                             .background(Color.gray.opacity(0.2))
+                    }
+                    .onTapGesture {
+                        showPlayDetail = true
                     }
                 } else {
                     Image(systemName: "music.note")
@@ -191,10 +195,7 @@ struct PlayerControlView: View {
                 Spacer()
 
                 Button(action: {
-                    playController.loopMode =
-                        playController.loopMode == .once
-                        ? .sequence : (playController.loopMode == .sequence ? .shuffle : .once)
-                    playController.saveLoopMode()
+                    playController.switchToNextLoopMode()
                 }) {
                     Image(
                         systemName: playController.loopMode == .once
@@ -230,6 +231,6 @@ struct PlayerControlView: View {
     }
 }
 
-#Preview {
-    PlayerControlView()
-}
+//#Preview {
+//    PlayerControlView()
+//}

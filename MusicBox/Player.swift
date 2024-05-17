@@ -52,6 +52,19 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         }
     }
 
+    func switchToNextLoopMode() {
+        switch loopMode {
+        case .once:
+            loopMode = .sequence
+        case .sequence:
+            loopMode = .shuffle
+        case .shuffle:
+            loopMode = .once
+        }
+        sampleBufferPlayer.setLoopMode(loopMode)
+        saveLoopMode()
+    }
+
     func stopPlaying() {
         sampleBufferPlayer.pause()
         isPlaying = false
@@ -217,6 +230,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     private func loadMisc() {
         let loopMode = UserDefaults.standard.integer(forKey: "LoopMode")
         self.loopMode = LoopMode(rawValue: loopMode) ?? .sequence
+        self.sampleBufferPlayer.setLoopMode(self.loopMode)
     }
 
     func saveState() {

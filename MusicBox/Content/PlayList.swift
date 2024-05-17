@@ -128,7 +128,6 @@ struct PlayAllButton: View {
                 loadItem(song: song)
             }
             let _ = playController.addItemsToPlaylist(newItems)
-            playController.startPlaying()
         }) {
             Image(systemName: "plus.circle")
                 .resizable()
