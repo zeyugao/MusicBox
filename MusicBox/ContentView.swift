@@ -73,7 +73,8 @@ struct ContentView: View {
                             ) {
                                 Label("Now Playing", systemImage: "dot.radiowaves.left.and.right")
                             }.tag("Now Playing")
-
+                            
+                            #if DEBUG
                             NavigationLink(
                                 destination: PlayerView()
                                     .environmentObject(playController)
@@ -81,6 +82,7 @@ struct ContentView: View {
                             ) {
                                 Label("Debug", systemImage: "skew")
                             }.tag("Debug")
+                            #endif
                         }
 
                         Section(header: Text("Created Playlists")) {
