@@ -30,6 +30,11 @@
 		2D3A45A22BE3C591006CD909 /* libqopensslbackend.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2D3A459F2BE3C591006CD909 /* libqopensslbackend.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		2D3A45A62BE86F75006CD909 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45A52BE86F75006CD909 /* Player.swift */; };
 		2D3A45A82BE916C8006CD909 /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45A72BE916C8006CD909 /* NowPlaying.swift */; };
+		2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */; };
+		2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */; };
+		2DC8FDB52BF7C58900D21F6A /* MediaFileHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAF2BF7C58900D21F6A /* MediaFileHandle.swift */; };
+		2DC8FDB62BF7C58900D21F6A /* ResourceLoaderDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDB02BF7C58900D21F6A /* ResourceLoaderDelegate.swift */; };
+		2DC8FDB72BF7C58900D21F6A /* URLExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDB12BF7C58900D21F6A /* URLExtension.swift */; };
 		2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CA2BD2823E00F9D181 /* PlayList.swift */; };
 		2DED51CD2BD2AD7A00F9D181 /* Play.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CC2BD2AD7A00F9D181 /* Play.swift */; };
 		2DED51CF2BD3806D00F9D181 /* CloudMusicApi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */; };
@@ -102,6 +107,11 @@
 		2D3A459F2BE3C591006CD909 /* libqopensslbackend.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = libqopensslbackend.dylib; path = ../Qt/6.7.0/macos/plugins/tls/libqopensslbackend.dylib; sourceTree = "<group>"; };
 		2D3A45A52BE86F75006CD909 /* Player.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		2D3A45A72BE916C8006CD909 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
+		2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItem.swift; sourceTree = "<group>"; };
+		2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItemConfiguration.swift; sourceTree = "<group>"; };
+		2DC8FDAF2BF7C58900D21F6A /* MediaFileHandle.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MediaFileHandle.swift; sourceTree = "<group>"; };
+		2DC8FDB02BF7C58900D21F6A /* ResourceLoaderDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ResourceLoaderDelegate.swift; sourceTree = "<group>"; };
+		2DC8FDB12BF7C58900D21F6A /* URLExtension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLExtension.swift; sourceTree = "<group>"; };
 		2DED51CA2BD2823E00F9D181 /* PlayList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayList.swift; sourceTree = "<group>"; };
 		2DED51CC2BD2AD7A00F9D181 /* Play.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Play.swift; sourceTree = "<group>"; };
 		2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudMusicApi.swift; sourceTree = "<group>"; };
@@ -165,6 +175,7 @@
 				2D2800932BCE1F20007A55D5 /* MusicBoxApp.swift */,
 				2D2800D32BD21F20007A55D5 /* Player */,
 				2D3A45A52BE86F75006CD909 /* Player.swift */,
+				2DC8FDB22BF7C58900D21F6A /* CachingPlayerItem */,
 				2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */,
 				2DFB58E42BF5997B00D488F4 /* PlayingDetailView.swift */,
 				2D2800992BCE1F21007A55D5 /* Preview Content */,
@@ -224,6 +235,18 @@
 			path = AAC;
 			sourceTree = "<group>";
 		};
+		2DC8FDB22BF7C58900D21F6A /* CachingPlayerItem */ = {
+			isa = PBXGroup;
+			children = (
+				2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */,
+				2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */,
+				2DC8FDAF2BF7C58900D21F6A /* MediaFileHandle.swift */,
+				2DC8FDB02BF7C58900D21F6A /* ResourceLoaderDelegate.swift */,
+				2DC8FDB12BF7C58900D21F6A /* URLExtension.swift */,
+			);
+			path = CachingPlayerItem;
+			sourceTree = "<group>";
+		};
 		2DED51C72BD2815800F9D181 /* Content */ = {
 			isa = PBXGroup;
 			children = (
@@ -267,7 +290,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1530;
-				LastUpgradeCheck = 1530;
+				LastUpgradeCheck = 1540;
 				TargetAttributes = {
 					2D28008F2BCE1F20007A55D5 = {
 						CreatedOnToolsVersion = 15.3;
@@ -313,6 +336,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2DED51CF2BD3806D00F9D181 /* CloudMusicApi.swift in Sources */,
+				2DC8FDB62BF7C58900D21F6A /* ResourceLoaderDelegate.swift in Sources */,
 				2D2800DC2BD21FE9007A55D5 /* NowPlayingCenter.swift in Sources */,
 				2D3A45A82BE916C8006CD909 /* NowPlaying.swift in Sources */,
 				2D2800E52BD2202A007A55D5 /* ADTSSampleBufferSource.swift in Sources */,
@@ -320,6 +344,7 @@
 				2D3A45842BE3A90F006CD909 /* QCloudMusicApi.h in Sources */,
 				2D2800D52BD21F20007A55D5 /* SampleBufferPlayer.swift in Sources */,
 				2DED51CD2BD2AD7A00F9D181 /* Play.swift in Sources */,
+				2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */,
 				2D2800962BCE1F20007A55D5 /* ContentView.swift in Sources */,
 				2D3A45A62BE86F75006CD909 /* Player.swift in Sources */,
 				2D2800DE2BD21FE9007A55D5 /* RemoteCommandCenter.swift in Sources */,
@@ -327,10 +352,13 @@
 				2D2800DD2BD21FE9007A55D5 /* PlaylistItem.swift in Sources */,
 				2D2800D42BD21F20007A55D5 /* SampleBufferItem.swift in Sources */,
 				2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */,
+				2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */,
+				2DC8FDB52BF7C58900D21F6A /* MediaFileHandle.swift in Sources */,
 				2D2800E42BD2202A007A55D5 /* ADTSHeader.swift in Sources */,
 				2D2800942BCE1F20007A55D5 /* MusicBoxApp.swift in Sources */,
 				2D2800D62BD21F20007A55D5 /* SampleBufferSerializer.swift in Sources */,
 				2DED51EE2BD3F62100F9D181 /* Extensions.swift in Sources */,
+				2DC8FDB72BF7C58900D21F6A /* URLExtension.swift in Sources */,
 				2D2800D72BD21F20007A55D5 /* SampleBufferSource.swift in Sources */,
 				2D2800A32BCF6998007A55D5 /* PlayerControlView.swift in Sources */,
 				2DFB58D72BF0744100D488F4 /* Account.swift in Sources */,
@@ -374,6 +402,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -437,6 +466,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -469,6 +499,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"MusicBox/Preview Content\"";
 				DEVELOPMENT_TEAM = WL4FUY6R56;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -511,6 +542,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"MusicBox/Preview Content\"";
 				DEVELOPMENT_TEAM = WL4FUY6R56;
 				ENABLE_HARDENED_RUNTIME = YES;

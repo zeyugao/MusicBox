@@ -140,7 +140,7 @@ struct ContentView: View {
         .onKeyPress { press in
             if press.characters == " " {
                 DispatchQueue.main.async {
-                    playController.togglePlayPause()
+                    Task { await playController.togglePlayPause() }
                 }
                 return .handled
             }
@@ -183,7 +183,7 @@ struct ContentView: View {
             }
 
             Task {
-                playController.loadState(continuePlaying: false)
+                 await playController.loadState(continuePlaying: false)
             }
         }
     }

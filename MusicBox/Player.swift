@@ -16,13 +16,19 @@ enum LoopMode: Int {
     case sequence
 }
 
-class PlayController: ObservableObject, RemoteCommandHandler {
-    let sampleBufferPlayer = SampleBufferPlayer()
+enum PlayerState: Int {
+    case unknown = 0
+    case playing = 1
+    case paused = 2
+    case stopped = 3
+    case interrupted = 4
+}
 
+class PlayController: ObservableObject, RemoteCommandHandler {
     private let savedCurrentPlaylistKey = "CurrentPlaylist"
     private let savedCurrentPlayingItemIndexKey = "CurrentPlayingItemIndex"
 
-    @Published var isPlaying: Bool = false
+    private var player = AVPlayer()
 
     @Published var playedSecond: Double = 0.0
     @Published var duration: Double = 0.0
@@ -37,16 +43,32 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     var scrobbled: Bool = false
 
-    // Private notification observers.
-    private var currentOffsetObserver: NSObjectProtocol!
-    private var currentItemObserver: NSObjectProtocol!
-    private var playbackRateObserver: NSObjectProtocol!
-    private var playbackOffsetChangeObserver: NSObjectProtocol!
+    var playerState: PlayerState = .stopped
 
-    func togglePlayPause() {
-        isPlaying.toggle()  // 切换播放状态
-        if isPlaying {
-            startPlaying()
+    var isPlaying: Bool {
+        playerState == .playing
+    }
+
+    var playlist: [PlaylistItem] = []
+    private var currentItemIndex: Int? = nil
+    var currentItem: PlaylistItem? {
+        if let currentItemIndex = currentItemIndex {
+            return playlist[currentItemIndex]
+        }
+        return nil
+    }
+
+    // Private notification observers.
+    var periodicTimeObserverToken: Any?
+    var playerShouldNextObserver: NSObjectProtocol?
+    var playerSelectionChangedObserver: NSObjectProtocol?
+    var playerStateObserver: NSKeyValueObservation?
+    var timeControlStatus: AVPlayer.TimeControlStatus = .waitingToPlayAtSpecifiedRate
+    var timeControlStautsObserver: NSKeyValueObservation?
+
+    func togglePlayPause() async {
+        if !isPlaying {
+            await startPlaying()
         } else {
             stopPlaying()
         }
@@ -61,94 +83,144 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         case .shuffle:
             loopMode = .once
         }
-        sampleBufferPlayer.setLoopMode(loopMode)
         saveLoopMode()
     }
 
     func stopPlaying() {
-        sampleBufferPlayer.pause()
-        isPlaying = false
+        player.pause()
+        playerState = .paused
         updateCurrentPlaybackInfo()
         NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
     }
 
-    func startPlaying() {
-        guard sampleBufferPlayer.itemCount > 0 else { return }
-        sampleBufferPlayer.play()
-        isPlaying = true
+    func startPlaying() async {
+        if player.currentItem == nil {
+            await nextTrack()
+        }
+        player.play()
+        playerState = .playing
         updateCurrentPlaybackInfo()
         NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
     }
 
     func performRemoteCommand(_ command: RemoteCommand) {
-        switch command {
-        case .play:
-            startPlaying()
-        case .pause:
-            stopPlaying()
-        case .togglePlayPause:
-            togglePlayPause()
-        case .nextTrack:
-            nextTrack()
-        case .previousTrack:
-            previousTrack()
-        case .skipForward(let distance):
-            seekByOffset(offset: distance)
-        case .skipBackward(let distance):
-            seekByOffset(offset: -distance)
-        case .changePlaybackPosition(let offset):
-            seekToOffset(offset: offset)
+        runBlocking {
+            switch command {
+            case .play:
+                await startPlaying()
+            case .pause:
+                stopPlaying()
+            case .togglePlayPause:
+                await togglePlayPause()
+            case .nextTrack:
+                await nextTrack()
+            case .previousTrack:
+                await previousTrack()
+            case .skipForward(let distance):
+                seekByOffset(offset: distance)
+            case .skipBackward(let distance):
+                seekByOffset(offset: -distance)
+            case .changePlaybackPosition(let offset):
+                seekToOffset(offset: offset)
+            }
         }
     }
 
-    func nextTrack() {
+    func nextTrack() async {
+        if loopMode == .once && currentItemIndex == playlist.count - 1 {
+            stopPlaying()
+            await seekToItem(offset: nil)
+        }
+
         let offset =
             if loopMode == .shuffle {
-                Int.random(in: 0..<sampleBufferPlayer.itemCount)
+                Int.random(in: 0..<playlist.count)
             } else {
                 1
             }
-        seekItemByOffset(offset: offset)
+        await seekByItem(offset: offset)
+        player.play()
     }
 
-    func previousTrack() {
+    func previousTrack() async {
         let offset =
             if loopMode == .shuffle {
-                Int.random(in: 0..<sampleBufferPlayer.itemCount)
+                Int.random(in: 0..<playlist.count)
             } else {
                 -1
             }
-        seekItemByOffset(offset: offset)
+        await seekToItem(offset: offset)
+        player.play()
     }
 
-    func seekItemByOffset(offset: Int) {
-        if let currentItemIndex = sampleBufferPlayer.currentItemIndex {
-            let totalCnt = sampleBufferPlayer.itemCount
-            let offset = (offset + totalCnt) % totalCnt
-            let newItemIndex = ((currentItemIndex + offset) + totalCnt) % totalCnt
-            sampleBufferPlayer.seekToItem(at: newItemIndex)
+    func seekByItem(offset: Int) async {
+        guard playlist.count > 0 else { return }
+
+        let currentItemIndex = currentItemIndex ?? 0
+        let newItemIndex = (currentItemIndex + offset + playlist.count) % playlist.count
+        await seekToItem(offset: newItemIndex)
+    }
+
+    func updateDuration(duration: Double) {
+        DispatchQueue.main.async {
+            self.duration = duration
+        }
+    }
+
+    func seekToItem(offset: Int?) async {
+        if let offset = offset {
+            guard offset < playlist.count else { return }
+
+            let item = playlist[offset]
+            currentItemIndex = offset
+            updateDuration(duration: item.duration.seconds)
+
+            // let playerItem: AVPlayerItem
+            // if let url = item.getLocalUrl() {
+            //     playerItem = AVPlayerItem(url: url)
+            // } else if let url = await item.getUrlAsync(),
+            //     let savePath = item.getPotentialLocalUrl(),
+            //     let ext = item.ext
+            // {
+            //     playerItem = CachingPlayerItem(
+            //         url: url, saveFilePath: savePath.path, customFileExtension: ext)
+            // } else {
+            //     return
+            // }
+            // player.replaceCurrentItem(with: playerItem)
+            // player.automaticallyWaitsToMinimizeStalling = false
+
+            if let url = await item.getUrlAsync() {
+                let playerItem = AVPlayerItem(url: url)
+                player.replaceCurrentItem(with: playerItem)
+                player.automaticallyWaitsToMinimizeStalling = false
+            } else {
+                return
+            }
+
+            saveCurrentPlayingItemIndex()
+        } else {
+            updateDuration(duration: 0.0)
+            currentItemIndex = nil
+            player.replaceCurrentItem(with: nil)
         }
     }
 
     func seekToOffset(offset: Double) {
-        isUpdatingOffset = true
-        playedSecond = offset
-        let offset = CMTime(seconds: offset, preferredTimescale: 10)
-        sampleBufferPlayer.seekToOffset(offset)
+        let newTime = CMTime(seconds: offset, preferredTimescale: 1)
+        player.seek(to: newTime)
         updateCurrentPlaybackInfo()
     }
 
     func seekByOffset(offset: Double) {
-        isUpdatingOffset = true
-        let newPlayedSecond = playedSecond + offset
-        let offset = CMTime(seconds: newPlayedSecond, preferredTimescale: 10)
-        sampleBufferPlayer.seekToOffset(offset)
+        let currentTime = player.currentTime()
+        let newTime = CMTimeAdd(currentTime, CMTime(seconds: offset, preferredTimescale: 1))
+        player.seek(to: newTime)
         updateCurrentPlaybackInfo()
     }
 
     private func findIdIndex(_ id: UInt64) -> Int {
-        let items = sampleBufferPlayer.items
-        for (index, item) in items.enumerated() {
+        for (index, item) in playlist.enumerated() {
             if item.id == id {
                 return index
             }
@@ -161,9 +233,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     ) -> Int {
         var idIdx = findIdIndex(item.id)
         if idIdx == -1 {
-            let totalCnt = sampleBufferPlayer.itemCount
-            sampleBufferPlayer.insertItem(item, at: totalCnt, continuePlaying: continuePlaying)
-            idIdx = totalCnt
+            playlist.append(item)
+            idIdx = playlist.count - 1
         }
         if shouldSaveState {
             saveState()
@@ -173,10 +244,11 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     func replacePlaylist(
         _ items: [PlaylistItem], continuePlaying: Bool = true, shouldSaveState: Bool = true
-    ) {
-        sampleBufferPlayer.replaceItems(with: items)
+    ) async {
+        playlist = items
+        await seekToItem(offset: nil)
         if continuePlaying {
-            startPlaying()
+            await startPlaying()
         }
         if shouldSaveState {
             saveState()
@@ -185,13 +257,13 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     func addItemsToPlaylist(
         _ items: [PlaylistItem], continuePlaying: Bool = true, shouldSaveState: Bool = true
-    ) {
+    ) async {
         for item in items {
             let _ = addItemToPlaylist(
                 item, continuePlaying: continuePlaying, shouldSaveState: false)
         }
         if continuePlaying {
-            startPlaying()
+            await startPlaying()
         }
         if shouldSaveState {
             saveState()
@@ -199,27 +271,27 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     private func savePlaylist() {
-        let items = sampleBufferPlayer.items
-        saveEncodableState(forKey: savedCurrentPlaylistKey, data: items)
+        saveEncodableState(forKey: savedCurrentPlaylistKey, data: playlist)
     }
 
     private func saveCurrentPlayingItemIndex() {
-        UserDefaults.standard.set(
-            sampleBufferPlayer.currentItemIndex, forKey: savedCurrentPlayingItemIndexKey)
-        print("Current item saved")
+        UserDefaults.standard.set(currentItemIndex, forKey: savedCurrentPlayingItemIndexKey)
     }
 
-    private func loadCurrentPlayingItemIndex() {
+    private func loadCurrentPlayingItemIndex() async {
         if let savedIndex = UserDefaults.standard.object(forKey: savedCurrentPlayingItemIndexKey)
             as? Int
         {
-            sampleBufferPlayer.seekToItem(at: savedIndex)
+            if savedIndex < 0 || savedIndex >= playlist.count {
+                return
+            }
+            currentItemIndex = savedIndex
+            await seekToItem(offset: savedIndex)
         }
     }
 
     func saveLoopMode() {
-        UserDefaults.standard.set(
-            loopMode.rawValue, forKey: "LoopMode")
+        UserDefaults.standard.set(loopMode.rawValue, forKey: "LoopMode")
     }
 
     private func saveMisc() {
@@ -229,7 +301,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     private func loadMisc() {
         let loopMode = UserDefaults.standard.integer(forKey: "LoopMode")
         self.loopMode = LoopMode(rawValue: loopMode) ?? .sequence
-        self.sampleBufferPlayer.setLoopMode(self.loopMode)
     }
 
     func saveState() {
@@ -238,38 +309,43 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         saveMisc()
     }
 
-    func loadState(continuePlaying: Bool = true) {
-        loadMisc()
-        loadCurrentPlayingItemIndex()
+    func loadState(continuePlaying: Bool = true) async {
+        DispatchQueue.main.async {
+            self.loadMisc()
+        }
+
         if let playlist = loadDecodableState(
-            forKey: savedCurrentPlaylistKey, type: [PlaylistItem].self)
+            forKey: self.savedCurrentPlaylistKey, type: [PlaylistItem].self)
         {
-            replacePlaylist(
+            await self.replacePlaylist(
                 playlist, continuePlaying: continuePlaying, shouldSaveState: false)
             print("Playlist loaded")
         } else {
             print("Failed to load playlist")
         }
+        await self.loadCurrentPlayingItemIndex()
     }
 
     func clearPlaylist() {
-        sampleBufferPlayer.replaceItems(with: [])
+        playlist = []
+        saveState()
     }
 
-    func addItemAndPlay(_ item: PlaylistItem) -> Int {
+    func addItemAndPlay(_ item: PlaylistItem) async -> Int {
         let idIdx = addItemToPlaylist(item, continuePlaying: false)
-        sampleBufferPlayer.seekToItem(at: idIdx)
+        await seekToItem(offset: idIdx)
         return idIdx
     }
 
     private func doScrobble() {
-        if let currentItem = sampleBufferPlayer.currentItem {
-            if playedSecond / currentItem.duration.seconds > 0.75 {
-                if !scrobbled {
+        if let currentItem = player.currentItem, let currentItemIndex = currentItemIndex {
+            if !scrobbled {
+                if playedSecond / currentItem.duration.seconds > 0.75 {
+                    let item = playlist[currentItemIndex]
                     Task {
                         await CloudMusicApi.scrobble(
-                            id: currentItem.id, sourceid: currentItem.albumId,
-                            time: Int64(duration))
+                            id: item.id, sourceid: item.albumId,
+                            time: Int64(item.duration.seconds))
                         scrobbled = true
                     }
                 }
@@ -280,10 +356,17 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     func updateCurrentPlaybackInfo() {
         doScrobble()
 
+        let duration =
+            if let currentItemIndex = currentItemIndex {
+                playlist[currentItemIndex].duration.seconds
+            } else {
+                0.0
+            }
+
         NowPlayingCenter.handlePlaybackChange(
-            playing: sampleBufferPlayer.isPlaying, rate: sampleBufferPlayer.rate,
+            playing: player.timeControlStatus == .playing, rate: player.rate,
             position: self.playedSecond,
-            duration: sampleBufferPlayer.currentItem?.duration.seconds ?? 0)
+            duration: duration)
     }
 
     func nowPlayingInit() {
@@ -292,86 +375,63 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
     }
 
+    func initPlayerObservers() {
+        timeControlStautsObserver = player.observe(\.timeControlStatus, options: [.initial, .new]) {
+            [weak self] (player, changes) in
+            self?.timeControlStatus = player.timeControlStatus
+        }
+
+        let timeScale = CMTimeScale(NSEC_PER_SEC)
+
+        playerStateObserver = player.observe(\.rate, options: [.initial, .new]) { player, _ in
+            guard player.status == .readyToPlay else { return }
+
+            self.playerState = player.rate.isZero ? .paused : .playing
+        }
+
+        periodicTimeObserverToken = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.5, preferredTimescale: timeScale), queue: .main
+        ) { [weak self] time in
+            self?.playedSecond = self?.player.currentTime().seconds ?? 0.0
+            self?.updateCurrentPlaybackInfo()
+        }
+
+        playerShouldNextObserver = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main
+        ) { _ in
+            Task {
+                await self.nextTrack()
+            }
+        }
+
+        playerSelectionChangedObserver = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.mediaSelectionDidChangeNotification, object: nil, queue: .main
+        ) { _ in
+            print("mediaSelectionDidChangeNotification")
+        }
+    }
+
+    func deinitPlayerObservers() {
+        if let timeObserverToken = periodicTimeObserverToken {
+            player.removeTimeObserver(timeObserverToken)
+            periodicTimeObserverToken = nil
+            playedSecond = 0
+        }
+        playerStateObserver?.invalidate()
+        timeControlStautsObserver?.invalidate()
+
+        if let obs = playerShouldNextObserver {
+            NotificationCenter.default.removeObserver(obs)
+            playerShouldNextObserver = nil
+        }
+    }
+
     init() {
-        let notificationCenter = NotificationCenter.default
-
-        currentOffsetObserver = notificationCenter.addObserver(
-            forName: SampleBufferPlayer.currentOffsetDidChange,
-            object: sampleBufferPlayer,
-            queue: .main
-        ) { [unowned self] notification in
-            let offset =
-                (notification.userInfo?[SampleBufferPlayer.currentOffsetKey] as? NSValue)?
-                .timeValue.seconds
-            // Avoid updating the offset if it is being changed by the user.
-            if !isUpdatingOffset {
-                if let offset = offset {
-                    let newOffset = Int(offset)
-                    if newOffset != lastUpdatedSecond {
-                        lastUpdatedSecond = newOffset
-                        DispatchQueue.main.async {
-                            self.playedSecond = Double(self.lastUpdatedSecond)
-                        }
-                    }
-                }
-            }
-            updateCurrentPlaybackInfo()
-        }
-
-        currentItemObserver = notificationCenter.addObserver(
-            forName: SampleBufferPlayer.currentItemDidChange,
-            object: sampleBufferPlayer,
-            queue: .main
-        ) { [unowned self] _ in
-            NowPlayingCenter.handleItemChange(
-                item: sampleBufferPlayer.currentItem,
-                index: sampleBufferPlayer.currentItemIndex ?? 0,
-                count: sampleBufferPlayer.itemCount)
-
-            scrobbled = false
-
-            saveCurrentPlayingItemIndex()
-
-            if let currentItem = sampleBufferPlayer.currentItem {
-                let duration = currentItem.duration.seconds
-                self.duration = duration
-            } else {
-                switch loopMode {
-                case .once:
-                    self.stopPlaying()
-                case .sequence:
-                    self.startPlaying()
-                case .shuffle:
-                    self.nextTrack()
-                }
-            }
-        }
-
-        playbackRateObserver = notificationCenter.addObserver(
-            forName: SampleBufferPlayer.playbackRateDidChange,
-            object: sampleBufferPlayer,
-            queue: .main
-        ) { [unowned self] notification in
-            self.isPlaying = sampleBufferPlayer.isPlaying
-            updateCurrentPlaybackInfo()
-            isUpdatingOffset = false
-
-            if let isLoading = notification.userInfo?[SampleBufferPlayer.isLoadingKey] as? Bool {
-                self.isLoading = isLoading
-            }
-        }
-
-        playbackOffsetChangeObserver = notificationCenter.addObserver(
-            forName: SampleBufferPlayer.playbackOffsetDidUpdated,
-            object: sampleBufferPlayer,
-            queue: .main
-        ) { [unowned self] _ in
-            isUpdatingOffset = false
-            self.isPlaying = sampleBufferPlayer.isPlaying
-
-            updateCurrentPlaybackInfo()
-        }
-
         nowPlayingInit()
+        initPlayerObservers()
+    }
+
+    deinit {
+        deinitPlayerObservers()
     }
 }

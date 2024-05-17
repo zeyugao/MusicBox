@@ -87,7 +87,7 @@ struct PlayerControlView: View {
         GeometryReader { geometry in
             let height = geometry.size.height
             HStack(spacing: 16) {
-                if let currentItem = playController.sampleBufferPlayer.currentItem,
+                if let currentItem = playController.currentItem,
                     let url = currentItem.getArtwork()
                 {
                     AsyncImage(url: url) { image in
@@ -120,7 +120,7 @@ struct PlayerControlView: View {
 
                     HStack(spacing: 24) {
                         Button(action: {
-                            playController.previousTrack()
+                            Task { await playController.previousTrack() }
                         }) {
                             Image(systemName: "backward.fill")
                                 .resizable()
@@ -134,7 +134,7 @@ struct PlayerControlView: View {
                                 .frame(width: 20, height: 20)
                         } else {
                             Button(action: {
-                                playController.togglePlayPause()
+                                Task { await playController.togglePlayPause() }
                             }) {
                                 Image(
                                     systemName: playController.isPlaying
@@ -148,7 +148,7 @@ struct PlayerControlView: View {
                         }
 
                         Button(action: {
-                            playController.nextTrack()
+                            Task { await playController.nextTrack() }
                         }) {
                             Image(systemName: "forward.fill")
                                 .resizable()
@@ -162,11 +162,11 @@ struct PlayerControlView: View {
                 Spacer()
 
                 VStack {
-                    Text("\(playController.sampleBufferPlayer.currentItem?.title ?? "Title")")
+                    Text("\(playController.currentItem?.title ?? "Title")")
                         .font(.system(size: 12))
                         .lineLimit(1)
                         .padding(.bottom, 1)
-                    Text("\(playController.sampleBufferPlayer.currentItem?.artist ?? "Artists")")
+                    Text("\(playController.currentItem?.artist ?? "Artists")")
                         .font(.system(size: 12))
                         .lineLimit(1)
                         .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))

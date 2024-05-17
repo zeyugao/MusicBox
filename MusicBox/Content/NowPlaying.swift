@@ -36,7 +36,7 @@ struct NowPlayingView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-                    if song.id == playController.sampleBufferPlayer.currentItem?.id {
+                    if song.id == playController.currentItem?.id {
                         Image(systemName: "speaker.3.fill")
                     }
                 }
@@ -45,7 +45,7 @@ struct NowPlayingView: View {
                 Text(formatCMTime(song.duration))
             }.width(max: 60)
         } rows: {
-            ForEach(playController.sampleBufferPlayer.items) { item in
+            ForEach(playController.playlist) { item in
                 TableRow(item)
             }
         }

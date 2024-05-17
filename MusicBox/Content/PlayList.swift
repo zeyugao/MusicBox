@@ -94,9 +94,11 @@ struct TableContextMenu: View {
 
     var body: some View {
         Button("Play") {
-            let newItem = loadItem(song: song)
-            let _ = playController.addItemAndPlay(newItem)
-            playController.startPlaying()
+            Task {
+                let newItem = loadItem(song: song)
+                let _ = await playController.addItemAndPlay(newItem)
+                await playController.startPlaying()
+            }
         }
         Button("Add to Playlist") {
             let newItem = loadItem(song: song)
@@ -112,11 +114,13 @@ struct PlayAllButton: View {
 
     var body: some View {
         Button(action: {
-            let newItems = songs.map { song in
-                loadItem(song: song)
+            Task {
+                let newItems = songs.map { song in
+                    loadItem(song: song)
+                }
+                let _ = await playController.replacePlaylist(newItems, continuePlaying: false)
+                await playController.startPlaying()
             }
-            let _ = playController.replacePlaylist(newItems, continuePlaying: false)
-            playController.startPlaying()
         }) {
             Image(systemName: "play.circle")
                 .resizable()
@@ -126,10 +130,12 @@ struct PlayAllButton: View {
         .help("Play All")
 
         Button(action: {
-            let newItems = songs.map { song in
-                loadItem(song: song)
+            Task {
+                let newItems = songs.map { song in
+                    loadItem(song: song)
+                }
+                let _ = await playController.addItemsToPlaylist(newItems)
             }
-            let _ = playController.addItemsToPlaylist(newItems)
         }) {
             Image(systemName: "plus.circle")
                 .resizable()
@@ -192,16 +198,16 @@ struct DownloadAllButton: View {
 
                 for (idx, song) in songs.enumerated() {
                     text = "Downloading \(idx + 1) / \(totalCnt)"
-                     if let _ = getCachedMusicFile(id: song.id) {
-                     } else {
-                         if let songData = await CloudMusicApi.song_url_v1(id: [song.id]) {
-                             let songData = songData[0]
-                             let ext = songData.type
-                             if let url = URL(string: songData.url.https) {
-                                 let _ = await downloadMusicFile(url: url, id: song.id, ext: ext)
-                             }
-                         }
-                     }
+                    if let _ = getCachedMusicFile(id: song.id) {
+                    } else {
+                        if let songData = await CloudMusicApi.song_url_v1(id: [song.id]) {
+                            let songData = songData[0]
+                            let ext = songData.type
+                            if let url = URL(string: songData.url.https) {
+                                let _ = await downloadMusicFile(url: url, id: song.id, ext: ext)
+                            }
+                        }
+                    }
 
                     downloadProgress = Double(idx + 1) / Double(totalCnt)
 

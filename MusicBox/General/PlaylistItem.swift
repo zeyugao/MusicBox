@@ -219,8 +219,34 @@ class PlaylistItem: Identifiable, Codable {
     func isUrlReady() -> Bool {
         if let url = self.url {
             return isLocalURL(url)
+        } else if let cachedFile = getCachedMusicFile(id: id) {
+            self.url = cachedFile
+            return true
         }
+
         return false
+    }
+
+    func getLocalUrl() -> URL? {
+        if let url = self.url, isLocalURL(url) {
+            return url
+        } else if let cachedFile = getCachedMusicFile(id: id) {
+            self.url = cachedFile
+            return self.url
+        }
+        return nil
+    }
+
+    func getPotentialLocalUrl() -> URL? {
+        guard let appMusicFolder = getMusicBoxFolder() else {
+            return nil
+        }
+
+        if let ext = self.ext {
+            let localFileUrl = appMusicFolder.appendingPathComponent("\(id).\(ext)")
+            return localFileUrl
+        }
+        return nil
     }
 
     func getUrl() -> URL? {
@@ -257,10 +283,7 @@ class PlaylistItem: Identifiable, Codable {
             if isLocalURL(url) {
                 return self.url
             } else {
-                if let ext = self.ext {
-                    self.url = await downloadMusicFile(url: url, id: id, ext: ext)
-                    return self.url
-                }
+                return url
             }
         } else {
             if let cachedFile = getCachedMusicFile(id: id) {
@@ -270,8 +293,11 @@ class PlaylistItem: Identifiable, Codable {
             if let songData = await CloudMusicApi.song_url_v1(id: [id]) {
                 let songData = songData[0]
                 self.ext = songData.type
-                if let url = URL(string: songData.url.https), let ext = self.ext {
-                    self.url = await downloadMusicFile(url: url, id: id, ext: ext)
+                if self.ext == "" {
+                    self.ext = songData.encodeType
+                }
+                if let url = URL(string: songData.url.https) {
+                    self.url = url
                     return self.url
                 }
             }
