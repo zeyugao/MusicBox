@@ -233,12 +233,14 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     func saveState() {
-        saveMisc()
         savePlaylist()
         saveCurrentPlayingItemIndex()
+        saveMisc()
     }
 
     func loadState(continuePlaying: Bool = true) {
+        loadMisc()
+        loadCurrentPlayingItemIndex()
         if let playlist = loadDecodableState(
             forKey: savedCurrentPlaylistKey, type: [PlaylistItem].self)
         {
@@ -248,10 +250,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         } else {
             print("Failed to load playlist")
         }
-
-        loadCurrentPlayingItemIndex()
-
-        loadMisc()
     }
 
     func clearPlaylist() {
@@ -287,7 +285,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             position: self.playedSecond,
             duration: sampleBufferPlayer.currentItem?.duration.seconds ?? 0)
     }
-    
+
     func nowPlayingInit() {
         RemoteCommandCenter.handleRemoteCommands(using: self)
         updateCurrentPlaybackInfo()
@@ -373,7 +371,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
             updateCurrentPlaybackInfo()
         }
-        
+
         nowPlayingInit()
     }
 }
