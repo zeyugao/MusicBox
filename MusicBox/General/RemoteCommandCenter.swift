@@ -9,7 +9,7 @@ import MediaPlayer
 
 /// Types of remote commands.
 enum RemoteCommand {
-    case pause, play, nextTrack, previousTrack
+    case pause, play, nextTrack, previousTrack, togglePlayPause
     case skipForward(TimeInterval)
     case skipBackward(TimeInterval)
     case changePlaybackPosition(TimeInterval)
@@ -36,6 +36,12 @@ class RemoteCommandCenter {
         commandCenter.playCommand.addTarget { [weak handler] _ in
             guard let handler = handler else { return .noActionableNowPlayingItem }
             handler.performRemoteCommand(.play)
+            return .success
+        }
+        
+        commandCenter.togglePlayPauseCommand.addTarget { [weak handler] _ in
+            guard let handler = handler else { return .noActionableNowPlayingItem }
+            handler.performRemoteCommand(.togglePlayPause)
             return .success
         }
         

@@ -68,17 +68,16 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     func stopPlaying() {
         sampleBufferPlayer.pause()
         isPlaying = false
-        NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
         updateCurrentPlaybackInfo()
+        NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
     }
 
     func startPlaying() {
         guard sampleBufferPlayer.itemCount > 0 else { return }
-        RemoteCommandCenter.handleRemoteCommands(using: self)
         sampleBufferPlayer.play()
         isPlaying = true
-        NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
         updateCurrentPlaybackInfo()
+        NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
     }
 
     func performRemoteCommand(_ command: RemoteCommand) {
@@ -87,12 +86,12 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             startPlaying()
         case .pause:
             stopPlaying()
+        case .togglePlayPause:
+            togglePlayPause()
         case .nextTrack:
             nextTrack()
-            break
         case .previousTrack:
             previousTrack()
-            break
         case .skipForward(let distance):
             seekByOffset(offset: distance)
         case .skipBackward(let distance):
@@ -280,13 +279,19 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         }
     }
 
-    private func updateCurrentPlaybackInfo() {
+    func updateCurrentPlaybackInfo() {
         doScrobble()
 
         NowPlayingCenter.handlePlaybackChange(
             playing: sampleBufferPlayer.isPlaying, rate: sampleBufferPlayer.rate,
             position: self.playedSecond,
             duration: sampleBufferPlayer.currentItem?.duration.seconds ?? 0)
+    }
+    
+    func nowPlayingInit() {
+        RemoteCommandCenter.handleRemoteCommands(using: self)
+        updateCurrentPlaybackInfo()
+        NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
     }
 
     init() {
@@ -368,5 +373,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
             updateCurrentPlaybackInfo()
         }
+        
+        nowPlayingInit()
     }
 }

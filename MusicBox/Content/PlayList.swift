@@ -62,7 +62,8 @@ func loadItem(song: CloudMusicApi.Song, songData: CloudMusicApi.SongData) async 
         albumId: song.al.id,
         ext: songData.type,
         duration: CMTime(value: songData.time, timescale: 1000),
-        artworkUrl: URL(string: song.al.picUrl.https)
+        artworkUrl: URL(string: song.al.picUrl.https),
+        nsSong: song
     )
     return newItem
 }
@@ -76,7 +77,8 @@ func loadItem(song: CloudMusicApi.Song) -> PlaylistItem {
         albumId: song.al.id,
         ext: nil,
         duration: CMTime(value: song.dt, timescale: 1000),
-        artworkUrl: URL(string: song.al.picUrl.https)
+        artworkUrl: URL(string: song.al.picUrl.https),
+        nsSong: song
     )
     return newItem
 }

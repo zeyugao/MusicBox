@@ -161,11 +161,14 @@ class PlaylistItem: Identifiable, Codable {
 
     var artworkUrl: URL?
 
+    let nsSong: CloudMusicApi.Song?
+
     /// Initializes a valid item.
     init(
         id: UInt64, url: URL?, title: String, artist: String, albumId: UInt64, ext: String?,
         duration: CMTime,
-        artworkUrl: URL?
+        artworkUrl: URL?,
+        nsSong: CloudMusicApi.Song?
     ) {
         self.id = id
         self.url = url
@@ -176,10 +179,11 @@ class PlaylistItem: Identifiable, Codable {
         self.duration = duration
         self.error = nil
         self.artworkUrl = artworkUrl
+        self.nsSong = nsSong
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, url, title, artist, ext, duration, albumId, artworkUrl
+        case id, url, title, artist, ext, duration, albumId, artworkUrl, nsSong
     }
 
     required init(from decoder: Decoder) throws {
@@ -193,6 +197,7 @@ class PlaylistItem: Identifiable, Codable {
         duration = CMTime(seconds: seconds, preferredTimescale: 1)
         albumId = try container.decode(UInt64.self, forKey: .albumId)
         artworkUrl = try container.decodeIfPresent(URL.self, forKey: .artworkUrl)
+        nsSong = try container.decodeIfPresent(CloudMusicApi.Song.self, forKey: .nsSong)
         error = nil  // This should be handled according to your application logic
     }
 
@@ -208,6 +213,7 @@ class PlaylistItem: Identifiable, Codable {
         try container.encode(durationSeconds, forKey: .duration)
         try container.encode(albumId, forKey: .albumId)
         try container.encodeIfPresent(artworkUrl, forKey: .artworkUrl)
+        try container.encodeIfPresent(nsSong, forKey: .nsSong)
     }
 
     func isUrlReady() -> Bool {

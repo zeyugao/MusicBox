@@ -44,7 +44,7 @@ func loadAsset(url: URL) async -> PlaylistItem? {
             url: url, title: metadata.title, artist: metadata.artist,
             albumId: 0,
             ext: url.pathExtension,
-            duration: metadata.duration, artworkUrl: nil)
+            duration: metadata.duration, artworkUrl: nil, nsSong: nil)
         return newItem
     }
     return nil

@@ -30,6 +30,12 @@ struct NowPlayingView: View {
             TableColumn("Title") { song in
                 HStack {
                     Text(song.title)
+                    if let nsSong = song.nsSong {
+                        if let alia = nsSong.tns?.first ?? nsSong.alia.first {
+                            Text("( \(alia) )")
+                                .foregroundColor(.secondary)
+                        }
+                    }
                     if song.id == playController.sampleBufferPlayer.currentItem?.id {
                         Image(systemName: "speaker.3.fill")
                     }

@@ -54,12 +54,12 @@ class CloudMusicApi {
         let creator: Profile
     }
 
-    struct Quality: Decodable {
+    struct Quality: Codable {
         let br: UInt64
         let size: UInt64
     }
 
-    struct Album: Decodable {
+    struct Album: Codable {
         let id: UInt64
         let name: String
         let pic: UInt64
@@ -67,7 +67,7 @@ class CloudMusicApi {
         let tns: [String]
     }
 
-    struct Artist: Decodable {
+    struct Artist: Codable {
         let id: UInt64
         let name: String
 
@@ -75,7 +75,7 @@ class CloudMusicApi {
         let tns: [String]
     }
 
-    struct CloudMusic: Decodable {
+    struct CloudMusic: Codable {
         let alb: String
         let ar: String
         let br: UInt64
@@ -84,20 +84,20 @@ class CloudMusicApi {
         let uid: UInt64
     }
 
-    enum Fee: Int, Decodable {
+    enum Fee: Int, Codable {
         case free = 0  // 免费或无版权
         case vip = 1  // VIP 歌曲
         case album = 4  // 购买专辑
         case trial = 8  // 非会员可免费播放低音质，会员可播放高音质及下载
     }
 
-    enum OriginCoverType: Int, Decodable {
+    enum OriginCoverType: Int, Codable {
         case unknown = 0
         case origin = 1
         case cover = 2
     }
 
-    struct Song: Decodable, Identifiable {
+    struct Song: Codable, Identifiable {
         let name: String
         let id: UInt64
 

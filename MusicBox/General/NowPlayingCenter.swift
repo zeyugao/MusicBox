@@ -27,6 +27,9 @@ class NowPlayingCenter {
             nowPlayingInfo[MPNowPlayingInfoPropertyIsLiveStream] = false
             nowPlayingInfo[MPMediaItemPropertyTitle] = currentItem.title
             nowPlayingInfo[MPMediaItemPropertyArtist] = currentItem.artist
+            if let nsSong = currentItem.nsSong {
+                nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = nsSong.al.name
+            }
 
             if let artworkUrl = currentItem.getArtwork(),
                 let imageData = try? Data(contentsOf: artworkUrl),
