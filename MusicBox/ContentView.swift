@@ -50,77 +50,73 @@ struct ContentView: View {
             content: {
                 NavigationSplitView {
                     List(selection: $selection) {
-                        AccountHeaderView()
-                            .environmentObject(userInfo)
-                        if userInfo.profile == nil {
-                            Section(header: Text("Account")) {
-                                NavigationLink(
-                                    destination: LoginView()
-                                        .environmentObject(playController)
-                                        .navigationTitle("Login")
-                                ) {
-                                    Label(
-                                        "Login", systemImage: "person.crop.circle")
-                                }.tag("Login")
-                            }
-                        }
+                        NavigationLink(
+                            destination: AccountView()
+                                .environmentObject(userInfo)
+                                .environmentObject(playController)
+                                .navigationTitle("Account")
+                        ) {
+                            Label(
+                                "Account", systemImage: "person.crop.circle")
+                        }.tag("Account")
 
-                        Section(header: Text("Music")) {
+                        NavigationLink(
+                            destination: NowPlayingView()
+                                .environmentObject(playController)
+                                .navigationTitle("Now Playing")
+                        ) {
+                            Label("Now Playing", systemImage: "dot.radiowaves.left.and.right")
+                        }.tag("Now Playing")
+
+                        #if DEBUG
                             NavigationLink(
-                                destination: NowPlayingView()
+                                destination: PlayerView()
                                     .environmentObject(playController)
-                                    .navigationTitle("Now Playing")
+                                    .navigationTitle("Debug")
                             ) {
-                                Label("Now Playing", systemImage: "dot.radiowaves.left.and.right")
-                            }.tag("Now Playing")
+                                Label("Debug", systemImage: "skew")
+                            }.tag("Debug")
+                        #endif
 
-                            #if DEBUG
-                                NavigationLink(
-                                    destination: PlayerView()
-                                        .environmentObject(playController)
-                                        .navigationTitle("Debug")
-                                ) {
-                                    Label("Debug", systemImage: "skew")
-                                }.tag("Debug")
-                            #endif
-                        }
-
-                        Section(header: Text("Created Playlists")) {
-                            ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
-                                NavigationLink(
-                                    destination: PlayListView(neteasePlaylist: playlist)
-                                        .environmentObject(playController)
-                                        .environmentObject(userInfo)
-                                ) {
-                                    Label(playlist.name, systemImage: "music.note.list")
+                        
+                        if userInfo.profile != nil {
+                            Section(header: Text("Created Playlists")) {
+                                ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
+                                    NavigationLink(
+                                        destination: PlayListView(neteasePlaylist: playlist)
+                                            .environmentObject(playController)
+                                            .environmentObject(userInfo)
+                                    ) {
+                                        Label(playlist.name, systemImage: "music.note.list")
+                                    }
                                 }
                             }
-                        }
 
-                        Section(header: Text("Favored Playlists")) {
-                            ForEach(userInfo.playlists.filter { $0.subscribed }) { playlist in
-                                NavigationLink(
-                                    destination: PlayListView(neteasePlaylist: playlist)
-                                        .environmentObject(playController)
-                                        .environmentObject(userInfo)
-                                ) {
-                                    Label(playlist.name, systemImage: "music.note.list")
+                            Section(header: Text("Favored Playlists")) {
+                                ForEach(userInfo.playlists.filter { $0.subscribed }) { playlist in
+                                    NavigationLink(
+                                        destination: PlayListView(neteasePlaylist: playlist)
+                                            .environmentObject(playController)
+                                            .environmentObject(userInfo)
+                                    ) {
+                                        Label(playlist.name, systemImage: "music.note.list")
+                                    }
                                 }
                             }
                         }
                     }
                     .listStyle(SidebarListStyle())
                     .frame(minWidth: 200, idealWidth: 250)
-                    .toolbar(removing: .sidebarToggle)
+                    // .toolbar(removing: .sidebarToggle)
                 } detail: {
                 }
-                .navigationTitle("Home")
                 .padding(.bottom, 80)
+                .toolbar {}
                 .onAppear {
                     DispatchQueue.main.async {
                         Task {
                             try await Task.sleep(for: .seconds(0.01))
-                            selection = "Now Playing"
+                            selection = "Account"
                         }
                     }
                 }
@@ -154,38 +150,7 @@ struct ContentView: View {
         }
         .onAppear {
             Task {
-                if let profile = loadDecodableState(
-                    forKey: "profile", type: CloudMusicApi.Profile.self)
-                {
-                    userInfo.profile = profile
-                }
-
-                if let playlists = loadDecodableState(
-                    forKey: "playlists", type: [CloudMusicApi.PlayListItem].self)
-                {
-                    userInfo.playlists = playlists
-                }
-
-                if let likelist = loadDecodableState(
-                    forKey: "likelist", type: Set<UInt64>.self)
-                {
-                    userInfo.likelist = likelist
-                }
-
-                if let profile = await CloudMusicApi.login_status() {
-                    userInfo.profile = profile
-                    saveEncodableState(forKey: "profile", data: profile)
-
-                    if let playlists = try? await CloudMusicApi.user_playlist(uid: profile.userId) {
-                        userInfo.playlists = playlists
-                        saveEncodableState(forKey: "playlists", data: playlists)
-                    }
-
-                    if let likelist = await CloudMusicApi.likelist(userId: profile.userId) {
-                        userInfo.likelist = Set(likelist)
-                        saveEncodableState(forKey: "likelist", data: userInfo.likelist)
-                    }
-                }
+                await initUserData(userInfo: userInfo)
             }
 
             Task {

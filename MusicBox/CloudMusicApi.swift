@@ -341,6 +341,44 @@ class CloudMusicApi {
         return nil
     }
 
+    static func login_cellphone(phone: String, countrycode: Int = 86, password: String) async
+        -> Bool
+    {
+        guard
+            let ret = try? await doRequest(
+                memberName: "login_cellphone",
+                data: [
+                    "phone": phone,
+                    "countrycode": countrycode,
+                    "password": password,
+                ])
+        else {
+            print("login_cellphone failed")
+            return false
+        }
+
+        struct Result: Decodable {
+            let code: Int
+            let message: String?
+            let cookie: String?
+        }
+
+        print(ret.asAny())
+
+        if let parsed = ret.asType(Result.self) {
+            if parsed.code == 200, let cookie = parsed.cookie {
+                setCookie(cookie)
+                return true
+            }
+        }
+        return false
+    }
+
+    static func logout() async {
+        guard let _ = try? await doRequest(memberName: "logout", data: [:]) else { return }
+        setCookie("aa")
+    }
+
     static func user_account() async {
         guard let ret = try? await doRequest(memberName: "user_account", data: [:]) else { return }
         print(ret)
