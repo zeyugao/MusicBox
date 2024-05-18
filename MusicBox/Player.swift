@@ -320,7 +320,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         let loopMode = UserDefaults.standard.integer(forKey: "LoopMode")
         self.loopMode = LoopMode(rawValue: loopMode) ?? .sequence
 
-        let volume = UserDefaults.standard.float(forKey: "playerVolume")
+        let volume = UserDefaults.standard.object(forKey: "playerVolume") as? Float ?? 0.5
         player.volume = volume
     }
 
