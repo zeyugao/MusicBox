@@ -116,7 +116,6 @@ struct ContentView: View {
                     Text("Hello")
                 }
                 .navigationTitle("Home")
-                .searchable(text: .constant(""), prompt: "Search")
                 .padding(.bottom, 80)
 
                 PlayerControlView(showPlayDetail: $showPlayDetail)

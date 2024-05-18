@@ -17,6 +17,9 @@ class PlaylistDetailModel: ObservableObject {
     @Published var songs: [CloudMusicApi.Song]?
     var curId: UInt64?
 
+    var sortOrder: [KeyPathComparator<CloudMusicApi.Song>]? = nil
+    var searchText = ""
+
     func updatePlaylistDetail(id: UInt64) async {
         if let playlist = await CloudMusicApi.playlist_detail(id: id) {
             let trackIds = playlist.trackIds
@@ -43,12 +46,38 @@ class PlaylistDetailModel: ObservableObject {
     }
 
     func applySorting(by sortOrder: [KeyPathComparator<CloudMusicApi.Song>]) {
-        guard let originalSongs = originalSongs else { return }
-        songs = originalSongs.sorted(using: sortOrder)
+        self.sortOrder = sortOrder
+    }
+
+    func applySearch(by keyword: String) {
+        searchText = keyword
     }
 
     func resetSorting() {
-        songs = originalSongs
+        sortOrder = nil
+    }
+
+    func resetSearchText() {
+        searchText = ""
+    }
+
+    func update() {
+        guard let originalSongs = originalSongs else { return }
+        var songs = originalSongs
+        if !searchText.isEmpty {
+            let keyword = searchText.lowercased()
+            songs = songs.filter { song in
+                song.name.lowercased().contains(keyword)
+                    || song.ar.map(\.name).joined(separator: "").lowercased().contains(keyword)
+                    || song.al.name.lowercased().contains(keyword)
+            }
+        }
+
+        if let sortOrder = sortOrder {
+            songs = songs.sorted(using: sortOrder)
+        }
+
+        self.songs = songs
     }
 }
 
@@ -253,8 +282,9 @@ struct PlayListView: View {
     @State private var selectedItem: CloudMusicApi.Song.ID?
     @State private var sortOrder = [KeyPathComparator<CloudMusicApi.Song>]()
     @State private var loadingTask: Task<Void, Never>? = nil
-    @State private var isSorted = false
     @State private var isLoading = false
+
+    @State private var searchText = ""
 
     var neteasePlaylist: CloudMusicApi.PlayListItem?
 
@@ -418,7 +448,12 @@ struct PlayListView: View {
 
                 handleSortChange(sortOrder: self.sortOrder)
             }
+            .onChange(of: searchText) { prevSearchText, searchText in
+                model.applySearch(by: searchText)
+                model.update()
+            }
             .navigationTitle(neteasePlaylist?.name ?? "Playlist")
+            .searchable(text: $searchText, prompt: "Search in Playlist")
             .toolbar {
                 PlayAllButton(songs: model.songs ?? [])
                 DownloadAllButton(songs: model.songs ?? [])
@@ -448,7 +483,12 @@ struct PlayListView: View {
     private func updatePlaylist() {
         if let id = neteasePlaylist?.id {
             isLoading = true
+
+            searchText = ""
+            sortOrder = []
+
             model.songs = nil
+            model.originalSongs = nil
 
             model.curId = id
             loadingTask?.cancel()
@@ -462,11 +502,11 @@ struct PlayListView: View {
     private func handleSortChange(sortOrder: [KeyPathComparator<CloudMusicApi.Song>]) {
         guard !sortOrder.isEmpty else {
             model.resetSorting()
-            isSorted = false
+            model.update()
             return
         }
 
-        isSorted = true
         model.applySorting(by: [sortOrder[0]])
+        model.update()
     }
 }
