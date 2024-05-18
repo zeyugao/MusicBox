@@ -57,25 +57,25 @@ class RemoteCommandCenter {
             return .success
         }
         
-        commandCenter.skipForwardCommand.preferredIntervals = [15.0]
-        commandCenter.skipForwardCommand.addTarget { [weak handler] event in
-            guard let handler = handler,
-                let event = event as? MPSkipIntervalCommandEvent
-                else { return .noActionableNowPlayingItem }
+        // commandCenter.skipForwardCommand.preferredIntervals = [15.0]
+        // commandCenter.skipForwardCommand.addTarget { [weak handler] event in
+        //     guard let handler = handler,
+        //         let event = event as? MPSkipIntervalCommandEvent
+        //         else { return .noActionableNowPlayingItem }
             
-            handler.performRemoteCommand(.skipForward(event.interval))
-            return .success
-        }
+        //     handler.performRemoteCommand(.skipForward(event.interval))
+        //     return .success
+        // }
         
-        commandCenter.skipBackwardCommand.preferredIntervals = [15.0]
-        commandCenter.skipBackwardCommand.addTarget { [weak handler] event in
-            guard let handler = handler,
-                let event = event as? MPSkipIntervalCommandEvent
-                else { return .noActionableNowPlayingItem }
+        // commandCenter.skipBackwardCommand.preferredIntervals = [15.0]
+        // commandCenter.skipBackwardCommand.addTarget { [weak handler] event in
+        //     guard let handler = handler,
+        //         let event = event as? MPSkipIntervalCommandEvent
+        //         else { return .noActionableNowPlayingItem }
             
-            handler.performRemoteCommand(.skipBackward(event.interval))
-            return .success
-        }
+        //     handler.performRemoteCommand(.skipBackward(event.interval))
+        //     return .success
+        // }
         
         commandCenter.changePlaybackPositionCommand.addTarget { [weak handler] event in
             guard let handler = handler,
