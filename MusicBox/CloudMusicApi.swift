@@ -115,7 +115,15 @@ class CloudMusicApi {
         case cover = 2
     }
 
-    struct Song: Codable, Identifiable {
+    struct Song: Codable, Identifiable, Hashable, Equatable {
+        static func == (lhs: CloudMusicApi.Song, rhs: CloudMusicApi.Song) -> Bool {
+            return lhs.id == rhs.id
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
+        }
+
         let name: String
         let id: UInt64
 
@@ -708,6 +716,142 @@ class CloudMusicApi {
 
         if let parsed = res.asType(Result.self) {
             return parsed.data.dailySongs
+        }
+        return nil
+    }
+
+    enum SearchType: Int {
+        case singleSong = 1
+        case album = 10
+        case artist = 100
+        case playlist = 1000
+        case user = 1002
+        case mv = 1004
+        case lyric = 1006
+        case radio = 1009
+        case video = 1014
+    }
+
+    struct SearchResult {
+        struct Artist: Decodable {
+            let img1v1: UInt64
+            let img1v1Url: String
+            let name: String
+            let id: UInt64
+
+            func convertToArtist() -> CloudMusicApi.Artist {
+                return CloudMusicApi.Artist(id: id, name: name, alias: [], tns: [])
+            }
+        }
+        struct Album: Decodable {
+            let picId: UInt64
+            let id: UInt64
+            let name: String
+
+            let artist: Artist
+            let publishTime: Int64
+
+            func convertToAlbum() -> CloudMusicApi.Album {
+                return CloudMusicApi.Album(
+                    id: id, name: name, pic: picId, picUrl: "", tns: [])
+            }
+        }
+
+        struct Song: Decodable {
+            let album: Album
+            let alias: [String]
+            let artists: [Artist]
+            let duration: Int64
+            let id: UInt64
+            let fee: Fee
+            let name: String
+            let mvid: UInt64
+            let transNames: [String]?
+
+            func convertToSong() -> CloudMusicApi.Song {
+                return CloudMusicApi.Song(
+                    name: name,
+                    id: id,
+                    al: album.convertToAlbum(),
+                    ar: artists.map { $0.convertToArtist() },
+                    alia: alias,
+                    tns: nil,
+                    fee: fee,
+                    originCoverType: .unknown,
+                    mv: mvid,
+                    dt: duration,
+                    hr: nil, sq: nil, h: nil, m: nil, l: nil,
+                    publishTime: album.publishTime,
+                    pc: nil
+                )
+            }
+        }
+    }
+
+    static func search_suggest(keyword: String) async -> [SearchResult.Song]? {
+        guard
+            let res = try? await doRequest(
+                memberName: "search_suggest",
+                data: [
+                    "keywords": keyword,
+//                    "type": "mobile",
+                ])
+        else {
+            print("search_suggest failed")
+            return nil
+        }
+
+        struct SuggestResult: Decodable {
+            let songs: [SearchResult.Song]
+        }
+
+        struct Result: Decodable {
+            let code: Int
+            let result: SuggestResult
+        }
+        
+        print(res.asAny())
+
+        if let parsed = res.asType(Result.self) {
+            return parsed.result.songs
+        }
+        print("search_suggest failed")
+        return nil
+    }
+
+    static func search(
+        keyword: String, type: SearchType = .singleSong, limit: Int = 30, offset: Int = 0
+    ) async
+        -> [SearchResult.Song]?
+    {
+        guard
+            let res = try? await doRequest(
+                memberName: "search",
+                data: [
+                    "keywords": keyword,
+                    "type": type.rawValue,
+                    "limit": limit,
+                    "offset": offset,
+                ])
+        else {
+            print("search failed")
+            return nil
+        }
+
+        struct Result2: Decodable {
+            let hasMore: Bool
+            let songCount: Int
+            let songs: [SearchResult.Song]
+        }
+
+        struct Result: Decodable {
+            let result: Result2
+        }
+
+        print(res.asAny())
+
+        if let parsed = res.asType(Result.self) {
+            return parsed.result.songs
         }
         return nil
     }
