@@ -32,6 +32,8 @@ extension Data {
 }
 
 class CloudMusicApi {
+    static let RecommandSongPlaylistId: UInt64 = 0
+
     struct Profile: Codable {
         let avatarUrl: String
         let nickname: String
@@ -52,6 +54,22 @@ class CloudMusicApi {
         let privacy: Int
         let description: String?
         let creator: Profile
+    }
+
+    struct RecommandPlaylistItem: Codable, Identifiable, Equatable {
+        static func == (
+            lhs: CloudMusicApi.RecommandPlaylistItem, rhs: CloudMusicApi.RecommandPlaylistItem
+        ) -> Bool {
+            return lhs.id == rhs.id
+        }
+
+        let creator: Profile?
+        let picUrl: String
+        let userId: UInt64?
+        let id: UInt64
+        let name: String
+        let playcount: UInt64?
+        let trackCount: UInt64?
     }
 
     struct Quality: Codable {
@@ -363,7 +381,7 @@ class CloudMusicApi {
             let cookie: String?
         }
 
-        print(ret.asAny())
+        print(ret.asAny() ?? "No data")
 
         if let parsed = ret.asType(Result.self) {
             if parsed.code == 200, let cookie = parsed.cookie {
@@ -399,6 +417,9 @@ class CloudMusicApi {
     }
 
     static func playlist_detail(id: UInt64) async -> (tracks: [Song], trackIds: [UInt64])? {
+        if id == RecommandSongPlaylistId {
+            return await recommend_songs().map { ($0, $0.map { $0.id }) }
+        }
         guard
             let ret: Data = try? await doRequest(
                 memberName: "playlist_detail",
@@ -645,5 +666,49 @@ class CloudMusicApi {
             return parsed.code == 200
         }
         return false
+    }
+
+    static func recommend_resource() async -> [RecommandPlaylistItem]? {
+        guard
+            let res = try? await doRequest(
+                memberName: "recommend_resource",
+                data: [:])
+        else {
+            print("recommend_resource failed")
+            return nil
+        }
+
+        struct Result: Decodable {
+            let recommend: [RecommandPlaylistItem]
+        }
+
+        if let parsed = res.asType(Result.self) {
+            return parsed.recommend
+        }
+        return nil
+    }
+
+    static func recommend_songs() async -> [Song]? {
+        guard
+            let res = try? await doRequest(
+                memberName: "recommend_songs",
+                data: [:])
+        else {
+            print("recommend_songs failed")
+            return nil
+        }
+
+        struct Data: Decodable {
+            let dailySongs: [Song]
+        }
+
+        struct Result: Decodable {
+            let data: Data
+        }
+
+        if let parsed = res.asType(Result.self) {
+            return parsed.data.dailySongs
+        }
+        return nil
     }
 }

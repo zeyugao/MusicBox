@@ -169,6 +169,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     func replaceCurrentItem(item: AVPlayerItem?) {
         player = AVPlayer(playerItem: item)
+        loadVolume()
         player.automaticallyWaitsToMinimizeStalling = false
         initPlayerObservers()
     }
@@ -307,8 +308,18 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         UserDefaults.standard.set(loopMode.rawValue, forKey: "LoopMode")
     }
 
+    func loadLoopMode() {
+        let loopMode = UserDefaults.standard.integer(forKey: "LoopMode")
+        self.loopMode = LoopMode(rawValue: loopMode) ?? .sequence
+    }
+
     func saveVolume() {
         UserDefaults.standard.set(player.volume, forKey: "playerVolume")
+    }
+
+    private func loadVolume() {
+        let volume = UserDefaults.standard.object(forKey: "playerVolume") as? Float ?? 0.5
+        player.volume = volume
     }
 
     private func saveMisc() {
@@ -317,11 +328,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     private func loadMisc() {
-        let loopMode = UserDefaults.standard.integer(forKey: "LoopMode")
-        self.loopMode = LoopMode(rawValue: loopMode) ?? .sequence
-
-        let volume = UserDefaults.standard.object(forKey: "playerVolume") as? Float ?? 0.5
-        player.volume = volume
+        loadLoopMode()
+        loadVolume()
     }
 
     func saveState() {

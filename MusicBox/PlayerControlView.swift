@@ -75,6 +75,7 @@ struct PlaySliderView: View {
 struct PlayerControlView: View {
     @EnvironmentObject var playController: PlayController
     @Binding var showPlayDetail: Bool
+    @EnvironmentObject private var userInfo: UserInfo
 
     func secondsToMinutesAndSeconds(seconds: Double) -> String {
         let seconds_int = Int(seconds)
@@ -193,6 +194,28 @@ struct PlayerControlView: View {
                 // .padding(.vertical, 16)
 
                 Spacer()
+
+                let currentId = playController.currentItem?.id ?? 0
+                let favored = (userInfo.likelist.contains(currentId))
+                Button(action: {
+                    guard currentId != 0 else { return }
+                    Task {
+                        if await CloudMusicApi.like(id: currentId, like: !favored) {
+                            if favored {
+                                userInfo.likelist.remove(currentId)
+                            } else {
+                                userInfo.likelist.insert(currentId)
+                            }
+                        }
+                    }
+                }) {
+                    Image(systemName: favored ? "heart.fill" : "heart")
+                        .resizable()
+                        .frame(width: 16, height: 14)
+                        .help(favored ? "Unfavor" : "Favor")
+                        .padding(.trailing, 4)
+                }
+                .buttonStyle(PlayControlButtonStyle())
 
                 Button(action: {
                     playController.switchToNextLoopMode()

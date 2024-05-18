@@ -286,7 +286,7 @@ struct PlayListView: View {
 
     @State private var searchText = ""
 
-    var neteasePlaylist: CloudMusicApi.PlayListItem?
+    var neteasePlaylistMetadata: (id: UInt64, name: String)?
 
     let currencyStyle = Decimal.FormatStyle.Currency(code: "USD")
 
@@ -335,8 +335,9 @@ struct PlayListView: View {
                 sortOrder: $sortOrder
             ) {
                 TableColumn("") { song in
+                    let favored = (userInfo.likelist.contains(song.id))
+
                     Button(action: {
-                        let favored = (userInfo.likelist.contains(song.id))
                         Task {
                             if await CloudMusicApi.like(id: song.id, like: !favored) {
                                 if favored {
@@ -347,7 +348,6 @@ struct PlayListView: View {
                             }
                         }
                     }) {
-                        let favored = (userInfo.likelist.contains(song.id))
                         Image(systemName: favored ? "heart.fill" : "heart")
                             .resizable()
                             .frame(width: 16, height: 14)
@@ -452,13 +452,13 @@ struct PlayListView: View {
                 model.applySearch(by: searchText)
                 model.update()
             }
-            .navigationTitle(neteasePlaylist?.name ?? "Playlist")
+            .navigationTitle(neteasePlaylistMetadata?.name ?? "Playlist")
             .searchable(text: $searchText, prompt: "Search in Playlist")
             .toolbar {
                 PlayAllButton(songs: model.songs ?? [])
                 DownloadAllButton(songs: model.songs ?? [])
             }
-            .onChange(of: neteasePlaylist) {
+            .onChange(of: neteasePlaylistMetadata?.id) {
                 updatePlaylist()
             }
             .onAppear {
@@ -481,7 +481,7 @@ struct PlayListView: View {
     }
 
     private func updatePlaylist() {
-        if let id = neteasePlaylist?.id {
+        if let id = neteasePlaylistMetadata?.id {
             isLoading = true
 
             searchText = ""

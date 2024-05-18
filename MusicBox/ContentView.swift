@@ -67,6 +67,15 @@ struct ContentView: View {
                         ) {
                             Label("Now Playing", systemImage: "dot.radiowaves.left.and.right")
                         }.tag("Now Playing")
+                        
+                        NavigationLink(
+                            destination: ExploreView()
+                                .environmentObject(userInfo)
+                                .environmentObject(playController)
+                                .navigationTitle("Explore")
+                        ) {
+                            Label("Explore", systemImage: "music.house")
+                        }.tag("Explore")
 
                         #if DEBUG
                             NavigationLink(
@@ -83,7 +92,7 @@ struct ContentView: View {
                             Section(header: Text("Created Playlists")) {
                                 ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
                                     NavigationLink(
-                                        destination: PlayListView(neteasePlaylist: playlist)
+                                        destination: PlayListView(neteasePlaylistMetadata: (playlist.id, playlist.name))
                                             .environmentObject(playController)
                                             .environmentObject(userInfo)
                                     ) {
@@ -95,7 +104,7 @@ struct ContentView: View {
                             Section(header: Text("Favored Playlists")) {
                                 ForEach(userInfo.playlists.filter { $0.subscribed }) { playlist in
                                     NavigationLink(
-                                        destination: PlayListView(neteasePlaylist: playlist)
+                                        destination: PlayListView(neteasePlaylistMetadata: (playlist.id, playlist.name))
                                             .environmentObject(playController)
                                             .environmentObject(userInfo)
                                     ) {
@@ -123,6 +132,7 @@ struct ContentView: View {
 
                 PlayerControlView(showPlayDetail: $showPlayDetail)
                     .environmentObject(playController)
+                    .environmentObject(userInfo)
                     .frame(height: 80)
                     .overlay(
                         Rectangle()
