@@ -212,7 +212,15 @@ struct PlayerControlView: View {
                 HStack(spacing: 32) {
                     HStack {
                         Slider(
-                            value: .constant(0.5)
+                            value: Binding(
+                                get: {
+                                    playController.volume
+                                },
+                                set: {
+                                    playController.volume = $0
+                                }
+                            ),
+                            in: 0...1
                         ) {
                         } minimumValueLabel: {
                             Image(systemName: "speaker.fill")

@@ -115,8 +115,6 @@ public final class CachingPlayerItem: AVPlayerItem {
         if let headers = avUrlAssetOptions?["AVURLAssetHTTPHeaderFieldsKey"] as? [String: String] {
             self.urlRequestHeaders = headers
         }
-        
-        print("url: \(url), saveFilePath: \(saveFilePath), customFileExtension: \(customFileExtension)")
 
         let asset = AVURLAsset(url: urlWithCustomScheme, options: avUrlAssetOptions)
         super.init(asset: asset, automaticallyLoadedAssetKeys: nil)

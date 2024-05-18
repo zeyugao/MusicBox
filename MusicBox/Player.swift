@@ -139,7 +139,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 1
             }
         await seekByItem(offset: offset)
-        player.play()
+        await startPlaying()
     }
 
     func previousTrack() async {
@@ -150,7 +150,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 -1
             }
         await seekToItem(offset: offset)
-        player.play()
+        await startPlaying()
     }
 
     func seekByItem(offset: Int) async {
@@ -167,6 +167,12 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         }
     }
 
+    func replaceCurrentItem(item: AVPlayerItem?) {
+        player = AVPlayer(playerItem: item)
+        player.automaticallyWaitsToMinimizeStalling = false
+        initPlayerObservers()
+    }
+
     func seekToItem(offset: Int?) async {
         if let offset = offset {
             guard offset < playlist.count else { return }
@@ -175,34 +181,41 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             currentItemIndex = offset
             updateDuration(duration: item.duration.seconds)
 
-            // let playerItem: AVPlayerItem
-            // if let url = item.getLocalUrl() {
-            //     playerItem = AVPlayerItem(url: url)
-            // } else if let url = await item.getUrlAsync(),
-            //     let savePath = item.getPotentialLocalUrl(),
-            //     let ext = item.ext
-            // {
-            //     playerItem = CachingPlayerItem(
-            //         url: url, saveFilePath: savePath.path, customFileExtension: ext)
-            // } else {
-            //     return
-            // }
-            // player.replaceCurrentItem(with: playerItem)
-            // player.automaticallyWaitsToMinimizeStalling = false
-
-            if let url = await item.getUrlAsync() {
-                let playerItem = AVPlayerItem(url: url)
-                player.replaceCurrentItem(with: playerItem)
-                player.automaticallyWaitsToMinimizeStalling = false
+            let playerItem: AVPlayerItem
+            if let url = item.getLocalUrl() {
+                playerItem = AVPlayerItem(url: url)
+            } else if let url = await item.getUrlAsync(),
+                let savePath = item.getPotentialLocalUrl(),
+                let ext = item.ext
+            {
+                playerItem = CachingPlayerItem(
+                    url: url, saveFilePath: savePath.path, customFileExtension: ext)
             } else {
                 return
             }
+
+            replaceCurrentItem(item: playerItem)
+
+            NowPlayingCenter.handleItemChange(
+                item: currentItem,
+                index: currentItemIndex ?? 0,
+                count: playlist.count)
 
             saveCurrentPlayingItemIndex()
         } else {
             updateDuration(duration: 0.0)
             currentItemIndex = nil
-            player.replaceCurrentItem(with: nil)
+            replaceCurrentItem(item: nil)
+        }
+    }
+
+    var volume: Float {
+        get {
+            player.volume
+        }
+        set {
+            player.volume = newValue
+            saveVolume()
         }
     }
 
@@ -294,13 +307,21 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         UserDefaults.standard.set(loopMode.rawValue, forKey: "LoopMode")
     }
 
+    func saveVolume() {
+        UserDefaults.standard.set(player.volume, forKey: "playerVolume")
+    }
+
     private func saveMisc() {
         saveLoopMode()
+        saveVolume()
     }
 
     private func loadMisc() {
         let loopMode = UserDefaults.standard.integer(forKey: "LoopMode")
         self.loopMode = LoopMode(rawValue: loopMode) ?? .sequence
+
+        let volume = UserDefaults.standard.float(forKey: "playerVolume")
+        player.volume = volume
     }
 
     func saveState() {
@@ -428,7 +449,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     init() {
         nowPlayingInit()
-        initPlayerObservers()
     }
 
     deinit {
