@@ -73,15 +73,15 @@ struct ContentView: View {
                             ) {
                                 Label("Now Playing", systemImage: "dot.radiowaves.left.and.right")
                             }.tag("Now Playing")
-                            
+
                             #if DEBUG
-                            NavigationLink(
-                                destination: PlayerView()
-                                    .environmentObject(playController)
-                                    .navigationTitle("Debug")
-                            ) {
-                                Label("Debug", systemImage: "skew")
-                            }.tag("Debug")
+                                NavigationLink(
+                                    destination: PlayerView()
+                                        .environmentObject(playController)
+                                        .navigationTitle("Debug")
+                                ) {
+                                    Label("Debug", systemImage: "skew")
+                                }.tag("Debug")
                             #endif
                         }
 
@@ -113,10 +113,17 @@ struct ContentView: View {
                     .frame(minWidth: 200, idealWidth: 250)
                     .toolbar(removing: .sidebarToggle)
                 } detail: {
-                    Text("Hello")
                 }
                 .navigationTitle("Home")
                 .padding(.bottom, 80)
+                .onAppear {
+                    DispatchQueue.main.async {
+                        Task {
+                            try await Task.sleep(for: .seconds(0.01))
+                            selection = "Now Playing"
+                        }
+                    }
+                }
 
                 PlayerControlView(showPlayDetail: $showPlayDetail)
                     .environmentObject(playController)
@@ -182,7 +189,7 @@ struct ContentView: View {
             }
 
             Task {
-                 await playController.loadState(continuePlaying: false)
+                await playController.loadState(continuePlaying: false)
             }
         }
     }
