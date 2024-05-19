@@ -12,6 +12,29 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum PlaylistMetadata {
+    case netease(UInt64, String)  // id, name
+    case songs([CloudMusicApi.Song], UInt64, String)  // all songs, id, name
+
+    var name: String {
+        switch self {
+        case .netease(_, let name):
+            return name
+        case .songs(_, _, let name):
+            return name
+        }
+    }
+
+    var id: UInt64 {
+        switch self {
+        case .netease(let id, _):
+            return id
+        case .songs(_, let id, _):
+            return id
+        }
+    }
+}
+
 class PlaylistDetailModel: ObservableObject {
     var originalSongs: [CloudMusicApi.Song]?
     @Published var songs: [CloudMusicApi.Song]?
@@ -20,27 +43,35 @@ class PlaylistDetailModel: ObservableObject {
     var sortOrder: [KeyPathComparator<CloudMusicApi.Song>]? = nil
     var searchText = ""
 
-    func updatePlaylistDetail(id: UInt64) async {
-        if let playlist = await CloudMusicApi.playlist_detail(id: id) {
-            let trackIds = playlist.trackIds
-            let tracks = playlist.tracks
+    func updatePlaylistDetail(metadata: PlaylistMetadata) async {
+        switch metadata {
+        case .netease(let id, _):
+            if let playlist = await CloudMusicApi.playlist_detail(id: id) {
+                let trackIds = playlist.trackIds
+                let tracks = playlist.tracks
 
-            if let cur = curId, cur != id {
-                return
-            }
-
-            if trackIds.count == tracks.count {
-                self.originalSongs = tracks
-                DispatchQueue.main.async {
-                    self.songs = tracks
+                if let cur = curId, cur != id {
+                    return
                 }
-            } else {
-                if let playlist = await CloudMusicApi.song_detail(ids: trackIds) {
-                    self.originalSongs = playlist
+
+                if trackIds.count == tracks.count {
+                    self.originalSongs = tracks
                     DispatchQueue.main.async {
-                        self.songs = playlist
+                        self.songs = tracks
+                    }
+                } else {
+                    if let playlist = await CloudMusicApi.song_detail(ids: trackIds) {
+                        self.originalSongs = playlist
+                        DispatchQueue.main.async {
+                            self.songs = playlist
+                        }
                     }
                 }
+            }
+        case .songs(let songs, _, _):
+            self.originalSongs = songs
+            DispatchQueue.main.async {
+                self.songs = songs
             }
         }
     }
@@ -129,7 +160,7 @@ struct TableContextMenu: View {
                 await playController.startPlaying()
             }
         }
-        Button("Add to Playlist") {
+        Button("Add to Now Playing") {
             let newItem = loadItem(song: song)
             let _ = playController.addItemToPlaylist(newItem)
         }
@@ -286,7 +317,7 @@ struct PlayListView: View {
 
     @State private var searchText = ""
 
-    var neteasePlaylistMetadata: (id: UInt64, name: String)?
+    var playlistMetadata: PlaylistMetadata?
 
     let currencyStyle = Decimal.FormatStyle.Currency(code: "USD")
 
@@ -452,13 +483,13 @@ struct PlayListView: View {
                 model.applySearch(by: searchText)
                 model.update()
             }
-            .navigationTitle(neteasePlaylistMetadata?.name ?? "Playlist")
+            .navigationTitle((playlistMetadata?.name) ?? "Playlist")
             .searchable(text: $searchText, prompt: "Search in Playlist")
             .toolbar {
                 PlayAllButton(songs: model.songs ?? [])
                 DownloadAllButton(songs: model.songs ?? [])
             }
-            .onChange(of: neteasePlaylistMetadata?.id) {
+            .onChange(of: playlistMetadata?.id) {
                 updatePlaylist()
             }
             .onAppear {
@@ -481,7 +512,7 @@ struct PlayListView: View {
     }
 
     private func updatePlaylist() {
-        if let id = neteasePlaylistMetadata?.id {
+        if let playlistMetadata = playlistMetadata {
             isLoading = true
 
             searchText = ""
@@ -490,10 +521,10 @@ struct PlayListView: View {
             model.songs = nil
             model.originalSongs = nil
 
-            model.curId = id
+            model.curId = playlistMetadata.id
             loadingTask?.cancel()
             loadingTask = Task {
-                await model.updatePlaylistDetail(id: id)
+                await model.updatePlaylistDetail(metadata: playlistMetadata)
                 isLoading = false
             }
         }

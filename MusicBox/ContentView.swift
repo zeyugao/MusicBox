@@ -67,7 +67,7 @@ struct ContentView: View {
                         ) {
                             Label("Now Playing", systemImage: "dot.radiowaves.left.and.right")
                         }.tag("Now Playing")
-                        
+
                         NavigationLink(
                             destination: ExploreView()
                                 .environmentObject(userInfo)
@@ -87,14 +87,17 @@ struct ContentView: View {
                             }.tag("Debug")
                         #endif
 
-                        
                         if userInfo.profile != nil {
                             Section(header: Text("Created Playlists")) {
                                 ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
+                                    let metadata = PlaylistMetadata.netease(
+                                        playlist.id, playlist.name)
                                     NavigationLink(
-                                        destination: PlayListView(neteasePlaylistMetadata: (playlist.id, playlist.name))
-                                            .environmentObject(playController)
-                                            .environmentObject(userInfo)
+                                        destination: PlayListView(
+                                            playlistMetadata: metadata
+                                        )
+                                        .environmentObject(playController)
+                                        .environmentObject(userInfo)
                                     ) {
                                         Label(playlist.name, systemImage: "music.note.list")
                                     }
@@ -103,10 +106,14 @@ struct ContentView: View {
 
                             Section(header: Text("Favored Playlists")) {
                                 ForEach(userInfo.playlists.filter { $0.subscribed }) { playlist in
+                                    let metadata = PlaylistMetadata.netease(
+                                        playlist.id, playlist.name)
                                     NavigationLink(
-                                        destination: PlayListView(neteasePlaylistMetadata: (playlist.id, playlist.name))
-                                            .environmentObject(playController)
-                                            .environmentObject(userInfo)
+                                        destination: PlayListView(
+                                            playlistMetadata: metadata
+                                        )
+                                        .environmentObject(playController)
+                                        .environmentObject(userInfo)
                                     ) {
                                         Label(playlist.name, systemImage: "music.note.list")
                                     }
