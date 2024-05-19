@@ -156,7 +156,7 @@ struct TableContextMenu: View {
         Button("Play") {
             Task {
                 let newItem = loadItem(song: song)
-                let _ = await playController.addItemAndPlay(newItem)
+                let _ = await playController.addItemAndSeekTo(newItem)
                 await playController.startPlaying()
             }
         }

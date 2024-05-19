@@ -360,9 +360,11 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         saveState()
     }
 
-    func addItemAndPlay(_ item: PlaylistItem) async -> Int {
+    func addItemAndSeekTo(_ item: PlaylistItem) async -> Int {
         let idIdx = addItemToPlaylist(item, continuePlaying: false)
         await seekToItem(offset: idIdx)
+
+        savePlaylist()
         return idIdx
     }
 

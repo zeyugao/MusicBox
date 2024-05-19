@@ -97,14 +97,14 @@ struct AlbumListView: View {
                 }
             }
             .searchable(
-                text: $searchText
-                    // ,
-                    // suggestions: {
-                    //     ForEach(searchSuggestions, id: \.self) { suggestion in
-                    //         Text(suggestion.name)
-                    //             .searchCompletion(suggestion)
-                    //     }
-                    // }
+                text: $searchText,
+                suggestions: {
+                    ForEach(searchSuggestions, id: \.self) { suggestion in
+                        Text(suggestion.name + " - " + suggestion.al.name)
+                            .searchCompletion(
+                                "##%%ID" + (encodeObjToJSON(suggestion)))
+                    }
+                }
             )
             .onSubmit(of: .search) {
                 Task {
@@ -124,33 +124,47 @@ struct AlbumListView: View {
             ) {
                 if !searchResult.isEmpty {
                     let metadata = PlaylistMetadata.songs(
-                        searchResult, UInt64.random(in: 1...10000), "搜索结果")
+                        searchResult,
+                        searchResult.map { $0.id }.reduce(0, +),
+                        "搜索结果")
                     PlayListView(playlistMetadata: metadata)
                         .environmentObject(userInfo)
                         .environmentObject(playController)
                 }
             }
-            // .onChange(of: searchText) { _, text in
-            //     task?.cancel()
+            .onChange(of: searchText) { _, text in
+                task?.cancel()
 
-            //     guard !searchText.isEmpty else {
-            //         return
-            //     }
+                guard !searchText.isEmpty else {
+                    return
+                }
 
-            //     task = Task {
-            //         do {
-            //             try await Task.sleep(nanoseconds: UInt64(0.3 * 1_000_000_000))
-            //         } catch {
-            //             return
-            //         }
+                if searchText.starts(with: "##%%ID") {
+                    let data = searchText.dropFirst(6)
+                    if let song = decodeJSONToObj(CloudMusicApi.Song.self, String(data)) {
+                        searchResult = [song]
+                    } else {
+                        searchResult = []
+                    }
 
-            //         if let res = await CloudMusicApi.search_suggest(keyword: text) {
-            //             DispatchQueue.main.async {
-            //                 self.searchSuggestions = res.map { $0.convertToSong() }
-            //             }
-            //         }
-            //     }
-            // }
+                    defer { searchText = "" }
+                    return
+                }
+
+                task = Task {
+                    do {
+                        try await Task.sleep(nanoseconds: UInt64(0.3 * 1_000_000_000))
+                    } catch {
+                        return
+                    }
+
+                    if let res = await CloudMusicApi.search_suggest(keyword: text) {
+                        DispatchQueue.main.async {
+                            self.searchSuggestions = res.map { $0.convertToSong() }
+                        }
+                    }
+                }
+            }
 
             if isLoading {
                 LoadingIndicatorView()

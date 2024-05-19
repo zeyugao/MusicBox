@@ -87,7 +87,7 @@ struct DebugView: View {
     private func selectAndProcessAudioFile() async {
         if let url = await selectFile() {
             if let newItem = await loadAsset(url: url) {
-                let _ = await playController.addItemAndPlay(newItem)
+                let _ = await playController.addItemAndSeekTo(newItem)
                 await playController.startPlaying()
             }
         }

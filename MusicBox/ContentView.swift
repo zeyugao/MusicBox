@@ -14,6 +14,22 @@ enum DisplayContentType {
     case playlist
 }
 
+func encodeObjToJSON<T: Encodable>(_ value: T) -> String {
+    let encoder = JSONEncoder()
+    if let data = try? encoder.encode(value) {
+        return String(data: data, encoding: .utf8) ?? "{}"
+    }
+    return "{}"
+}
+
+func decodeJSONToObj<T: Decodable>(_ type: T.Type, _ json: String) -> T? {
+    if let data = json.data(using: .utf8) {
+        let decoder = JSONDecoder()
+        return try? decoder.decode(type, from: data)
+    }
+    return nil
+}
+
 func loadDecodableState<T: Decodable>(forKey: String, type: T.Type) -> T? {
     if let savedData = UserDefaults.standard.object(forKey: forKey)
         as? Data
@@ -158,32 +174,32 @@ struct ContentView: View {
                         switch selection {
                         case .account:
                             AccountView()
-                                 .environmentObject(userInfo)
-                                 .environmentObject(playController)
+                                .environmentObject(userInfo)
+                                .environmentObject(playController)
                                 .navigationTitle("Account")
                         case .nowPlaying:
                             NowPlayingView()
-                                 .environmentObject(playController)
+                                .environmentObject(playController)
                                 .navigationTitle("Now Playing")
                         case .explore:
                             ExploreView()
-                                 .environmentObject(userInfo)
-                                 .environmentObject(playController)
+                                .environmentObject(userInfo)
+                                .environmentObject(playController)
                                 .navigationTitle("Explore")
                         case .debug:
                             DebugView()
-                                 .environmentObject(playController)
+                                .environmentObject(playController)
                                 .navigationTitle("Debug")
                         case let .playlist(playlist):
                             let metadata = PlaylistMetadata.netease(playlist.id, playlist.name)
                             PlayListView(playlistMetadata: metadata)
-                                 .environmentObject(userInfo)
-                                 .environmentObject(playController)
+                                .environmentObject(userInfo)
+                                .environmentObject(playController)
                                 .navigationTitle(playlist.name)
                         case .songDetail:
                             PlayingDetailView()
-                                 .environmentObject(playController)
-                                 .environmentObject(userInfo)
+                                .environmentObject(playController)
+                                .environmentObject(userInfo)
                                 .navigationTitle("Song Detail")
                         }
                     }

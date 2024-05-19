@@ -154,11 +154,11 @@
 			isa = PBXGroup;
 			children = (
 				2D2800972BCE1F21007A55D5 /* Assets.xcassets */,
-				2D2800952BCE1F20007A55D5 /* ContentView.swift */,
 				2DC73A812BFA3D840015EB06 /* Api */,
 				2D2800DB2BD21FE9007A55D5 /* General */,
 				2D28009C2BCE1F21007A55D5 /* MusicBox.entitlements */,
 				2DED51C72BD2815800F9D181 /* Content */,
+				2D2800952BCE1F20007A55D5 /* ContentView.swift */,
 				2DC73A802BFA3D0C0015EB06 /* Player */,
 				2DC73A7F2BFA3CE70015EB06 /* Component */,
 				2D2800932BCE1F20007A55D5 /* MusicBoxApp.swift */,
