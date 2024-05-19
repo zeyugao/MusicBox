@@ -56,3 +56,13 @@ extension URL {
         }
     }
 }
+
+extension Data {
+    func asType<T: Decodable>(_ type: T.Type) -> T? {
+        return try? JSONDecoder().decode(type, from: self)
+    }
+
+    func asAny() -> Any? {
+        return try? JSONSerialization.jsonObject(with: self, options: [])
+    }
+}

@@ -123,14 +123,6 @@ class LoginViewModel: ObservableObject {
     }
 }
 
-extension URL {
-    func fixSecure() -> URL {
-        var components = URLComponents(url: self, resolvingAgainstBaseURL: false)
-        components?.scheme = "https"
-        return components?.url ?? self
-    }
-}
-
 struct LoginView: View {
     @State private var username = ""
     @State private var password = ""

@@ -8,30 +8,6 @@
 import Foundation
 import SwiftUI
 
-final class Debounce<T> {
-    private let block: @Sendable (T) async -> Void
-    private let duration: ContinuousClock.Duration
-    private var task: Task<Void, Never>?
-
-    init(
-        duration: ContinuousClock.Duration,
-        block: @Sendable @escaping (T) async -> Void
-    ) {
-        self.duration = duration
-        self.block = block
-    }
-
-    func emit(value: T) {
-        self.task?.cancel()
-        self.task = Task { [duration, block] in
-            do {
-                try await Task.sleep(for: duration)
-                await block(value)
-            } catch {}
-        }
-    }
-}
-
 struct RecommendResourceIcon: View {
     var res: CloudMusicApi.RecommandPlaylistItem
 
@@ -177,13 +153,7 @@ struct AlbumListView: View {
             // }
 
             if isLoading {
-                ProgressView()
-                    .colorInvert()
-                    .progressViewStyle(CircularProgressViewStyle())
-                    .controlSize(.small)
-                    .frame(width: 48, height: 48)
-                    .background(Color.black.opacity(0.75))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                LoadingIndicatorView()
             }
         }
     }

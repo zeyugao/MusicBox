@@ -629,13 +629,7 @@ struct PlayListView: View {
             }
 
             if isLoading {
-                ProgressView()
-                    .colorInvert()
-                    .progressViewStyle(CircularProgressViewStyle())
-                    .controlSize(.small)
-                    .frame(width: 48, height: 48)
-                    .background(Color.black.opacity(0.75))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                LoadingIndicatorView()
             }
         }
     }

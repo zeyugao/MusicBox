@@ -36,16 +36,6 @@ struct ServerError: Decodable, Error {
     let message: String?
 }
 
-extension Data {
-    func asType<T: Decodable>(_ type: T.Type) -> T? {
-        return try? JSONDecoder().decode(type, from: self)
-    }
-
-    func asAny() -> Any? {
-        return try? JSONSerialization.jsonObject(with: self, options: [])
-    }
-}
-
 class CloudMusicApi {
     static let RecommandSongPlaylistId: UInt64 = 0
 
