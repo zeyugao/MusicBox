@@ -37,9 +37,37 @@ class UserInfo: ObservableObject {
     @Published var playlists: [CloudMusicApi.PlayListItem] = []
 }
 
+enum Sidebar: Hashable {
+    case account
+    case nowPlaying
+    case explore
+    case debug
+    case playlist(playlist: CloudMusicApi.PlayListItem)
+}
+
+struct TextWithImage: View {
+    var text: String
+    var image: String?
+
+    init(_ text: String, image: String? = nil) {
+        self.text = text
+        self.image = image
+    }
+
+    var body: some View {
+        HStack {
+            if let image = image {
+                Image(systemName: image)
+                    .foregroundStyle(.blue)
+            }
+            Text(text)
+        }
+    }
+}
+
 struct ContentView: View {
     @StateObject var playController = PlayController()
-    @State private var selection: String?  // = "Now Playing"
+    @State private var selection: Sidebar = .account
     @StateObject private var userInfo = UserInfo()
 
     @State private var showPlayDetail = false
@@ -50,92 +78,64 @@ struct ContentView: View {
             content: {
                 NavigationSplitView {
                     List(selection: $selection) {
-                        NavigationLink(
-                            destination: AccountView()
-                                .environmentObject(userInfo)
-                                .environmentObject(playController)
-                                .navigationTitle("Account")
-                        ) {
-                            Label(
-                                "Account", systemImage: "person.crop.circle")
-                        }.tag("Account")
-
-                        NavigationLink(
-                            destination: NowPlayingView()
-                                .environmentObject(playController)
-                                .navigationTitle("Now Playing")
-                        ) {
-                            Label("Now Playing", systemImage: "dot.radiowaves.left.and.right")
-                        }.tag("Now Playing")
-
-                        NavigationLink(
-                            destination: ExploreView()
-                                .environmentObject(userInfo)
-                                .environmentObject(playController)
-                                .navigationTitle("Explore")
-                        ) {
-                            Label("Explore", systemImage: "music.house")
-                        }.tag("Explore")
-
+                        TextWithImage("Account", image: "person.crop.circle")
+                            .tag(Sidebar.account)
+                        TextWithImage("Now Playing", image: "dot.radiowaves.left.and.right")
+                            .tag(Sidebar.nowPlaying)
+                        TextWithImage("Explore", image: "music.house")
+                            .tag(Sidebar.explore)
                         #if DEBUG
-                            NavigationLink(
-                                destination: DebugView()
-                                    .environmentObject(playController)
-                                    .navigationTitle("Debug")
-                            ) {
-                                Label("Debug", systemImage: "skew")
-                            }.tag("Debug")
+                            TextWithImage("Debug", image: "skew")
+                                .tag(Sidebar.debug)
                         #endif
 
                         if userInfo.profile != nil {
                             Section(header: Text("Created Playlists")) {
                                 ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
-                                    let metadata = PlaylistMetadata.netease(
-                                        playlist.id, playlist.name)
-                                    NavigationLink(
-                                        destination: PlayListView(
-                                            playlistMetadata: metadata
-                                        )
-                                        .environmentObject(playController)
-                                        .environmentObject(userInfo)
-                                    ) {
-                                        Label(playlist.name, systemImage: "music.note.list")
-                                    }
+                                    TextWithImage(playlist.name, image: "music.note.list")
+                                        .tag(Sidebar.playlist(playlist: playlist))
                                 }
                             }
 
                             Section(header: Text("Favored Playlists")) {
                                 ForEach(userInfo.playlists.filter { $0.subscribed }) { playlist in
-                                    let metadata = PlaylistMetadata.netease(
-                                        playlist.id, playlist.name)
-                                    NavigationLink(
-                                        destination: PlayListView(
-                                            playlistMetadata: metadata
-                                        )
-                                        .environmentObject(playController)
-                                        .environmentObject(userInfo)
-                                    ) {
-                                        Label(playlist.name, systemImage: "music.note.list")
-                                    }
+                                    TextWithImage(playlist.name, image: "music.note.list")
+                                        .tag(Sidebar.playlist(playlist: playlist))
                                 }
                             }
                         }
                     }
                     .listStyle(SidebarListStyle())
                     .frame(minWidth: 200, idealWidth: 250)
-                    // .toolbar(removing: .sidebarToggle)
                 } detail: {
-                }
-                .padding(.bottom, 80)
-                .toolbar {}
-                .onAppear {
-                    DispatchQueue.main.async {
-                        Task {
-                            try await Task.sleep(for: .seconds(0.01))
-                            selection = "Account"
-                        }
+                    switch selection {
+                    case .account:
+                        AccountView()
+                            .environmentObject(userInfo)
+                            .environmentObject(playController)
+                            .navigationTitle("Account")
+                    case .nowPlaying:
+                        NowPlayingView()
+                            .environmentObject(playController)
+                            .navigationTitle("Now Playing")
+                    case .explore:
+                        ExploreView()
+                            .environmentObject(userInfo)
+                            .environmentObject(playController)
+                            .navigationTitle("Explore")
+                    case .debug:
+                        DebugView()
+                            .environmentObject(playController)
+                            .navigationTitle("Debug")
+                    case let .playlist(playlist):
+                        let metadata = PlaylistMetadata.netease(playlist.id, playlist.name)
+                        PlayListView(playlistMetadata: metadata)
+                            .environmentObject(userInfo)
+                            .environmentObject(playController)
+                            .navigationTitle(playlist.name)
                     }
                 }
+                .padding(.bottom, 80)
 
                 PlayerControlView(showPlayDetail: $showPlayDetail)
                     .environmentObject(playController)
@@ -151,9 +151,6 @@ struct ContentView: View {
                     )
                     .background(Color.white)
                     .frame(minWidth: 800)
-                // .fullScreenCover(isPresented: $showPlayDetail) {
-                //     PlayingDetailView()
-                // }
             }
         )
         .onKeyPress { press in

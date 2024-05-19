@@ -45,9 +45,13 @@ class CloudMusicApi {
         let userId: UInt64
     }
 
-    struct PlayListItem: Identifiable, Codable, Equatable {
+    struct PlayListItem: Identifiable, Codable, Equatable, Hashable {
         static func == (lhs: CloudMusicApi.PlayListItem, rhs: CloudMusicApi.PlayListItem) -> Bool {
             return lhs.id == rhs.id
+        }
+        
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
         }
 
         let subscribed: Bool
