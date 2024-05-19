@@ -79,7 +79,7 @@ struct AddArticleView: View {
         .frame(width: 300, height: 200)
     }
 }
-struct PlayerView: View {
+struct DebugView: View {
     @EnvironmentObject var playController: PlayController
 
     @State var presentAddArticleSheet = false

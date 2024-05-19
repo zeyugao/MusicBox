@@ -79,7 +79,7 @@ struct ContentView: View {
 
                         #if DEBUG
                             NavigationLink(
-                                destination: PlayerView()
+                                destination: DebugView()
                                     .environmentObject(playController)
                                     .navigationTitle("Debug")
                             ) {
