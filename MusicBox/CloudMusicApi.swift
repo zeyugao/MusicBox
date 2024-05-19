@@ -512,7 +512,6 @@ class CloudMusicApi {
         if let parsed = ret.asType(Result.self) {
             return parsed.data
         }
-        print(ret.asAny() ?? "")
         print("song_url_v1 failed")
         return nil
     }
@@ -535,7 +534,6 @@ class CloudMusicApi {
         if let parsed = ret.asType(Result.self) {
             return parsed.data
         }
-        print(ret.asAny() ?? "")
         print("song_download_url failed")
         return nil
     }
@@ -614,8 +612,6 @@ class CloudMusicApi {
             return nil
         }
 
-        print(res.asAny() ?? "No data")
-
         struct PrivateCloud: Decodable {
             let songId: UInt64
         }
@@ -643,8 +639,6 @@ class CloudMusicApi {
             print("cloud_match failed")
             return
         }
-
-        print(res.asAny() ?? "No data")
     }
 
     static func likelist(userId: UInt64) async -> [UInt64]? {
@@ -824,9 +818,6 @@ class CloudMusicApi {
             let code: Int
             let result: SuggestResult
         }
-
-        print(res.asAny() ?? "No data")
-
         if let parsed = res.asType(Result.self) {
             return parsed.result.songs
         }
