@@ -167,6 +167,64 @@ struct TableContextMenu: View {
     }
 }
 
+struct ListPlaylistDialogView: View {
+    @EnvironmentObject var userInfo: UserInfo
+    @Environment(\.dismiss) private var dismiss
+
+    var onSelect: ((CloudMusicApi.PlayListItem) -> Void)?
+
+    var body: some View {
+        VStack {
+            ScrollView {
+                VStack(alignment: .leading) {
+                    ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
+                        
+                        Button(action: {
+                            onSelect?(playlist)
+                            dismiss()
+                        }) {
+                            HStack {
+                                let height = 64.0
+                                AsyncImage(url: URL(string: playlist.coverImgUrl.https)) { image in
+                                    image.resizable()
+                                        .scaledToFit()
+                                        .frame(width: height, height: height)
+                                } placeholder: {
+                                    Image(systemName: "music.note")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 30, height: 30)
+                                        .padding()
+                                        .frame(width: height, height: height)
+                                        .background(Color.gray.opacity(0.2))
+                                }
+                                Text(playlist.name)
+                                    .font(.title2)
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity)
+                        .onHover { inside in
+                            if inside {
+                                NSCursor.pointingHand.push()
+                            } else {
+                                NSCursor.pop()
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: 400, maxHeight: 600)
+
+            Button("Cancel") {
+                dismiss()
+            }
+        }.padding()
+    }
+}
+
 struct PlayAllButton: View {
     @EnvironmentObject var playController: PlayController
 
@@ -316,6 +374,8 @@ struct PlayListView: View {
     @State private var isLoading = false
 
     @State private var searchText = ""
+    @State private var errorText = ""
+    @State private var selectedSongToAdd: CloudMusicApi.Song?
 
     var playlistMetadata: PlaylistMetadata?
 
@@ -446,6 +506,27 @@ struct PlayListView: View {
                             .contextMenu {
                                 TableContextMenu(song: song)
 
+                                Button("Add to Playlist") {
+                                    selectedSongToAdd = song
+                                }
+
+                                if case .netease(let songId, _) = playlistMetadata {
+                                    Button("Delete from Playlist") {
+                                        Task {
+                                            do {
+                                                try await CloudMusicApi.playlist_tracks(
+                                                    op: .del, playlistId: songId,
+                                                    trackIds: [song.id])
+                                                updatePlaylist()
+                                            } catch let error as RequestError {
+                                                errorText = error.localizedDescription
+                                            } catch {
+                                                errorText = error.localizedDescription
+                                            }
+                                        }
+                                    }
+                                }
+
                                 Button("Upload to Cloud") {
                                     Task {
                                         if let url = await selectFile() {
@@ -479,6 +560,28 @@ struct PlayListView: View {
 
                 handleSortChange(sortOrder: self.sortOrder)
             }
+            .sheet(
+                isPresented: Binding<Bool>(
+                    get: { selectedSongToAdd != nil },
+                    set: { if !$0 { selectedSongToAdd = nil } }
+                )
+            ) {
+                if let selectedSong = selectedSongToAdd {
+                    ListPlaylistDialogView { selectedPlaylist in
+                        Task {
+                            do {
+                                try await CloudMusicApi.playlist_tracks(
+                                    op: .add, playlistId: selectedPlaylist.id,
+                                    trackIds: [selectedSong.id])
+                            } catch let error as RequestError {
+                                errorText = error.localizedDescription
+                            } catch {
+                                errorText = error.localizedDescription
+                            }
+                        }
+                    }
+                }
+            }
             .onChange(of: searchText) { prevSearchText, searchText in
                 model.applySearch(by: searchText)
                 model.update()
@@ -497,6 +600,14 @@ struct PlayListView: View {
             }
             .onDisappear {
                 loadingTask?.cancel()
+            }
+            .alert(
+                isPresented: Binding<Bool>(
+                    get: { !errorText.isEmpty },
+                    set: { if !$0 { errorText = "" } }
+                )
+            ) {
+                Alert(title: Text("Error"), message: Text(errorText))
             }
 
             if isLoading {

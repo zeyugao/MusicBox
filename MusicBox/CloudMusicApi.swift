@@ -13,6 +13,21 @@ enum RequestError: Error {
     case errorCode((Int, String))
     case Request(String)
     case unknown
+
+    public var localizedDescription: String {
+        switch self {
+        case .error(let error):
+            return error.localizedDescription
+        case .noData:
+            return "No data"
+        case .errorCode((let code, let message)):
+            return "\(code): \(message)"
+        case .Request(let message):
+            return message
+        case .unknown:
+            return "Unknown error"
+        }
+    }
 }
 
 struct ServerError: Decodable, Error {
@@ -793,8 +808,8 @@ class CloudMusicApi {
             let res = try? await doRequest(
                 memberName: "search_suggest",
                 data: [
-                    "keywords": keyword,
-//                    "type": "mobile",
+                    "keywords": keyword
+                        //                    "type": "mobile",
                 ])
         else {
             print("search_suggest failed")
@@ -809,8 +824,8 @@ class CloudMusicApi {
             let code: Int
             let result: SuggestResult
         }
-        
-        print(res.asAny())
+
+        print(res.asAny() ?? "No data")
 
         if let parsed = res.asType(Result.self) {
             return parsed.result.songs
@@ -848,11 +863,40 @@ class CloudMusicApi {
             let result: Result2
         }
 
-        print(res.asAny())
-
         if let parsed = res.asType(Result.self) {
             return parsed.result.songs
         }
         return nil
+    }
+
+    enum PlaylistTracksOp: String {
+        case add = "add"
+        case del = "del"
+    }
+
+    static func playlist_tracks(op: PlaylistTracksOp, playlistId: UInt64, trackIds: [uint64])
+        async throws
+    {
+        guard
+            let res = try? await doRequest(
+                memberName: "playlist_tracks",
+                data: [
+                    "op": op.rawValue,
+                    "pid": playlistId,
+                    "tracks": trackIds.map { String($0) }.joined(separator: ","),
+                ])
+        else {
+            print("playlist_tracks failed")
+            return
+        }
+
+        struct ErrorResult: Decodable {
+            let code: Int
+            let message: String
+        }
+
+        if let error = res.asType(ErrorResult.self) {
+            throw RequestError.errorCode((error.code, error.message))
+        }
     }
 }

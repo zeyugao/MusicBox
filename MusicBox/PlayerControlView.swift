@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-private struct PlayControlButtonStyle: ButtonStyle {
+struct PlayControlButtonStyle: ButtonStyle {
     @ViewBuilder
     func makeBody(configuration: Configuration) -> some View {
         let color: Color = configuration.isPressed ? .secondary : .primary
