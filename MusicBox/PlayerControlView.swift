@@ -76,6 +76,7 @@ struct PlayerControlView: View {
     @EnvironmentObject var playController: PlayController
     @Binding var showPlayDetail: Bool
     @EnvironmentObject private var userInfo: UserInfo
+    @State var errorText: String = ""
 
     func secondsToMinutesAndSeconds(seconds: Double) -> String {
         let seconds_int = Int(seconds)
@@ -200,13 +201,14 @@ struct PlayerControlView: View {
                 Button(action: {
                     guard currentId != 0 else { return }
                     Task {
-                        if await CloudMusicApi.like(id: currentId, like: !favored) {
-                            if favored {
-                                userInfo.likelist.remove(currentId)
-                            } else {
-                                userInfo.likelist.insert(currentId)
-                            }
-                        }
+                        var likelist = userInfo.likelist
+                        await likeSong(
+                            likelist: &likelist,
+                            songId: currentId,
+                            favored: favored,
+                            errorText: $errorText
+                        )
+                        userInfo.likelist = likelist
                     }
                 }) {
                     Image(systemName: favored ? "heart.fill" : "heart")
@@ -257,6 +259,14 @@ struct PlayerControlView: View {
                 }
                 .padding(.trailing, 32)
 
+            }
+            .alert(
+                isPresented: Binding<Bool>(
+                    get: { !errorText.isEmpty },
+                    set: { if !$0 { errorText = "" } }
+                )
+            ) {
+                Alert(title: Text("Error"), message: Text(errorText))
             }
         }
     }

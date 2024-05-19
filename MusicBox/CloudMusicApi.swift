@@ -639,6 +639,7 @@ class CloudMusicApi {
             print("cloud_match failed")
             return
         }
+        print(res.asAny() ?? "")
     }
 
     static func likelist(userId: UInt64) async -> [UInt64]? {
@@ -663,7 +664,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func like(id: UInt64, like: Bool) async -> Bool {
+    static func like(id: UInt64, like: Bool) async throws {
         guard
             let res = try? await doRequest(
                 memberName: "like",
@@ -673,16 +674,17 @@ class CloudMusicApi {
                 ])
         else {
             print("like failed")
-            return false
+            return
         }
 
         struct Result: Decodable {
             let code: Int
         }
         if let parsed = res.asType(Result.self) {
-            return parsed.code == 200
+            if parsed.code != 200 {
+                throw RequestError.errorCode((parsed.code, "收藏失败"))
+            }
         }
-        return false
     }
 
     static func recommend_resource() async -> [RecommandPlaylistItem]? {
@@ -803,7 +805,6 @@ class CloudMusicApi {
                 memberName: "search_suggest",
                 data: [
                     "keywords": keyword
-                        //                    "type": "mobile",
                 ])
         else {
             print("search_suggest failed")

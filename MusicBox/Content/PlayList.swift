@@ -167,6 +167,24 @@ struct TableContextMenu: View {
     }
 }
 
+@MainActor
+func likeSong(likelist: inout Set<UInt64>, songId: UInt64, favored: Bool, errorText: Binding<String>)
+    async
+{
+    do {
+        try await CloudMusicApi.like(id: songId, like: !favored)
+        if favored {
+            likelist.remove(songId)
+        } else {
+            likelist.insert(songId)
+        }
+    } catch let error as RequestError {
+        errorText.wrappedValue = error.localizedDescription
+    } catch {
+        errorText.wrappedValue = error.localizedDescription
+    }
+}
+
 struct ListPlaylistDialogView: View {
     @EnvironmentObject var userInfo: UserInfo
     @Environment(\.dismiss) private var dismiss
@@ -178,7 +196,6 @@ struct ListPlaylistDialogView: View {
             ScrollView {
                 VStack(alignment: .leading) {
                     ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
-                        
                         Button(action: {
                             onSelect?(playlist)
                             dismiss()
@@ -430,13 +447,14 @@ struct PlayListView: View {
 
                     Button(action: {
                         Task {
-                            if await CloudMusicApi.like(id: song.id, like: !favored) {
-                                if favored {
-                                    userInfo.likelist.remove(song.id)
-                                } else {
-                                    userInfo.likelist.insert(song.id)
-                                }
-                            }
+                            var likelist = userInfo.likelist
+                            await likeSong(
+                                likelist: &likelist,
+                                songId: song.id,
+                                favored: favored,
+                                errorText: $errorText
+                            )
+                            userInfo.likelist = likelist
                         }
                     }) {
                         Image(systemName: favored ? "heart.fill" : "heart")

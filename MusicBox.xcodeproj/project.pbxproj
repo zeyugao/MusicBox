@@ -12,16 +12,9 @@
 		2D2800982BCE1F21007A55D5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2D2800972BCE1F21007A55D5 /* Assets.xcassets */; };
 		2D28009B2BCE1F21007A55D5 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2D28009A2BCE1F21007A55D5 /* Preview Assets.xcassets */; };
 		2D2800A32BCF6998007A55D5 /* PlayerControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */; };
-		2D2800D42BD21F20007A55D5 /* SampleBufferItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800CF2BD21F20007A55D5 /* SampleBufferItem.swift */; };
-		2D2800D52BD21F20007A55D5 /* SampleBufferPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800D02BD21F20007A55D5 /* SampleBufferPlayer.swift */; };
-		2D2800D62BD21F20007A55D5 /* SampleBufferSerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800D12BD21F20007A55D5 /* SampleBufferSerializer.swift */; };
-		2D2800D72BD21F20007A55D5 /* SampleBufferSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800D22BD21F20007A55D5 /* SampleBufferSource.swift */; };
 		2D2800DC2BD21FE9007A55D5 /* NowPlayingCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800D82BD21FE9007A55D5 /* NowPlayingCenter.swift */; };
 		2D2800DD2BD21FE9007A55D5 /* PlaylistItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800D92BD21FE9007A55D5 /* PlaylistItem.swift */; };
 		2D2800DE2BD21FE9007A55D5 /* RemoteCommandCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800DA2BD21FE9007A55D5 /* RemoteCommandCenter.swift */; };
-		2D2800E32BD2202A007A55D5 /* ADTSFormatHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800DF2BD2202A007A55D5 /* ADTSFormatHelper.swift */; };
-		2D2800E42BD2202A007A55D5 /* ADTSHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800E02BD2202A007A55D5 /* ADTSHeader.swift */; };
-		2D2800E52BD2202A007A55D5 /* ADTSSampleBufferSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800E12BD2202A007A55D5 /* ADTSSampleBufferSource.swift */; };
 		2D3A45842BE3A90F006CD909 /* QCloudMusicApi.h in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45832BE3A90F006CD909 /* QCloudMusicApi.h */; };
 		2D3A45902BE3C3A6006CD909 /* libQCloudMusicApi.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D3A45852BE3A9E1006CD909 /* libQCloudMusicApi.dylib */; };
 		2D3A45912BE3C3A6006CD909 /* libQCloudMusicApi.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2D3A45852BE3A9E1006CD909 /* libQCloudMusicApi.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -90,16 +83,9 @@
 		2D28009A2BCE1F21007A55D5 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		2D28009C2BCE1F21007A55D5 /* MusicBox.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MusicBox.entitlements; sourceTree = "<group>"; };
 		2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerControlView.swift; sourceTree = "<group>"; };
-		2D2800CF2BD21F20007A55D5 /* SampleBufferItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferItem.swift; sourceTree = "<group>"; };
-		2D2800D02BD21F20007A55D5 /* SampleBufferPlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferPlayer.swift; sourceTree = "<group>"; };
-		2D2800D12BD21F20007A55D5 /* SampleBufferSerializer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferSerializer.swift; sourceTree = "<group>"; };
-		2D2800D22BD21F20007A55D5 /* SampleBufferSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferSource.swift; sourceTree = "<group>"; };
 		2D2800D82BD21FE9007A55D5 /* NowPlayingCenter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NowPlayingCenter.swift; sourceTree = "<group>"; };
 		2D2800D92BD21FE9007A55D5 /* PlaylistItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaylistItem.swift; sourceTree = "<group>"; };
 		2D2800DA2BD21FE9007A55D5 /* RemoteCommandCenter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RemoteCommandCenter.swift; sourceTree = "<group>"; };
-		2D2800DF2BD2202A007A55D5 /* ADTSFormatHelper.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSFormatHelper.swift; sourceTree = "<group>"; };
-		2D2800E02BD2202A007A55D5 /* ADTSHeader.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSHeader.swift; sourceTree = "<group>"; };
-		2D2800E12BD2202A007A55D5 /* ADTSSampleBufferSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSSampleBufferSource.swift; sourceTree = "<group>"; };
 		2D3A45812BE3A90E006CD909 /* MusicBox-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "MusicBox-Bridging-Header.h"; sourceTree = "<group>"; };
 		2D3A45832BE3A90F006CD909 /* QCloudMusicApi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = QCloudMusicApi.h; sourceTree = "<group>"; };
 		2D3A45852BE3A9E1006CD909 /* libQCloudMusicApi.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libQCloudMusicApi.dylib; path = ../QCloudMusicApi/build/bin/libQCloudMusicApi.dylib; sourceTree = "<group>"; };
@@ -165,7 +151,6 @@
 		2D2800922BCE1F20007A55D5 /* MusicBox */ = {
 			isa = PBXGroup;
 			children = (
-				2D2800E22BD2202A007A55D5 /* AAC */,
 				2D2800972BCE1F21007A55D5 /* Assets.xcassets */,
 				2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */,
 				2DED51C72BD2815800F9D181 /* Content */,
@@ -175,7 +160,6 @@
 				2D3A45812BE3A90E006CD909 /* MusicBox-Bridging-Header.h */,
 				2D28009C2BCE1F21007A55D5 /* MusicBox.entitlements */,
 				2D2800932BCE1F20007A55D5 /* MusicBoxApp.swift */,
-				2D2800D32BD21F20007A55D5 /* Player */,
 				2D3A45A52BE86F75006CD909 /* Player.swift */,
 				2DC8FDB22BF7C58900D21F6A /* CachingPlayerItem */,
 				2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */,
@@ -206,17 +190,6 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		2D2800D32BD21F20007A55D5 /* Player */ = {
-			isa = PBXGroup;
-			children = (
-				2D2800CF2BD21F20007A55D5 /* SampleBufferItem.swift */,
-				2D2800D02BD21F20007A55D5 /* SampleBufferPlayer.swift */,
-				2D2800D12BD21F20007A55D5 /* SampleBufferSerializer.swift */,
-				2D2800D22BD21F20007A55D5 /* SampleBufferSource.swift */,
-			);
-			path = Player;
-			sourceTree = "<group>";
-		};
 		2D2800DB2BD21FE9007A55D5 /* General */ = {
 			isa = PBXGroup;
 			children = (
@@ -225,16 +198,6 @@
 				2D2800DA2BD21FE9007A55D5 /* RemoteCommandCenter.swift */,
 			);
 			path = General;
-			sourceTree = "<group>";
-		};
-		2D2800E22BD2202A007A55D5 /* AAC */ = {
-			isa = PBXGroup;
-			children = (
-				2D2800DF2BD2202A007A55D5 /* ADTSFormatHelper.swift */,
-				2D2800E02BD2202A007A55D5 /* ADTSHeader.swift */,
-				2D2800E12BD2202A007A55D5 /* ADTSSampleBufferSource.swift */,
-			);
-			path = AAC;
 			sourceTree = "<group>";
 		};
 		2DC8FDB22BF7C58900D21F6A /* CachingPlayerItem */ = {
@@ -342,10 +305,7 @@
 				2DC8FDB62BF7C58900D21F6A /* ResourceLoaderDelegate.swift in Sources */,
 				2D2800DC2BD21FE9007A55D5 /* NowPlayingCenter.swift in Sources */,
 				2D3A45A82BE916C8006CD909 /* NowPlaying.swift in Sources */,
-				2D2800E52BD2202A007A55D5 /* ADTSSampleBufferSource.swift in Sources */,
-				2D2800E32BD2202A007A55D5 /* ADTSFormatHelper.swift in Sources */,
 				2D3A45842BE3A90F006CD909 /* QCloudMusicApi.h in Sources */,
-				2D2800D52BD21F20007A55D5 /* SampleBufferPlayer.swift in Sources */,
 				2DED51CD2BD2AD7A00F9D181 /* Play.swift in Sources */,
 				2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */,
 				2D2800962BCE1F20007A55D5 /* ContentView.swift in Sources */,
@@ -353,17 +313,13 @@
 				2D2800DE2BD21FE9007A55D5 /* RemoteCommandCenter.swift in Sources */,
 				2DFB58E52BF5997B00D488F4 /* PlayingDetailView.swift in Sources */,
 				2D2800DD2BD21FE9007A55D5 /* PlaylistItem.swift in Sources */,
-				2D2800D42BD21F20007A55D5 /* SampleBufferItem.swift in Sources */,
 				2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */,
 				2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */,
 				2DC8FDB52BF7C58900D21F6A /* MediaFileHandle.swift in Sources */,
 				2DC8FDB92BF8A8A400D21F6A /* Explore.swift in Sources */,
-				2D2800E42BD2202A007A55D5 /* ADTSHeader.swift in Sources */,
 				2D2800942BCE1F20007A55D5 /* MusicBoxApp.swift in Sources */,
-				2D2800D62BD21F20007A55D5 /* SampleBufferSerializer.swift in Sources */,
 				2DED51EE2BD3F62100F9D181 /* Extensions.swift in Sources */,
 				2DC8FDB72BF7C58900D21F6A /* URLExtension.swift in Sources */,
-				2D2800D72BD21F20007A55D5 /* SampleBufferSource.swift in Sources */,
 				2D2800A32BCF6998007A55D5 /* PlayerControlView.swift in Sources */,
 				2DFB58D72BF0744100D488F4 /* Account.swift in Sources */,
 			);
