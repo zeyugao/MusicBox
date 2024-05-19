@@ -8,42 +8,67 @@
 import Foundation
 import SwiftUI
 
-struct FullScreenCoverModifier: ViewModifier {
-    @Binding var isPresented: Bool
-    let content: () -> AnyView
-
-    func body(content: Content) -> some View {
-        ZStack {
-            content
-                .zIndex(0)
-
-            if isPresented {
-                self.content()
-                    .background(Color.black.opacity(0.3).edgesIgnoringSafeArea(.all))
-                    .transition(.move(edge: .bottom))
-                    .zIndex(1)
-                .edgesIgnoringSafeArea(.all)
+struct LyricView: View {
+    var lyric: CloudMusicApi.LyricNew
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading) {
+                ForEach(lyric.lrc.parse().filter {
+                    line in
+                    return line.time >= 0 && !line.text.isEmpty
+                }, id: \.self) { line in
+                    Text(line.text)
+                }
             }
         }
     }
 }
 
-extension View {
-    func fullScreenCover<Content: View>(isPresented: Binding<Bool>, content: @escaping () -> Content) -> some View {
-        self.modifier(FullScreenCoverModifier(isPresented: isPresented, content: {
-            AnyView(content())
-        }))
-    }
-}
-
 struct PlayingDetailView: View {
-//    @Environment(\.dismiss) var dismiss
+    @State private var lyric: CloudMusicApi.LyricNew?
+    @EnvironmentObject var playController: PlayController
 
     var body: some View {
         ZStack {
-            Color.primary.edgesIgnoringSafeArea(.all)
-            Button("Dismiss Modal") {
-//                dismiss()
+            // Button("Dismiss Modal") {
+            //     PlayingDetailModel.closePlayingDetail()
+            // }
+
+            if let item = playController.currentItem {
+                HStack {
+                    Spacer()
+                    VStack {
+                        if let artworkUrl = item.artworkUrl {
+                            AsyncImage(url: artworkUrl) { image in
+                                image.resizable()
+                                    .interpolation(.high)
+                            } placeholder: {
+                                Color.white
+                            }
+                            .frame(width: 200, height: 200)
+                            .cornerRadius(5)
+                        }
+
+                        Text(item.title)
+                            .font(.title)
+                            .padding()
+                    }
+                    Spacer()
+
+                    if let lyric = lyric {
+                        LyricView(lyric: lyric)
+                            .padding()
+                    }
+                    Spacer()
+                }
+            }
+        }.onAppear {
+            Task {
+                if let currentId = playController.currentItem?.id,
+                    let lyric = await CloudMusicApi.lyric_new(id: currentId)
+                {
+                    self.lyric = lyric
+                }
             }
         }
     }

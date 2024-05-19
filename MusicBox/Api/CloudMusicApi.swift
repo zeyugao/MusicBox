@@ -49,7 +49,7 @@ class CloudMusicApi {
         static func == (lhs: CloudMusicApi.PlayListItem, rhs: CloudMusicApi.PlayListItem) -> Bool {
             return lhs.id == rhs.id
         }
-        
+
         func hash(into hasher: inout Hasher) {
             hasher.combine(id)
         }
@@ -884,5 +884,59 @@ class CloudMusicApi {
         if let error = res.asType(ErrorResult.self) {
             throw RequestError.errorCode((error.code, error.message))
         }
+    }
+
+    struct LyricNew: Decodable {
+
+        struct LyricLine: Decodable, Hashable {
+            let time: Float64
+            let text: String
+        }
+        struct Lyric: Decodable {
+            let lyric: String
+            let version: Int
+
+            func parse() -> [LyricLine] {
+                return lyric.split(separator: "\n").map { (line: Substring) in
+                    if !line.starts(with: "[") {
+                        return LyricLine(time: -1, text: String(line))
+                    }
+
+                    let parts = line.split(separator: "]")
+                    let time = parts[0].dropFirst().split(separator: ":")
+                    let text = parts.count < 2 ? "" : parts[1]
+                    if time.count < 2 {
+                        return LyricLine(time: 0, text: String(text))
+                    }
+                    let minute = Int(String(time[0])) ?? 0
+                    let second = Float64(time[1]) ?? 0
+                    return LyricLine(time: Float64(minute * 60) + second, text: String(text))
+                }
+            }
+        }
+
+        // let klyric: LyricNew.Lyric
+        let lrc: LyricNew.Lyric
+        let tlyric: LyricNew.Lyric
+        let romalrc: LyricNew.Lyric
+    }
+
+    static func lyric_new(id: UInt64) async -> LyricNew? {
+        print(id)
+        guard
+            let res = try? await doRequest(
+                memberName: "lyric_new",
+                data: [
+                    "id": id
+                ])
+        else {
+            print("lyric_new failed")
+            return nil
+        }
+
+        if let parsed = res.asType(LyricNew.self) {
+            return parsed
+        }
+        return nil
     }
 }

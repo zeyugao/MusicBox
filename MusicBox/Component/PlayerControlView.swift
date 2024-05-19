@@ -74,7 +74,6 @@ struct PlaySliderView: View {
 
 struct PlayerControlView: View {
     @EnvironmentObject var playController: PlayController
-    @Binding var showPlayDetail: Bool
     @EnvironmentObject private var userInfo: UserInfo
     @State var errorText: String = ""
 
@@ -106,7 +105,7 @@ struct PlayerControlView: View {
                             .background(Color.gray.opacity(0.2))
                     }
                     .onTapGesture {
-                        showPlayDetail = true
+                        PlayingDetailModel.openPlayingDetail()
                     }
                 } else {
                     Image(systemName: "music.note")
