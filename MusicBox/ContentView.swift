@@ -205,11 +205,11 @@ struct ContentView: View {
                                 .environmentObject(userInfo)
                                 .environmentObject(playController)
                                 .navigationTitle(playlist.name)
-                         case .songDetail:
-                             PlayingDetailView()
-                                 .environmentObject(playController)
-                                 .environmentObject(userInfo)
-                                 .navigationTitle("Song Detail")
+                        case .songDetail:
+                            PlayingDetailView()
+                                .environmentObject(playController)
+                                .environmentObject(userInfo)
+                                .navigationTitle("Song Detail")
                         }
                     }
                 }

@@ -63,7 +63,6 @@ struct PlayingDetailView: View {
 
     var body: some View {
         GeometryReader { geometry in
-
             ZStack {
                 if let item = playController.currentItem {
                     HStack {
