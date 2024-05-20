@@ -66,6 +66,9 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     var timeControlStatus: AVPlayer.TimeControlStatus = .waitingToPlayAtSpecifiedRate
     var timeControlStautsObserver: NSKeyValueObservation?
 
+    var lyricTimeline: [Double] = []
+    @Published var currentLyricIndex: Int? = nil
+
     func togglePlayPause() async {
         if !isPlaying {
             await startPlaying()
@@ -245,6 +248,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     func seekToOffset(offset: Double) {
         let newTime = CMTime(seconds: offset, preferredTimescale: 1)
         player.seek(to: newTime)
+        self.currentLyricIndex = nil
         updateCurrentPlaybackInfo()
     }
 
@@ -252,6 +256,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         let currentTime = player.currentTime()
         let newTime = CMTimeAdd(currentTime, CMTime(seconds: offset, preferredTimescale: 1))
         player.seek(to: newTime)
+        self.currentLyricIndex = 0
         updateCurrentPlaybackInfo()
     }
 
@@ -422,6 +427,23 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             duration: duration)
     }
 
+    func resetLyricIndex() {
+        self.currentLyricIndex = monotonouslyUpdateLyric(lyricIndex: 0)
+    }
+
+    func monotonouslyUpdateLyric(lyricIndex: Int) -> Int? {
+        var lyricIndex = lyricIndex
+        while lyricIndex < self.lyricTimeline.count
+            && self.playedSecond > self.lyricTimeline[lyricIndex]
+        {
+            lyricIndex += 1
+        }
+        if lyricIndex > 0 {
+            return lyricIndex - 1
+        }
+        return nil
+    }
+
     func nowPlayingInit() {
         RemoteCommandCenter.handleRemoteCommands(using: self)
         updateCurrentPlaybackInfo()
@@ -447,6 +469,15 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         ) { [weak self] time in
             self?.playedSecond = self?.player.currentTime().seconds ?? 0.0
             self?.updateCurrentPlaybackInfo()
+
+            let initIdx = self?.currentLyricIndex
+            let newIdx = self?.monotonouslyUpdateLyric(lyricIndex: initIdx ?? 0)
+
+            if newIdx != initIdx {
+                withAnimation {
+                    self?.currentLyricIndex = newIdx
+                }
+            }
         }
 
         playerShouldNextObserver = NotificationCenter.default.addObserver(
@@ -457,11 +488,13 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             }
         }
 
-        playerSelectionChangedObserver = NotificationCenter.default.addObserver(
-            forName: AVPlayerItem.mediaSelectionDidChangeNotification, object: nil, queue: .main
-        ) { _ in
-            print("mediaSelectionDidChangeNotification")
-        }
+        // lyricDidUpdateObserver = NotificationCenter.default.addObserver(
+        //     forName: LyricModel.lyricDidUpdateName, object: nil, queue: .main
+        // ) { [weak self] notification in
+        //     if let lyricTimeline = notification.userInfo?["lyricTimeline"] as? [Double] {
+        //         self.lyricTimeline = lyricTimeline
+        //     }
+        // }
     }
 
     func deinitPlayerObservers() {

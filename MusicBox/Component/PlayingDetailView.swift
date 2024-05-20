@@ -9,34 +9,61 @@ import Foundation
 import SwiftUI
 
 struct LyricView: View {
-    var lyric: CloudMusicApi.LyricNew
+    var lyric: [CloudMusicApi.LyricLine]
+    @EnvironmentObject var playController: PlayController
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
-                ForEach(lyric.lrc.parse().filter {
-                    line in
-                    return line.time >= 0 && !line.text.isEmpty
-                }, id: \.self) { line in
-                    Text(line.text)
+                ForEach(
+                    lyric.indices, id: \.self
+                ) { index in
+                    let line = lyric[index]
+                    let currentPlaying = playController.currentLyricIndex == index
+
+                    VStack(alignment: .leading) {
+                        Text(String(format: "%.2f", line.time))
+                            .font(currentPlaying ? .title : .body)
+                            .foregroundColor(.gray)
+
+                        Text(line.lyric)
+                            .font(currentPlaying ? .title : .body)
+
+                        if let tlyric = line.tlyric {
+                            Text(tlyric)
+                                .font(currentPlaying ? .title : .body)
+                                .padding(.top, 8)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+
+                    Spacer()
+                        .id(index)
                 }
             }
+            .padding()
         }
+        .scrollPosition(
+            id: Binding(
+                get: {
+                    playController.currentLyricIndex
+                },
+                set: { value in
+                    // playController.currentLyricIndex = value
+                }),
+            anchor: .center)
     }
 }
 
 struct PlayingDetailView: View {
-    @State private var lyric: CloudMusicApi.LyricNew?
+    @State private var lyric: [CloudMusicApi.LyricLine]?
     @EnvironmentObject var playController: PlayController
 
     var body: some View {
         ZStack {
-            // Button("Dismiss Modal") {
-            //     PlayingDetailModel.closePlayingDetail()
-            // }
-
             if let item = playController.currentItem {
                 HStack {
-                    Spacer()
                     VStack {
                         if let artworkUrl = item.artworkUrl {
                             AsyncImage(url: artworkUrl) { image in
@@ -48,18 +75,22 @@ struct PlayingDetailView: View {
                             .frame(width: 200, height: 200)
                             .cornerRadius(5)
                         }
-
                         Text(item.title)
                             .font(.title)
                             .padding()
                     }
-                    Spacer()
+                    .frame(maxWidth: .infinity)
 
-                    if let lyric = lyric {
-                        LyricView(lyric: lyric)
-                            .padding()
+                    Divider()
+
+                    VStack {
+                        if let lyric = lyric {
+                            LyricView(lyric: lyric)
+                        } else {
+                            Text("还没有歌词")
+                        }
                     }
-                    Spacer()
+                    .frame(maxWidth: .infinity)
                 }
             }
         }.onAppear {
@@ -67,7 +98,10 @@ struct PlayingDetailView: View {
                 if let currentId = playController.currentItem?.id,
                     let lyric = await CloudMusicApi.lyric_new(id: currentId)
                 {
+                    let lyric = lyric.merge()
                     self.lyric = lyric
+                    self.playController.lyricTimeline = lyric.map { $0.time }
+                    self.playController.currentLyricIndex = nil
                 }
             }
         }

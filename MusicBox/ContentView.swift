@@ -84,8 +84,8 @@ struct TextWithImage: View {
 
 class PlayingDetailModel: ObservableObject {
     @Published var isPresented = false
-    private var openPlayingDetailObserver: NSObjectProtocol!
-    private var closePlayingDetailObserver: NSObjectProtocol!
+    private var openPlayingDetailObserver: NSObjectProtocol?
+    private var closePlayingDetailObserver: NSObjectProtocol?
     static let openPlayingDetailName = Notification.Name("openPlayingDetail")
     static let closePlayingDetailName = Notification.Name("closePlayingDetail")
 
@@ -117,6 +117,15 @@ class PlayingDetailModel: ObservableObject {
             queue: .main
         ) { [weak self] notification in
             self?.isPresented = false
+        }
+    }
+
+    deinit {
+        if let obs = openPlayingDetailObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+        if let obs = closePlayingDetailObserver {
+            NotificationCenter.default.removeObserver(obs)
         }
     }
 }
@@ -196,11 +205,11 @@ struct ContentView: View {
                                 .environmentObject(userInfo)
                                 .environmentObject(playController)
                                 .navigationTitle(playlist.name)
-                        case .songDetail:
-                            PlayingDetailView()
-                                .environmentObject(playController)
-                                .environmentObject(userInfo)
-                                .navigationTitle("Song Detail")
+                         case .songDetail:
+                             PlayingDetailView()
+                                 .environmentObject(playController)
+                                 .environmentObject(userInfo)
+                                 .navigationTitle("Song Detail")
                         }
                     }
                 }
@@ -227,15 +236,15 @@ struct ContentView: View {
                     .frame(minWidth: 800)
             }
         )
-        .onKeyPress { press in
-            if press.characters == " " {
-                DispatchQueue.main.async {
-                    Task { await playController.togglePlayPause() }
-                }
-                return .handled
-            }
-            return .ignored
-        }
+        //        .onKeyPress { press in
+        //            if press.characters == " " {
+        //                DispatchQueue.main.async {
+        //                    Task { await playController.togglePlayPause() }
+        //                }
+        //                return .handled
+        //            }
+        //            return .ignored
+        //        }
         .onAppear {
             Task {
                 await initUserData(userInfo: userInfo)
