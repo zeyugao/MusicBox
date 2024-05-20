@@ -59,7 +59,6 @@ enum Sidebar: Hashable {
     case explore
     case debug
     case playlist(playlist: CloudMusicApi.PlayListItem)
-    case songDetail
 }
 
 struct TextWithImage: View {
@@ -218,11 +217,6 @@ struct ContentView: View {
                                 .environmentObject(userInfo)
                                 .environmentObject(playController)
                                 .navigationTitle(playlist.name)
-                        case .songDetail:
-                            PlayingDetailView()
-                                .environmentObject(playController)
-                                .environmentObject(userInfo)
-                                .navigationTitle("Song Detail")
                         }
                     }
                 }
