@@ -24,6 +24,7 @@ func formatCMTime(_ time: CMTime) -> String {
 
 struct NowPlayingView: View {
     @EnvironmentObject var playController: PlayController
+    @State private var playlist: [PlaylistItem] = []
 
     var body: some View {
         Table(of: PlaylistItem.self) {
@@ -45,9 +46,26 @@ struct NowPlayingView: View {
                 Text(formatCMTime(song.duration))
             }.width(max: 60)
         } rows: {
-            ForEach(playController.playlist) { item in
+            ForEach(playlist) { item in
                 TableRow(item)
+                    .contextMenu {
+                        Button("Play") {
+                            Task {
+                                await playController.playBySongId(id: item.id)
+                            }
+                        }
+
+                        Button("Delete") {
+                            Task {
+                                await playController.deleteBySongId(id: item.id)
+                                playlist = playController.playlist
+                            }
+                        }
+                    }
             }
+        }
+        .onAppear {
+            playlist = playController.playlist
         }
     }
 }

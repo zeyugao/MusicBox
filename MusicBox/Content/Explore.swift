@@ -102,7 +102,7 @@ struct AlbumListView: View {
                     ForEach(searchSuggestions, id: \.self) { suggestion in
                         Text(suggestion.name + " - " + suggestion.al.name)
                             .searchCompletion(
-                                "##%%ID" + (encodeObjToJSON(suggestion)))
+                                "##%%ID" + String(suggestion.id))
                     }
                 }
             )
@@ -110,6 +110,19 @@ struct AlbumListView: View {
                 Task {
                     isLoading = true
                     defer { isLoading = false }
+
+                    if searchText.starts(with: "##%%ID") {
+                        let data = searchText.dropFirst(6)
+                        let id = UInt64(data) ?? 0
+
+                        if let res = await CloudMusicApi.song_detail(ids: [id]) {
+                            searchResult = res
+                        }
+
+                        defer { searchText = "" }
+                        return
+                    }
+
                     if let res = await CloudMusicApi.search(keyword: searchText) {
                         let res = res.map { $0.convertToSong() }
                         searchResult = res
@@ -136,18 +149,6 @@ struct AlbumListView: View {
                 task?.cancel()
 
                 guard !searchText.isEmpty else {
-                    return
-                }
-
-                if searchText.starts(with: "##%%ID") {
-                    let data = searchText.dropFirst(6)
-                    if let song = decodeJSONToObj(CloudMusicApi.Song.self, String(data)) {
-                        searchResult = [song]
-                    } else {
-                        searchResult = []
-                    }
-
-                    defer { searchText = "" }
                     return
                 }
 

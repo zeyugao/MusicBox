@@ -174,6 +174,28 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         initPlayerObservers()
     }
 
+    func playBySongId(id: UInt64) async {
+        guard let index = playlist.firstIndex(where: { $0.id == id }) else { return }
+        await seekToItem(offset: index)
+        await startPlaying()
+    }
+
+    func deleteBySongId(id: UInt64) async {
+        guard let index = playlist.firstIndex(where: { $0.id == id }) else { return }
+        playlist.remove(at: index)
+
+        if let currentItemIndex = currentItemIndex {
+            if index == currentItemIndex {
+                await seekToItem(offset: index)
+            } else if index < currentItemIndex {
+                self.currentItemIndex = currentItemIndex - 1
+                updateCurrentPlaybackInfo()
+            }
+        }
+
+        saveState()
+    }
+
     func seekToItem(offset: Int?) async {
         if let offset = offset {
             guard offset < playlist.count else { return }
