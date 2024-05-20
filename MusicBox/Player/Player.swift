@@ -58,6 +58,9 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         return nil
     }
 
+    private let timeScale = CMTimeScale(NSEC_PER_SEC)
+    private let toleranceTime = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+
     // Private notification observers.
     var periodicTimeObserverToken: Any?
     var playerShouldNextObserver: NSObjectProtocol?
@@ -246,16 +249,16 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     func seekToOffset(offset: Double) {
-        let newTime = CMTime(seconds: offset, preferredTimescale: 1)
-        player.seek(to: newTime)
+        let newTime = CMTime(seconds: offset, preferredTimescale: timeScale)
+        player.seek(to: newTime, toleranceBefore: toleranceTime, toleranceAfter: toleranceTime)
         self.currentLyricIndex = nil
         updateCurrentPlaybackInfo()
     }
 
     func seekByOffset(offset: Double) {
         let currentTime = player.currentTime()
-        let newTime = CMTimeAdd(currentTime, CMTime(seconds: offset, preferredTimescale: 1))
-        player.seek(to: newTime)
+        let newTime = CMTimeAdd(currentTime, CMTime(seconds: offset, preferredTimescale: timeScale))
+        player.seek(to: newTime, toleranceBefore: toleranceTime, toleranceAfter: toleranceTime)
         self.currentLyricIndex = 0
         updateCurrentPlaybackInfo()
     }
@@ -455,8 +458,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             [weak self] (player, changes) in
             self?.timeControlStatus = player.timeControlStatus
         }
-
-        let timeScale = CMTimeScale(NSEC_PER_SEC)
 
         playerStateObserver = player.observe(\.rate, options: [.initial, .new]) { player, _ in
             guard player.status == .readyToPlay else { return }
