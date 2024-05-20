@@ -144,6 +144,7 @@ struct PlayerControlView: View {
                                 .resizable()
                                 .frame(width: 20, height: 20)
                             }
+                            .keyboardShortcut(.space, modifiers: [])
                             .buttonStyle(PlayControlButtonStyle())
                             .frame(width: 20, height: 20)
                         }
