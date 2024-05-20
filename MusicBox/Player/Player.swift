@@ -487,14 +487,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 await self.nextTrack()
             }
         }
-
-        // lyricDidUpdateObserver = NotificationCenter.default.addObserver(
-        //     forName: LyricModel.lyricDidUpdateName, object: nil, queue: .main
-        // ) { [weak self] notification in
-        //     if let lyricTimeline = notification.userInfo?["lyricTimeline"] as? [Double] {
-        //         self.lyricTimeline = lyricTimeline
-        //     }
-        // }
     }
 
     func deinitPlayerObservers() {

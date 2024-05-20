@@ -50,7 +50,6 @@ struct LyricView: View {
                     playController.currentLyricIndex
                 },
                 set: { value in
-                    // playController.currentLyricIndex = value
                 }),
             anchor: .center)
     }
