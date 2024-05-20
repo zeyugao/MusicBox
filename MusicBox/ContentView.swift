@@ -86,12 +86,14 @@ class PlayingDetailModel: ObservableObject {
     @Published var isPresented = false
     private var openPlayingDetailObserver: NSObjectProtocol?
     private var closePlayingDetailObserver: NSObjectProtocol?
+    private var togglePlayingDetailObserver: NSObjectProtocol?
     static let openPlayingDetailName = Notification.Name("openPlayingDetail")
     static let closePlayingDetailName = Notification.Name("closePlayingDetail")
+    static let togglePlayingDetailName = Notification.Name("togglePlayingDetail")
 
-    // static func togglePlayingDetail() {
-    //     NotificationCenter.default.post(name: PlayController.togglePlayPauseName, object: nil)
-    // }
+    static func togglePlayingDetail() {
+        NotificationCenter.default.post(name: togglePlayingDetailName, object: nil)
+    }
 
     static func openPlayingDetail() {
         NotificationCenter.default.post(name: openPlayingDetailName, object: nil)
@@ -118,6 +120,14 @@ class PlayingDetailModel: ObservableObject {
         ) { [weak self] notification in
             self?.isPresented = false
         }
+
+        togglePlayingDetailObserver = notificationCenter.addObserver(
+            forName: PlayingDetailModel.togglePlayingDetailName,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.isPresented.toggle()
+        }
     }
 
     deinit {
@@ -125,6 +135,9 @@ class PlayingDetailModel: ObservableObject {
             NotificationCenter.default.removeObserver(obs)
         }
         if let obs = closePlayingDetailObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+        if let obs = togglePlayingDetailObserver {
             NotificationCenter.default.removeObserver(obs)
         }
     }

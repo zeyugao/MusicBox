@@ -105,7 +105,7 @@ struct PlayerControlView: View {
                             .background(Color.gray.opacity(0.2))
                     }
                     .onTapGesture {
-                        PlayingDetailModel.openPlayingDetail()
+                        PlayingDetailModel.togglePlayingDetail()
                     }
                 } else {
                     Image(systemName: "music.note")
