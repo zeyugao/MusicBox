@@ -23,16 +23,18 @@ struct LyricView: View {
 
                     VStack(alignment: .leading) {
                         Text(String(format: "%.2f", line.time))
+                            .lineLimit(1)
                             .font(currentPlaying ? .title : .body)
                             .foregroundColor(.gray)
 
                         Text(line.lyric)
+                            .lineLimit(1)
                             .font(currentPlaying ? .title : .body)
 
                         if let tlyric = line.tlyric {
                             Text(tlyric)
+                                .lineLimit(1)
                                 .font(currentPlaying ? .title : .body)
-                                .padding(.top, 8)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -60,47 +62,52 @@ struct PlayingDetailView: View {
     @EnvironmentObject var playController: PlayController
 
     var body: some View {
-        ZStack {
-            if let item = playController.currentItem {
-                HStack {
-                    VStack {
-                        if let artworkUrl = item.artworkUrl {
-                            AsyncImage(url: artworkUrl) { image in
-                                image.resizable()
-                                    .interpolation(.high)
-                            } placeholder: {
-                                Color.white
+        GeometryReader { geometry in
+
+            ZStack {
+                if let item = playController.currentItem {
+                    HStack {
+                        VStack {
+                            if let artworkUrl = item.artworkUrl {
+                                AsyncImage(url: artworkUrl) { image in
+                                    image.resizable()
+                                        .interpolation(.high)
+                                } placeholder: {
+                                    Color.white
+                                }
+                                .frame(width: 200, height: 200)
+                                .cornerRadius(5)
                             }
-                            .frame(width: 200, height: 200)
-                            .cornerRadius(5)
+                            Text(item.title)
+                                .font(.title)
+                                .padding()
                         }
-                        Text(item.title)
-                            .font(.title)
-                            .padding()
-                    }
-                    .frame(maxWidth: .infinity)
+                        // .frame(maxWidth: .infinity)
+                        .frame(width: geometry.size.width * 0.33)
 
-                    Divider()
+                        Divider()
 
-                    VStack {
-                        if let lyric = lyric {
-                            LyricView(lyric: lyric)
-                        } else {
-                            Text("还没有歌词")
+                        VStack {
+                            if let lyric = lyric {
+                                LyricView(lyric: lyric)
+                            } else {
+                                Text("还没有歌词")
+                            }
                         }
+                        // .frame(maxWidth: .infinity)
+                        .frame(width: geometry.size.width * 0.67)
                     }
-                    .frame(maxWidth: .infinity)
                 }
-            }
-        }.onAppear {
-            Task {
-                if let currentId = playController.currentItem?.id,
-                    let lyric = await CloudMusicApi.lyric_new(id: currentId)
-                {
-                    let lyric = lyric.merge()
-                    self.lyric = lyric
-                    self.playController.lyricTimeline = lyric.map { $0.time }
-                    self.playController.currentLyricIndex = nil
+            }.onAppear {
+                Task {
+                    if let currentId = playController.currentItem?.id,
+                        let lyric = await CloudMusicApi.lyric_new(id: currentId)
+                    {
+                        let lyric = lyric.merge()
+                        self.lyric = lyric
+                        self.playController.lyricTimeline = lyric.map { Int($0.time * 10) }
+                        self.playController.currentLyricIndex = nil
+                    }
                 }
             }
         }

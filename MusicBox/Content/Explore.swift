@@ -101,6 +101,7 @@ struct AlbumListView: View {
                 suggestions: {
                     ForEach(searchSuggestions, id: \.self) { suggestion in
                         Text(suggestion.name + " - " + suggestion.al.name)
+                            .lineLimit(1)
                             .searchCompletion(
                                 "##%%ID" + String(suggestion.id))
                     }

@@ -43,11 +43,15 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     var scrobbled: Bool = false
 
-    var playerState: PlayerState = .stopped
-
-    var isPlaying: Bool {
-        playerState == .playing
+    var playerState: PlayerState = .stopped {
+        didSet {
+            DispatchQueue.main.async {
+                self.isPlaying = self.playerState == .playing
+            }
+        }
     }
+
+    @Published var isPlaying: Bool = false
 
     var playlist: [PlaylistItem] = []
     private var currentItemIndex: Int? = nil
@@ -59,7 +63,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     private let timeScale = CMTimeScale(NSEC_PER_SEC)
-    private let toleranceTime = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
 
     // Private notification observers.
     var periodicTimeObserverToken: Any?
@@ -69,7 +72,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     var timeControlStatus: AVPlayer.TimeControlStatus = .waitingToPlayAtSpecifiedRate
     var timeControlStautsObserver: NSKeyValueObservation?
 
-    var lyricTimeline: [Double] = []
+    var lyricTimeline: [Int] = []  // We align to 0.1s, 12.32 -> 123
     @Published var currentLyricIndex: Int? = nil
 
     func togglePlayPause() async {
@@ -212,13 +215,18 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
             let playerItem: AVPlayerItem
             if let url = item.getLocalUrl() {
-                playerItem = AVPlayerItem(url: url)
+                let asset = AVURLAsset(
+                    url: url,
+                    options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+
+                playerItem = AVPlayerItem(asset: asset)
             } else if let url = await item.getUrlAsync(),
                 let savePath = item.getPotentialLocalUrl(),
                 let ext = item.ext
             {
                 playerItem = CachingPlayerItem(
-                    url: url, saveFilePath: savePath.path, customFileExtension: ext)
+                    url: url, saveFilePath: savePath.path, customFileExtension: ext,
+                    avUrlAssetOptions: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
             } else {
                 return
             }
@@ -250,7 +258,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     func seekToOffset(offset: Double) {
         let newTime = CMTime(seconds: offset, preferredTimescale: timeScale)
-        player.seek(to: newTime, toleranceBefore: toleranceTime, toleranceAfter: toleranceTime)
+        player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
         self.currentLyricIndex = nil
         updateCurrentPlaybackInfo()
     }
@@ -258,7 +266,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     func seekByOffset(offset: Double) {
         let currentTime = player.currentTime()
         let newTime = CMTimeAdd(currentTime, CMTime(seconds: offset, preferredTimescale: timeScale))
-        player.seek(to: newTime, toleranceBefore: toleranceTime, toleranceAfter: toleranceTime)
+        player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
         self.currentLyricIndex = 0
         updateCurrentPlaybackInfo()
     }
@@ -436,8 +444,9 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     func monotonouslyUpdateLyric(lyricIndex: Int) -> Int? {
         var lyricIndex = lyricIndex
+        let roundedPlayedSecond = Int(playedSecond * 10)
         while lyricIndex < self.lyricTimeline.count
-            && self.playedSecond > self.lyricTimeline[lyricIndex]
+            && roundedPlayedSecond >= self.lyricTimeline[lyricIndex]
         {
             lyricIndex += 1
         }
@@ -466,10 +475,13 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         }
 
         periodicTimeObserverToken = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.5, preferredTimescale: timeScale), queue: .main
+            forInterval: CMTime(seconds: 0.1, preferredTimescale: timeScale), queue: .main
         ) { [weak self] time in
-            self?.playedSecond = self?.player.currentTime().seconds ?? 0.0
-            self?.updateCurrentPlaybackInfo()
+            let newTime = self?.player.currentTime().seconds ?? 0.0
+            if Int(self?.playedSecond ?? 0) != Int(newTime) {
+                self?.playedSecond = newTime
+                self?.updateCurrentPlaybackInfo()
+            }
 
             let initIdx = self?.currentLyricIndex
             let newIdx = self?.monotonouslyUpdateLyric(lyricIndex: initIdx ?? 0)
