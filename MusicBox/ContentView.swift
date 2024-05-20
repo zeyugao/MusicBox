@@ -243,15 +243,6 @@ struct ContentView: View {
                     .frame(minWidth: 800)
             }
         )
-        //        .onKeyPress { press in
-        //            if press.characters == " " {
-        //                DispatchQueue.main.async {
-        //                    Task { await playController.togglePlayPause() }
-        //                }
-        //                return .handled
-        //            }
-        //            return .ignored
-        //        }
         .onAppear {
             Task {
                 await initUserData(userInfo: userInfo)
