@@ -144,7 +144,7 @@ class PlayingDetailModel: ObservableObject {
 
 struct ContentView: View {
     @StateObject var playController = PlayController()
-    @State private var selection: Sidebar = .account
+    @State private var selection: Sidebar = .nowPlaying
     @StateObject private var userInfo = UserInfo()
     @StateObject private var playingDetailModel = PlayingDetailModel()
 
