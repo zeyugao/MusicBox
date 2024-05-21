@@ -14,7 +14,7 @@ struct LyricView: View {
     @EnvironmentObject var playController: PlayController
 
     var body: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading) {
                 ForEach(
                     lyric.indices, id: \.self
