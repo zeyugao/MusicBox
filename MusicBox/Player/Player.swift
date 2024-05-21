@@ -174,6 +174,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     func replaceCurrentItem(item: AVPlayerItem?) {
+        deinitPlayerObservers()
         player = AVPlayer(playerItem: item)
         loadVolume()
         player.automaticallyWaitsToMinimizeStalling = false
@@ -365,6 +366,15 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         player.volume = volume
     }
 
+    private func loadPlayedSecond() {
+        let newPlayedSecond = UserDefaults.standard.object(forKey: "playedSecond") as? Double ?? 0.0
+        seekToOffset(offset: newPlayedSecond)
+    }
+
+    private func savePlayedSecond() {
+        UserDefaults.standard.set(playedSecond, forKey: "playedSecond")
+    }
+
     private func saveMisc() {
         saveLoopMode()
         saveVolume()
@@ -396,6 +406,10 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             print("Failed to load playlist")
         }
         await self.loadCurrentPlayingItemIndex()
+
+        DispatchQueue.main.async {
+            self.loadPlayedSecond()
+        }
     }
 
     func clearPlaylist() {
@@ -499,21 +513,15 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 }
             }
         }
-
-        playerShouldNextObserver = NotificationCenter.default.addObserver(
-            forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main
-        ) { _ in
-            Task {
-                await self.nextTrack()
-            }
-        }
     }
 
     func deinitPlayerObservers() {
         if let timeObserverToken = periodicTimeObserverToken {
             player.removeTimeObserver(timeObserverToken)
             periodicTimeObserverToken = nil
-            playedSecond = 0
+            DispatchQueue.main.async {
+                self.playedSecond = 0
+            }
         }
         playerStateObserver?.invalidate()
         timeControlStautsObserver?.invalidate()
@@ -526,6 +534,20 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     init() {
         nowPlayingInit()
+
+        playerShouldNextObserver = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main
+        ) { _ in
+            Task {
+                await self.nextTrack()
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { _ in
+            self.savePlayedSecond()
+        }
     }
 
     deinit {

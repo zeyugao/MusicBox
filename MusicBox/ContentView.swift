@@ -83,61 +83,22 @@ struct TextWithImage: View {
 
 class PlayingDetailModel: ObservableObject {
     @Published var isPresented = false
-    private var openPlayingDetailObserver: NSObjectProtocol?
-    private var closePlayingDetailObserver: NSObjectProtocol?
-    private var togglePlayingDetailObserver: NSObjectProtocol?
-    static let openPlayingDetailName = Notification.Name("openPlayingDetail")
-    static let closePlayingDetailName = Notification.Name("closePlayingDetail")
-    static let togglePlayingDetailName = Notification.Name("togglePlayingDetail")
 
-    static func togglePlayingDetail() {
-        NotificationCenter.default.post(name: togglePlayingDetailName, object: nil)
-    }
-
-    static func openPlayingDetail() {
-        NotificationCenter.default.post(name: openPlayingDetailName, object: nil)
-    }
-
-    static func closePlayingDetail() {
-        NotificationCenter.default.post(name: closePlayingDetailName, object: nil)
-    }
-
-    init() {
-        let notificationCenter = NotificationCenter.default
-        openPlayingDetailObserver = notificationCenter.addObserver(
-            forName: PlayingDetailModel.openPlayingDetailName,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            self?.isPresented = true
-        }
-
-        closePlayingDetailObserver = notificationCenter.addObserver(
-            forName: PlayingDetailModel.closePlayingDetailName,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            self?.isPresented = false
-        }
-
-        togglePlayingDetailObserver = notificationCenter.addObserver(
-            forName: PlayingDetailModel.togglePlayingDetailName,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            self?.isPresented.toggle()
+    func togglePlayingDetail() {
+        DispatchQueue.main.async {
+            self.isPresented.toggle()
         }
     }
 
-    deinit {
-        if let obs = openPlayingDetailObserver {
-            NotificationCenter.default.removeObserver(obs)
+    func openPlayingDetail() {
+        DispatchQueue.main.async {
+            self.isPresented = true
         }
-        if let obs = closePlayingDetailObserver {
-            NotificationCenter.default.removeObserver(obs)
-        }
-        if let obs = togglePlayingDetailObserver {
-            NotificationCenter.default.removeObserver(obs)
+    }
+
+    func closePlayingDetail() {
+        DispatchQueue.main.async {
+            self.isPresented = false
         }
     }
 }
@@ -222,7 +183,7 @@ struct ContentView: View {
                 }
                 .onChange(of: selection) {
                     if playingDetailModel.isPresented {
-                        PlayingDetailModel.closePlayingDetail()
+                        playingDetailModel.closePlayingDetail()
                     }
                 }
                 .padding(.bottom, 80)
@@ -230,6 +191,7 @@ struct ContentView: View {
                 PlayerControlView()
                     .environmentObject(playController)
                     .environmentObject(userInfo)
+                    .environmentObject(playingDetailModel)
                     .frame(height: 80)
                     .overlay(
                         Rectangle()

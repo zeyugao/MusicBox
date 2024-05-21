@@ -75,7 +75,9 @@ struct PlaySliderView: View {
 struct PlayerControlView: View {
     @EnvironmentObject var playController: PlayController
     @EnvironmentObject private var userInfo: UserInfo
+    @EnvironmentObject private var playingDetailModel: PlayingDetailModel
     @State var errorText: String = ""
+    @State var isHovered: Bool = false
 
     func secondsToMinutesAndSeconds(seconds: Double) -> String {
         let seconds_int = Int(seconds)
@@ -104,8 +106,31 @@ struct PlayerControlView: View {
                             .frame(width: height, height: height)
                             .background(Color.gray.opacity(0.2))
                     }
+                    .overlay(
+                        Group {
+                            if isHovered {
+                                Color.white.opacity(0.2)
+                                    .transition(.opacity)
+                                    .animation(.easeInOut, value: isHovered)
+                            }
+                        }
+                    )
+                    .overlay(
+                        Image(
+                            systemName: playingDetailModel.isPresented
+                                ? "rectangle.compress.vertical" : "rectangle.expand.vertical"
+                        )
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: height * 0.5, height: height * 0.5)
+                        .foregroundColor(Color.white.opacity(isHovered ? 0.8 : 0)),
+                        alignment: .center
+                    )
+                    .onHover { hovering in
+                        isHovered = hovering
+                    }
                     .onTapGesture {
-                        PlayingDetailModel.togglePlayingDetail()
+                        playingDetailModel.togglePlayingDetail()
                     }
                 } else {
                     Image(systemName: "music.note")
