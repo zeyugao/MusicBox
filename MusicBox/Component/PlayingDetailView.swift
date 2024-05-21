@@ -104,6 +104,8 @@ struct PlayingDetailView: View {
                             Text(item.artist)
                                 .font(.title2)
                         }
+                        .padding()
+
                         .frame(width: geometry.size.width * 0.33, height: geometry.size.height)
                         Spacer()
                         VStack {
