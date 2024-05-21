@@ -204,7 +204,7 @@ struct AccountView: View {
         if let profile = userInfo.profile {
             VStack {
                 VStack(spacing: 8) {
-                    AsyncImage(url: URL(string: profile.avatarUrl.https)) { image in
+                    AsyncImageWithCache(url: URL(string: profile.avatarUrl.https)!) { image in
                         image.resizable()
                             .interpolation(.high)
                     } placeholder: {
@@ -246,7 +246,7 @@ struct AccountHeaderView: View {
     var body: some View {
         HStack {
             if let profile = userInfo.profile {
-                AsyncImage(url: URL(string: profile.avatarUrl.https)) { image in
+                AsyncImageWithCache(url: URL(string: profile.avatarUrl.https)) { image in
                     image.resizable()
                         .interpolation(.high)
                 } placeholder: {

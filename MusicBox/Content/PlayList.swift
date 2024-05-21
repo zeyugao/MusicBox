@@ -202,7 +202,7 @@ struct ListPlaylistDialogView: View {
                         }) {
                             HStack {
                                 let height = 64.0
-                                AsyncImage(url: URL(string: playlist.coverImgUrl.https)) { image in
+                                AsyncImageWithCache(url: URL(string: playlist.coverImgUrl.https)) { image in
                                     image.resizable()
                                         .scaledToFit()
                                         .frame(width: height, height: height)

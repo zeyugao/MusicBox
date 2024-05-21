@@ -23,7 +23,7 @@
 		2D3A45A22BE3C591006CD909 /* libqopensslbackend.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 2D3A459F2BE3C591006CD909 /* libqopensslbackend.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		2D3A45A62BE86F75006CD909 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45A52BE86F75006CD909 /* Player.swift */; };
 		2D3A45A82BE916C8006CD909 /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45A72BE916C8006CD909 /* NowPlaying.swift */; };
-		2DC73A7E2BFA38BF0015EB06 /* LoadingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A7D2BFA38BF0015EB06 /* LoadingIndicator.swift */; };
+		2DC73A7E2BFA38BF0015EB06 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A7D2BFA38BF0015EB06 /* Utils.swift */; };
 		2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */; };
 		2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */; };
 		2DC8FDB52BF7C58900D21F6A /* MediaFileHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAF2BF7C58900D21F6A /* MediaFileHandle.swift */; };
@@ -95,7 +95,7 @@
 		2D3A459F2BE3C591006CD909 /* libqopensslbackend.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = libqopensslbackend.dylib; path = ../Qt/6.7.0/macos/plugins/tls/libqopensslbackend.dylib; sourceTree = "<group>"; };
 		2D3A45A52BE86F75006CD909 /* Player.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		2D3A45A72BE916C8006CD909 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
-		2DC73A7D2BFA38BF0015EB06 /* LoadingIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingIndicator.swift; sourceTree = "<group>"; };
+		2DC73A7D2BFA38BF0015EB06 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
 		2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItem.swift; sourceTree = "<group>"; };
 		2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItemConfiguration.swift; sourceTree = "<group>"; };
 		2DC8FDAF2BF7C58900D21F6A /* MediaFileHandle.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MediaFileHandle.swift; sourceTree = "<group>"; };
@@ -200,7 +200,7 @@
 			isa = PBXGroup;
 			children = (
 				2D2800A22BCF6998007A55D5 /* PlayerControlView.swift */,
-				2DC73A7D2BFA38BF0015EB06 /* LoadingIndicator.swift */,
+				2DC73A7D2BFA38BF0015EB06 /* Utils.swift */,
 				2DFB58E42BF5997B00D488F4 /* PlayingDetailView.swift */,
 			);
 			path = Component;
@@ -328,7 +328,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DC73A7E2BFA38BF0015EB06 /* LoadingIndicator.swift in Sources */,
+				2DC73A7E2BFA38BF0015EB06 /* Utils.swift in Sources */,
 				2DED51CF2BD3806D00F9D181 /* CloudMusicApi.swift in Sources */,
 				2DC8FDB62BF7C58900D21F6A /* ResourceLoaderDelegate.swift in Sources */,
 				2D2800DC2BD21FE9007A55D5 /* NowPlayingCenter.swift in Sources */,

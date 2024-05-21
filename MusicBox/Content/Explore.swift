@@ -14,7 +14,7 @@ struct RecommendResourceIcon: View {
     var body: some View {
         VStack(alignment: .center) {
             if res.picUrl.starts(with: "http") {
-                AsyncImage(url: URL(string: res.picUrl.https)) { image in
+                AsyncImageWithCache(url: URL(string: res.picUrl.https)) { image in
                     image.resizable()
                         .interpolation(.high)
                 } placeholder: {
