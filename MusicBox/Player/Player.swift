@@ -203,6 +203,9 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     func seekToItem(offset: Int?) async {
+        if switchingItem {
+            return
+        }
         switchingItem = true
         DispatchQueue.main.async {
             self.playedSecond = 0.0
