@@ -8,9 +8,7 @@
 #ifndef QCLOUDMUSIC_H
 #define QCLOUDMUSIC_H
 
-int invoke(char *memberName, char *value);
-char *get_result(int key);
-void free_result(int key);
+char *invoke(char *memberName, char *value);
 char *memberName(int i);
 int memberCount();
 

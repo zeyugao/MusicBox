@@ -317,9 +317,7 @@ class CloudMusicApi {
                     let memberNamePtr = UnsafeMutablePointer(mutating: memberNameCString)
                     jsonString.withCString { jsonString in
                         let jsonString = UnsafeMutablePointer(mutating: jsonString)
-                        let resultId = invoke(memberNamePtr, jsonString)
-                        let jsonResultCString = get_result(resultId)
-                        defer { free_result(resultId) }
+                        let jsonResultCString = invoke(memberNamePtr, jsonString)
                         if let cString = jsonResultCString {
                             let jsonResult = String(cString: cString)
 
