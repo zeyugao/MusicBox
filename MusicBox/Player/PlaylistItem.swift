@@ -136,7 +136,11 @@ func downloadMusicFile(url: URL, id: UInt64, ext: String) async -> URL? {
     return await downloadFile(url: url, savePath: localFileUrl, ext: ext)
 }
 
-class PlaylistItem: Identifiable, Codable {
+class PlaylistItem: Identifiable, Codable, Equatable {
+    static func == (lhs: PlaylistItem, rhs: PlaylistItem) -> Bool {
+        return lhs.id == rhs.id
+    }
+    
     let id: UInt64
 
     /// URL of the local file containing the track's audio.

@@ -56,7 +56,7 @@ struct LyricView: View {
         .scrollPosition(
             id: Binding(
                 get: {
-                    playController.currentLyricIndex
+                    playController.currentLyricIndex ?? 0
                 },
                 set: { value in
                 }),
@@ -69,6 +69,18 @@ struct PlayingDetailView: View {
     @EnvironmentObject var playController: PlayController
     @State var showRoma: Bool = false
     @State var hasRoma: Bool = false
+
+    func updateLyric() async {
+        if let currentId = playController.currentItem?.id,
+            let lyric = await CloudMusicApi.lyric_new(id: currentId)
+        {
+            self.hasRoma = !lyric.romalrc.lyric.isEmpty
+            let lyric = lyric.merge()
+            self.lyric = lyric
+            self.playController.lyricTimeline = lyric.map { Int($0.time * 10) }
+            self.playController.currentLyricIndex = nil
+        }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -106,15 +118,12 @@ struct PlayingDetailView: View {
                 }
             }.onAppear {
                 Task {
-                    if let currentId = playController.currentItem?.id,
-                        let lyric = await CloudMusicApi.lyric_new(id: currentId)
-                    {
-                        self.hasRoma = !lyric.romalrc.lyric.isEmpty
-                        let lyric = lyric.merge()
-                        self.lyric = lyric
-                        self.playController.lyricTimeline = lyric.map { Int($0.time * 10) }
-                        self.playController.currentLyricIndex = nil
-                    }
+                    await updateLyric()
+                }
+            }
+            .onChange(of: playController.currentItem) {
+                Task {
+                    await updateLyric()
                 }
             }
             .toolbar {

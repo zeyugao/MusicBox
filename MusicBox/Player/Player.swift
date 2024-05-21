@@ -37,11 +37,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     @Published var isLoading = false
 
-    var lastUpdatedSecond: Int = 0
-
-    var isUpdatingOffset: Bool = false
-
     var scrobbled: Bool = false
+    private var switchingItem: Bool = false
 
     var playerState: PlayerState = .stopped {
         didSet {
@@ -72,7 +69,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     var timeControlStatus: AVPlayer.TimeControlStatus = .waitingToPlayAtSpecifiedRate
     var timeControlStautsObserver: NSKeyValueObservation?
 
-    var lyricTimeline: [Int] = []  // We align to 0.1s, 12.32 -> 123
+    @Published var lyricTimeline: [Int] = []  // We align to 0.1s, 12.32 -> 123
     @Published var currentLyricIndex: Int? = nil
 
     func togglePlayPause() async {
@@ -206,6 +203,11 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     func seekToItem(offset: Int?) async {
+        switchingItem = true
+        DispatchQueue.main.async {
+            self.playedSecond = 0.0
+        }
+        defer { switchingItem = false }
         if let offset = offset {
             guard offset < playlist.count else { return }
 
@@ -477,18 +479,20 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         periodicTimeObserverToken = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.1, preferredTimescale: timeScale), queue: .main
         ) { [weak self] time in
-            let newTime = self?.player.currentTime().seconds ?? 0.0
-            if Int(self?.playedSecond ?? 0) != Int(newTime) {
-                self?.playedSecond = newTime
-                self?.updateCurrentPlaybackInfo()
-            }
+            if !(self?.switchingItem ?? true) {
+                let newTime = self?.player.currentTime().seconds ?? 0.0
+                if Int(self?.playedSecond ?? 0) != Int(newTime) {
+                    self?.playedSecond = newTime
+                    self?.updateCurrentPlaybackInfo()
+                }
 
-            let initIdx = self?.currentLyricIndex
-            let newIdx = self?.monotonouslyUpdateLyric(lyricIndex: initIdx ?? 0)
+                let initIdx = self?.currentLyricIndex
+                let newIdx = self?.monotonouslyUpdateLyric(lyricIndex: initIdx ?? 0)
 
-            if newIdx != initIdx {
-                withAnimation {
-                    self?.currentLyricIndex = newIdx
+                if newIdx != initIdx {
+                    withAnimation {
+                        self?.currentLyricIndex = newIdx
+                    }
                 }
             }
         }
