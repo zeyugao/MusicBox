@@ -34,16 +34,16 @@ func initUserData(userInfo: UserInfo) async {
         userInfo.likelist = likelist
     }
 
-    if let profile = await CloudMusicApi.login_status() {
+    if let profile = await CloudMusicApi().login_status() {
         userInfo.profile = profile
         saveEncodableState(forKey: "profile", data: profile)
 
-        if let playlists = try? await CloudMusicApi.user_playlist(uid: profile.userId) {
+        if let playlists = try? await CloudMusicApi().user_playlist(uid: profile.userId) {
             userInfo.playlists = playlists
             saveEncodableState(forKey: "playlists", data: playlists)
         }
 
-        if let likelist = await CloudMusicApi.likelist(userId: profile.userId) {
+        if let likelist = await CloudMusicApi().likelist(userId: profile.userId) {
             userInfo.likelist = Set(likelist)
             saveEncodableState(forKey: "likelist", data: userInfo.likelist)
         }
@@ -87,8 +87,8 @@ class LoginViewModel: ObservableObject {
                 self.qrCodeImageURL = nil
                 self.loginMessage = nil
             }
-            let keyResponse = try await CloudMusicApi.login_qr_key()
-            let url = try await CloudMusicApi.login_qr_create(key: keyResponse)
+            let keyResponse = try await CloudMusicApi().login_qr_key()
+            let url = try await CloudMusicApi().login_qr_create(key: keyResponse)
             DispatchQueue.main.async {
                 self.qrCodeImageURL = URL(string: url)
                 self.loginMessage = "等待扫码"
@@ -110,7 +110,7 @@ class LoginViewModel: ObservableObject {
                 return
             }
             try await Task.sleep(nanoseconds: 1 * 1_000_000_000)
-            let checkRes = try await CloudMusicApi.login_qr_check(key: key)
+            let checkRes = try await CloudMusicApi().login_qr_check(key: key)
             switch checkRes.code {
             case 803:
                 updateLoginMessage(message: "Login Successful")
@@ -142,7 +142,7 @@ struct LoginView: View {
                 Spacer()
                 Button(action: {
                     Task {
-                        if await CloudMusicApi.login_cellphone(
+                        if await CloudMusicApi().login_cellphone(
                             phone: username, password: password)
                         {
                             await initUserData(userInfo: userInfo)
@@ -221,7 +221,7 @@ struct AccountView: View {
                 HStack {
                     Button(action: {
                         Task {
-                            await CloudMusicApi.logout()
+                            await CloudMusicApi().logout()
                             userInfo.profile = nil
                             userInfo.likelist = []
                             userInfo.playlists = []

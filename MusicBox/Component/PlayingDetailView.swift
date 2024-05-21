@@ -72,7 +72,7 @@ struct PlayingDetailView: View {
 
     func updateLyric() async {
         if let currentId = playController.currentItem?.id,
-            let lyric = await CloudMusicApi.lyric_new(id: currentId)
+            let lyric = await CloudMusicApi(cacheTtl: -1).lyric_new(id: currentId)
         {
             self.hasRoma = !lyric.romalrc.lyric.isEmpty
             let lyric = lyric.merge()
@@ -131,11 +131,8 @@ struct PlayingDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     if hasRoma {
-                        Button {
-                            showRoma.toggle()
-                        } label: {
+                        Toggle(isOn: $showRoma) {
                             Image(systemName: "quote.bubble")
-                                .foregroundStyle(showRoma ? .blue : .gray)
                         }
                     }
                 }

@@ -77,7 +77,7 @@ struct AlbumListView: View {
                         trackCount: 0
                     )
                     var newRes = [dialyRecommend]
-                    if let res = await CloudMusicApi.recommend_resource() {
+                    if let res = await CloudMusicApi(cacheTtl: 5 * 60).recommend_resource() {
                         newRes.append(contentsOf: res)
                     }
                     recommendResource = newRes
@@ -116,7 +116,7 @@ struct AlbumListView: View {
                         let data = searchText.dropFirst(6)
                         let id = UInt64(data) ?? 0
 
-                        if let res = await CloudMusicApi.song_detail(ids: [id]) {
+                        if let res = await CloudMusicApi(cacheTtl: 5 * 60).song_detail(ids: [id]) {
                             searchResult = res
                         }
 
@@ -124,7 +124,8 @@ struct AlbumListView: View {
                         return
                     }
 
-                    if let res = await CloudMusicApi.search(keyword: searchText) {
+                    if let res = await CloudMusicApi(cacheTtl: 5 * 60).search(keyword: searchText)
+                    {
                         let res = res.map { $0.convertToSong() }
                         searchResult = res
                     }
@@ -160,7 +161,9 @@ struct AlbumListView: View {
                         return
                     }
 
-                    if let res = await CloudMusicApi.search_suggest(keyword: text) {
+                    if let res = await CloudMusicApi(cacheTtl: 1 * 60).search_suggest(
+                        keyword: text)
+                    {
                         DispatchQueue.main.async {
                             self.searchSuggestions = res.map { $0.convertToSong() }
                         }

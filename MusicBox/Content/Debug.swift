@@ -112,13 +112,13 @@ struct DebugView: View {
     private func uploadCloud() async {
         if let url = await selectFile() {
             if let metadata = await loadMetadata(url: url) {
-                if let _ = await CloudMusicApi.cloud(
+                if let _ = await CloudMusicApi().cloud(
                     filePath: url,
                     songName: metadata.title,
                     artist: metadata.artist,
                     album: metadata.album
                 ) {
-                    // await CloudMusicApi.cloud_match(
+                    // await CloudMusicApi().cloud_match(
 
                     // )
                 }

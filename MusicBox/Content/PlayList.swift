@@ -43,10 +43,12 @@ class PlaylistDetailModel: ObservableObject {
     var sortOrder: [KeyPathComparator<CloudMusicApi.Song>]? = nil
     var searchText = ""
 
-    func updatePlaylistDetail(metadata: PlaylistMetadata) async {
+    func updatePlaylistDetail(metadata: PlaylistMetadata, force: Bool = false) async {
         switch metadata {
         case .netease(let id, _):
-            if let playlist = await CloudMusicApi.playlist_detail(id: id) {
+            let cacheTtl = if force { 0.0 } else { 10 * 60.0 }
+
+            if let playlist = await CloudMusicApi(cacheTtl: cacheTtl).playlist_detail(id: id) {
                 let trackIds = playlist.trackIds
                 let tracks = playlist.tracks
 
@@ -60,7 +62,9 @@ class PlaylistDetailModel: ObservableObject {
                         self.songs = tracks
                     }
                 } else {
-                    if let playlist = await CloudMusicApi.song_detail(ids: trackIds) {
+                    if let playlist = await CloudMusicApi(cacheTtl: cacheTtl).song_detail(
+                        ids: trackIds)
+                    {
                         self.originalSongs = playlist
                         DispatchQueue.main.async {
                             self.songs = playlist
@@ -168,11 +172,13 @@ struct TableContextMenu: View {
 }
 
 @MainActor
-func likeSong(likelist: inout Set<UInt64>, songId: UInt64, favored: Bool, errorText: Binding<String>)
+func likeSong(
+    likelist: inout Set<UInt64>, songId: UInt64, favored: Bool, errorText: Binding<String>
+)
     async
 {
     do {
-        try await CloudMusicApi.like(id: songId, like: !favored)
+        try await CloudMusicApi().like(id: songId, like: !favored)
         if favored {
             likelist.remove(songId)
         } else {
@@ -202,7 +208,8 @@ struct ListPlaylistDialogView: View {
                         }) {
                             HStack {
                                 let height = 64.0
-                                AsyncImageWithCache(url: URL(string: playlist.coverImgUrl.https)) { image in
+                                AsyncImageWithCache(url: URL(string: playlist.coverImgUrl.https)) {
+                                    image in
                                     image.resizable()
                                         .scaledToFit()
                                         .frame(width: height, height: height)
@@ -257,11 +264,8 @@ struct PlayAllButton: View {
                 await playController.startPlaying()
             }
         }) {
-            Image(systemName: "play.circle")
-                .resizable()
-                .frame(width: 16, height: 16)
+            Image(systemName: "play")
         }
-        .buttonStyle(BorderlessButtonStyle())
         .help("Play All")
 
         Button(action: {
@@ -272,11 +276,8 @@ struct PlayAllButton: View {
                 let _ = await playController.addItemsToPlaylist(newItems)
             }
         }) {
-            Image(systemName: "plus.circle")
-                .resizable()
-                .frame(width: 16, height: 16)
+            Image(systemName: "plus")
         }
-        .buttonStyle(BorderlessButtonStyle())
         .help("Add All to Playlist")
     }
 }
@@ -326,6 +327,7 @@ struct DownloadAllButton: View {
                 presentDownloadAllSongDialog.toggle()
                 return
             }
+            presentDownloadAllSongDialog = true
             downloading = true
 
             Task {
@@ -335,7 +337,7 @@ struct DownloadAllButton: View {
                     text = "Downloading \(idx + 1) / \(totalCnt)"
                     if let _ = getCachedMusicFile(id: song.id) {
                     } else {
-                        if let songData = await CloudMusicApi.song_url_v1(id: [song.id]) {
+                        if let songData = await CloudMusicApi().song_url_v1(id: [song.id]) {
                             let songData = songData[0]
                             let ext = songData.type
                             if let url = URL(string: songData.url.https) {
@@ -359,15 +361,11 @@ struct DownloadAllButton: View {
                 ProgressView(value: downloadProgress)
                     .progressViewStyle(CircularProgressViewStyle())
                     .controlSize(.small)
-                    .help("Downloading")
             } else {
-                Image(systemName: "arrow.down.circle")
-                    .resizable()
-                    .frame(width: 16, height: 16)
-                    .help("Download All")
+                Image(systemName: "square.and.arrow.down")
             }
         }
-        .buttonStyle(BorderlessButtonStyle())
+        .help(downloading ? "Downloading" : "Download All")
         .popover(
             isPresented: $presentDownloadAllSongDialog
         ) {
@@ -402,13 +400,13 @@ struct PlayListView: View {
         isLoading = true
         defer { isLoading = false }
         if let metadata = await loadMetadata(url: url) {
-            if let privateSongId = await CloudMusicApi.cloud(
+            if let privateSongId = await CloudMusicApi().cloud(
                 filePath: url,
                 songName: metadata.title,
                 artist: metadata.artist,
                 album: metadata.album
             ) {
-                await CloudMusicApi.cloud_match(
+                await CloudMusicApi().cloud_match(
                     userId: userInfo.profile?.userId ?? 0,
                     songId: privateSongId,
                     adjustSongId: songId
@@ -532,7 +530,7 @@ struct PlayListView: View {
                                     Button("Delete from Playlist") {
                                         Task {
                                             do {
-                                                try await CloudMusicApi.playlist_tracks(
+                                                try await CloudMusicApi().playlist_tracks(
                                                     op: .del, playlistId: songId,
                                                     trackIds: [song.id])
                                                 updatePlaylist()
@@ -588,7 +586,7 @@ struct PlayListView: View {
                     ListPlaylistDialogView { selectedPlaylist in
                         Task {
                             do {
-                                try await CloudMusicApi.playlist_tracks(
+                                try await CloudMusicApi().playlist_tracks(
                                     op: .add, playlistId: selectedPlaylist.id,
                                     trackIds: [selectedSong.id])
                             } catch let error as RequestError {
@@ -609,6 +607,14 @@ struct PlayListView: View {
             .toolbar {
                 PlayAllButton(songs: model.songs ?? [])
                 DownloadAllButton(songs: model.songs ?? [])
+                Button(action: {
+                    Task {
+                        updatePlaylist(force: true)
+                    }
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .help("Refresh Playlist")
             }
             .onChange(of: playlistMetadata?.id) {
                 updatePlaylist()
@@ -634,7 +640,7 @@ struct PlayListView: View {
         }
     }
 
-    private func updatePlaylist() {
+    private func updatePlaylist(force: Bool = false) {
         if let playlistMetadata = playlistMetadata {
             isLoading = true
 
@@ -647,7 +653,7 @@ struct PlayListView: View {
             model.curId = playlistMetadata.id
             loadingTask?.cancel()
             loadingTask = Task {
-                await model.updatePlaylistDetail(metadata: playlistMetadata)
+                await model.updatePlaylistDetail(metadata: playlistMetadata, force: force)
                 isLoading = false
             }
         }

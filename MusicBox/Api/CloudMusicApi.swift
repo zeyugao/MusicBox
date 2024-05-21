@@ -5,6 +5,7 @@
 //  Created by Elsa on 2024/4/20.
 //
 
+import CryptoKit
 import Foundation
 
 enum RequestError: Error {
@@ -36,7 +37,97 @@ struct ServerError: Decodable, Error {
     let message: String?
 }
 
+class SharedCacheManager {
+    class CacheItem {
+        let value: Any
+        let expiryDate: Date?
+
+        init(value: Any, ttl: TimeInterval) {
+            self.value = value
+            if ttl == -1 {
+                self.expiryDate = nil
+            } else {
+                self.expiryDate = Date().addingTimeInterval(ttl)
+            }
+        }
+
+        var isExpired: Bool {
+            if let expiryDate = expiryDate {
+                return Date() > expiryDate
+            }
+            return false
+        }
+    }
+
+    private var cache: [String: CacheItem] = [:]
+    private let cacheQueue = DispatchQueue(label: "SharedCacheManagerQueue")
+
+    static let shared = SharedCacheManager()
+
+    private init() {
+        startPeriodicCleanup()
+    }
+
+    func md5(_ data: String) -> String {
+        let md5Data = Insecure.MD5.hash(data: Data(data.utf8))
+        return md5Data.map { String(format: "%02hhx", $0) }.joined()
+    }
+
+    func set(value: Any, for query: String, ttl: TimeInterval) {
+        cacheQueue.async {
+            self.cache[self.md5(query)] = CacheItem(value: value, ttl: ttl)
+        }
+    }
+
+    func get(for query: String) -> Any? {
+        var result: Any? = nil
+        let query = md5(query)
+        cacheQueue.sync {
+            if let item = self.cache[query], !item.isExpired {
+                result = item.value
+            } else {
+                self.cache.removeValue(forKey: query)
+            }
+        }
+        return result
+    }
+
+    func clear() {
+        cacheQueue.async {
+            self.cache.removeAll()
+        }
+    }
+
+    private func startPeriodicCleanup() {
+        Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
+            self?.cleanupExpiredItems()
+        }
+    }
+
+    private func cleanupExpiredItems() {
+        cacheQueue.async {
+            let now = Date()
+            self.cache = self.cache.filter { key, item in
+                if let expiryDate = item.expiryDate {
+                    return expiryDate > now
+                }
+                return true
+            }
+        }
+    }
+
+    deinit {
+        clear()
+    }
+}
+
 class CloudMusicApi {
+    let cacheTtl: TimeInterval  // 0 means no cache
+
+    init(cacheTtl: TimeInterval = 0) {
+        self.cacheTtl = cacheTtl
+    }
+
     static let RecommandSongPlaylistId: UInt64 = 0
 
     struct Profile: Codable {
@@ -197,7 +288,7 @@ class CloudMusicApi {
         let data: T
     }
 
-    static private func doRequest(
+    private func doRequest(
         memberName: String, data: [String: Any]
     ) async throws -> Data {
         var data = data
@@ -208,21 +299,33 @@ class CloudMusicApi {
         setenv("QT_LOGGING_RULES", "*.debug=false", 1)  // Reduce log
         return try await withCheckedThrowingContinuation { continuation in
             do {
-                let jsonData = try JSONSerialization.data(withJSONObject: data)
+                let jsonData = try JSONSerialization.data(withJSONObject: data, options: [.sortedKeys])
 
                 let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
 
-                memberName.withCString { memberName in
-                    let memberName = UnsafeMutablePointer(mutating: memberName)
+                let cacheKey = memberName + jsonString
+                if cacheTtl != 0 {
+                    if let cachedData = SharedCacheManager.shared.get(for: cacheKey) as? Data {
+                        SharedCacheManager.shared.set(
+                            value: cachedData, for: cacheKey, ttl: cacheTtl)
+                        continuation.resume(returning: cachedData)
+                        return
+                    }
+                }
+
+                memberName.withCString { memberNameCString in
+                    let memberNamePtr = UnsafeMutablePointer(mutating: memberNameCString)
                     jsonString.withCString { jsonString in
                         let jsonString = UnsafeMutablePointer(mutating: jsonString)
-                        let resultId = invoke(memberName, jsonString)
+                        let resultId = invoke(memberNamePtr, jsonString)
                         let jsonResultCString = get_result(resultId)
                         defer { free_result(resultId) }
                         if let cString = jsonResultCString {
                             let jsonResult = String(cString: cString)
 
                             if let jsonData = jsonResult.data(using: .utf8) {
+                                SharedCacheManager.shared.set(
+                                    value: jsonData, for: cacheKey, ttl: cacheTtl)
                                 continuation.resume(returning: jsonData)
                                 return
                             }
@@ -250,7 +353,7 @@ class CloudMusicApi {
         }
     }
 
-    static func login_qr_key(max_retries: UInt = 3) async throws -> String {
+    func login_qr_key(max_retries: UInt = 3) async throws -> String {
         struct Result: Decodable {
             let code: Int
             let unikey: String
@@ -266,7 +369,7 @@ class CloudMusicApi {
         throw RequestError.noData
     }
 
-    static func login_qr_create(key: String) async throws -> String {
+    func login_qr_create(key: String) async throws -> String {
         struct Result: Decodable {
             let qrurl: String
         }
@@ -286,15 +389,15 @@ class CloudMusicApi {
 
     static let SaveCookieName: String = "NeteaseApiCookie"
 
-    static func setCookie(_ cookie: String) {
-        UserDefaults.standard.set(cookie, forKey: SaveCookieName)
+    func setCookie(_ cookie: String) {
+        UserDefaults.standard.set(cookie, forKey: CloudMusicApi.SaveCookieName)
     }
 
-    static func getCookie() -> String? {
-        return UserDefaults.standard.string(forKey: SaveCookieName)
+    func getCookie() -> String? {
+        return UserDefaults.standard.string(forKey: CloudMusicApi.SaveCookieName)
     }
 
-    static func login_refresh() async throws {
+    func login_refresh() async throws {
         guard
             (try? await doRequest(
                 memberName: "login_refresh",
@@ -304,7 +407,7 @@ class CloudMusicApi {
         }
     }
 
-    static func login_qr_check(key: String) async throws -> (code: Int, message: String) {
+    func login_qr_check(key: String) async throws -> (code: Int, message: String) {
         struct Result: Decodable {
             let code: Int
             let message: String?
@@ -328,7 +431,7 @@ class CloudMusicApi {
         return (ret.code, ret.message ?? "No message")
     }
 
-    static func login_status() async -> Profile? {
+    func login_status() async -> Profile? {
         struct Data: Decodable {
             let profile: Profile?
         }
@@ -341,14 +444,14 @@ class CloudMusicApi {
         return ret.asType(Result.self)?.data.profile
     }
 
-    static func history_recommend_songs() async {
+    func history_recommend_songs() async {
         guard let ret = try? await doRequest(memberName: "history_recommend_songs", data: [:])
         else { return }
 
         print(ret.asAny() ?? "No data")
     }
 
-    static func user_playlist(
+    func user_playlist(
         uid: UInt64, limit: Int = 30, offset: Int = 0, includeVideo: Bool = true
     )
         async throws
@@ -378,7 +481,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func login_cellphone(phone: String, countrycode: Int = 86, password: String) async
+    func login_cellphone(phone: String, countrycode: Int = 86, password: String) async
         -> Bool
     {
         guard
@@ -411,23 +514,23 @@ class CloudMusicApi {
         return false
     }
 
-    static func logout() async {
+    func logout() async {
         guard let _ = try? await doRequest(memberName: "logout", data: [:]) else { return }
-        setCookie("aa")
+        setCookie("dummy saved cookie")
     }
 
-    static func user_account() async {
+    func user_account() async {
         guard let ret = try? await doRequest(memberName: "user_account", data: [:]) else { return }
         print(ret)
     }
 
-    static func user_subcount() async {
+    func user_subcount() async {
         guard let ret = try? await doRequest(memberName: "user_subcount", data: [:]) else { return }
 
         print(ret)
     }
 
-    static func user_cloud() async {
+    func user_cloud() async {
         guard let ret: Data = try? await doRequest(memberName: "user_cloud", data: [:]) else {
             return
         }
@@ -435,8 +538,8 @@ class CloudMusicApi {
         print(ret)
     }
 
-    static func playlist_detail(id: UInt64) async -> (tracks: [Song], trackIds: [UInt64])? {
-        if id == RecommandSongPlaylistId {
+    func playlist_detail(id: UInt64) async -> (tracks: [Song], trackIds: [UInt64])? {
+        if id == CloudMusicApi.RecommandSongPlaylistId {
             return await recommend_songs().map { ($0, $0.map { $0.id }) }
         }
         guard
@@ -470,7 +573,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func song_detail(ids: [UInt64]) async -> [Song]? {
+    func song_detail(ids: [UInt64]) async -> [Song]? {
         guard
             let ret = try? await doRequest(
                 memberName: "song_detail",
@@ -490,7 +593,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func song_url_v1(id: [UInt64], level: String = "jymaster") async -> [SongData]? {
+    func song_url_v1(id: [UInt64], level: String = "jymaster") async -> [SongData]? {
         guard
             let ret = try? await doRequest(
                 memberName: "song_url_v1",
@@ -512,7 +615,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func song_download_url(id: UInt64, br: UInt64 = 999000) async -> SongData? {
+    func song_download_url(id: UInt64, br: UInt64 = 999000) async -> SongData? {
         guard
             let ret = try? await doRequest(
                 memberName: "song_download_url",
@@ -534,7 +637,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func playlist_track_all(id: UInt64, limit: UInt64?, offset: UInt64?) async -> [Song]? {
+    func playlist_track_all(id: UInt64, limit: UInt64?, offset: UInt64?) async -> [Song]? {
         var p: [String: UInt64] = [
             "id": id
         ]
@@ -561,7 +664,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func scrobble(id: UInt64, sourceid: UInt64, time: Int64) async {
+    func scrobble(id: UInt64, sourceid: UInt64, time: Int64) async {
         guard
             let _ = try? await doRequest(
                 memberName: "scrobble",
@@ -576,7 +679,7 @@ class CloudMusicApi {
         }
     }
 
-    static func cloud(filePath: URL, songName: String?, artist: String?, album: String?) async
+    func cloud(filePath: URL, songName: String?, artist: String?, album: String?) async
         -> UInt64?
     {
         guard
@@ -622,7 +725,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func cloud_match(userId: UInt64, songId: UInt64, adjustSongId: UInt64) async {
+    func cloud_match(userId: UInt64, songId: UInt64, adjustSongId: UInt64) async {
         guard
             let res = try? await doRequest(
                 memberName: "cloud_match",
@@ -638,7 +741,7 @@ class CloudMusicApi {
         print(res.asAny() ?? "")
     }
 
-    static func likelist(userId: UInt64) async -> [UInt64]? {
+    func likelist(userId: UInt64) async -> [UInt64]? {
         guard
             let res = try? await doRequest(
                 memberName: "likelist",
@@ -660,7 +763,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func like(id: UInt64, like: Bool) async throws {
+    func like(id: UInt64, like: Bool) async throws {
         guard
             let res = try? await doRequest(
                 memberName: "like",
@@ -683,7 +786,7 @@ class CloudMusicApi {
         }
     }
 
-    static func recommend_resource() async -> [RecommandPlaylistItem]? {
+    func recommend_resource() async -> [RecommandPlaylistItem]? {
         guard
             let res = try? await doRequest(
                 memberName: "recommend_resource",
@@ -703,7 +806,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func recommend_songs() async -> [Song]? {
+    func recommend_songs() async -> [Song]? {
         guard
             let res = try? await doRequest(
                 memberName: "recommend_songs",
@@ -795,7 +898,7 @@ class CloudMusicApi {
         }
     }
 
-    static func search_suggest(keyword: String) async -> [SearchResult.Song]? {
+    func search_suggest(keyword: String) async -> [SearchResult.Song]? {
         guard
             let res = try? await doRequest(
                 memberName: "search_suggest",
@@ -822,7 +925,7 @@ class CloudMusicApi {
         return nil
     }
 
-    static func search(
+    func search(
         keyword: String, type: SearchType = .singleSong, limit: Int = 30, offset: Int = 0
     ) async
         -> [SearchResult.Song]?
@@ -862,7 +965,7 @@ class CloudMusicApi {
         case del = "del"
     }
 
-    static func playlist_tracks(op: PlaylistTracksOp, playlistId: UInt64, trackIds: [uint64])
+    func playlist_tracks(op: PlaylistTracksOp, playlistId: UInt64, trackIds: [uint64])
         async throws
     {
         guard
@@ -983,7 +1086,7 @@ class CloudMusicApi {
         let romalrc: LyricNew.Lyric
     }
 
-    static func lyric_new(id: UInt64) async -> LyricNew? {
+    func lyric_new(id: UInt64) async -> LyricNew? {
         guard
             let res = try? await doRequest(
                 memberName: "lyric_new",

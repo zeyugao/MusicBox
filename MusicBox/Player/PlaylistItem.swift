@@ -294,7 +294,7 @@ class PlaylistItem: Identifiable, Codable, Equatable {
                 self.url = cachedFile
                 return self.url
             }
-            if let songData = await CloudMusicApi.song_url_v1(id: [id]) {
+            if let songData = await CloudMusicApi().song_url_v1(id: [id]) {
                 let songData = songData[0]
                 self.ext = songData.type
                 if self.ext == "" {

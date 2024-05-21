@@ -431,7 +431,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 if playedSecond / currentItem.duration.seconds > 0.75 {
                     let item = playlist[currentItemIndex]
                     Task {
-                        await CloudMusicApi.scrobble(
+                        await CloudMusicApi().scrobble(
                             id: item.id, sourceid: item.albumId,
                             time: Int64(item.duration.seconds))
                         scrobbled = true
