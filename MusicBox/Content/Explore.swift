@@ -37,17 +37,56 @@ struct RecommendResourceIcon: View {
     }
 }
 
-struct AlbumListView: View {
+enum ExploreNavigationPath: Hashable {
+    static func hash(into hasher: inout Hasher, for value: ExploreNavigationPath) {
+        hasher.combine(value.id)
+    }
+
+    case playlist(UInt64, String)  // id, name
+    case searchResult([CloudMusicApi.Song])
+
+    var name: String {
+        switch self {
+        case let .playlist(_, name):
+            return name
+        case .searchResult:
+            return "搜索结果"
+        }
+    }
+
+    var id: UInt64 {
+        switch self {
+        case let .playlist(id, _):
+            return id
+        case let .searchResult(songs):
+            return songs.map { $0.id }.reduce(0, +)
+        }
+    }
+}
+
+struct ExploreView: View {
     @State var recommendResource: [CloudMusicApi.RecommandPlaylistItem] = []
-    @State private var selectedResource: CloudMusicApi.RecommandPlaylistItem?
     @State private var searchText = ""
     @State private var searchSuggestions = [CloudMusicApi.Song]()
-    @State private var searchResult = [CloudMusicApi.Song]()
     @State private var task: Task<Void, Never>?
     @State private var isLoading = false
 
+    @Binding private var navigationPath: NavigationPath
+
     @EnvironmentObject var playController: PlayController
     @EnvironmentObject private var userInfo: UserInfo
+
+    init(navigationPath: Binding<NavigationPath>) {
+        _navigationPath = navigationPath
+    }
+
+    private func gotoPlaylist(id: UInt64, name: String) {
+        navigationPath.append(ExploreNavigationPath.playlist(id, name))
+    }
+
+    private func displaySearchResult(_ result: [CloudMusicApi.Song]) {
+        navigationPath.append(ExploreNavigationPath.searchResult(result))
+    }
 
     var body: some View {
         ZStack {
@@ -57,7 +96,7 @@ struct AlbumListView: View {
                         RecommendResourceIcon(res: res)
                             .padding()
                             .onTapGesture {
-                                selectedResource = res
+                                gotoPlaylist(id: res.id, name: res.name)
                             }
                     }
                 }
@@ -81,19 +120,6 @@ struct AlbumListView: View {
                 }
                 recommendResource = newRes
             }
-            .navigationDestination(
-                isPresented: Binding<Bool>(
-                    get: { selectedResource != nil },
-                    set: { if !$0 { selectedResource = nil } }
-                )
-            ) {
-                if let res = selectedResource {
-                    let metadata = PlaylistMetadata.netease(res.id, res.name)
-                    PlayListView(playlistMetadata: metadata)
-                        .environmentObject(userInfo)
-                        .environmentObject(playController)
-                }
-            }
             .searchable(
                 text: $searchText,
                 suggestions: {
@@ -115,7 +141,7 @@ struct AlbumListView: View {
                         let id = UInt64(data) ?? 0
 
                         if let res = await CloudMusicApi(cacheTtl: 5 * 60).song_detail(ids: [id]) {
-                            searchResult = res
+                            displaySearchResult(res)
                         }
 
                         defer { searchText = "" }
@@ -124,25 +150,24 @@ struct AlbumListView: View {
 
                     if let res = await CloudMusicApi(cacheTtl: 5 * 60).search(keyword: searchText) {
                         let res = res.map { $0.convertToSong() }
-                        searchResult = res
+                        displaySearchResult(res)
                     }
                 }
             }
             .navigationDestination(
-                isPresented: Binding<Bool>(
-                    get: { !searchResult.isEmpty },
-                    set: { if !$0 { searchResult.removeAll() } }
-                )
-            ) {
-                if !searchResult.isEmpty {
-                    let metadata = PlaylistMetadata.songs(
-                        searchResult,
-                        searchResult.map { $0.id }.reduce(0, +),
-                        "搜索结果")
-                    PlayListView(playlistMetadata: metadata)
-                        .environmentObject(userInfo)
-                        .environmentObject(playController)
-                }
+                for: ExploreNavigationPath.self
+            ) { path in
+                let metadata =
+                    switch path {
+                    case let .playlist(id, name):
+                        PlaylistMetadata.netease(id, name)
+                    case let .searchResult(result):
+                        PlaylistMetadata.songs(result, path.id, "搜索结果")
+                    }
+
+                PlayListView(playlistMetadata: metadata)
+                    .environmentObject(userInfo)
+                    .environmentObject(playController)
             }
             .onChange(of: searchText) { _, text in
                 task?.cancel()
@@ -171,14 +196,6 @@ struct AlbumListView: View {
             if isLoading {
                 LoadingIndicatorView()
             }
-        }
-    }
-}
-
-struct ExploreView: View {
-    var body: some View {
-        NavigationStack {
-            AlbumListView()
         }
     }
 }

@@ -53,11 +53,15 @@ class UserInfo: ObservableObject {
     @Published var playlists: [CloudMusicApi.PlayListItem] = []
 }
 
-enum Sidebar: Hashable {
+enum NavigationScreen: Hashable, Equatable {
     case account
     case nowPlaying
     case explore
-    case playlist(playlist: CloudMusicApi.PlayListItem)
+    case playlist(playlist: PlaylistMetadata)
+}
+
+enum PlayingDetailPath: Hashable {
+    case playing
 }
 
 struct TextWithImage: View {
@@ -83,30 +87,32 @@ struct TextWithImage: View {
 class PlayingDetailModel: ObservableObject {
     @Published var isPresented = false
 
-    func togglePlayingDetail() {
-        DispatchQueue.main.async {
-            self.isPresented.toggle()
-        }
+    @MainActor
+    func togglePlayingDetail(navigationPath: inout NavigationPath) {
+        navigationPath.append(PlayingDetailPath.playing)
+        self.isPresented.toggle()
     }
 
-    func openPlayingDetail() {
-        DispatchQueue.main.async {
-            self.isPresented = true
-        }
+    @MainActor
+    func openPlayingDetail(navigationPath: inout NavigationPath) {
+        navigationPath.append(PlayingDetailPath.playing)
+        self.isPresented = true
     }
 
-    func closePlayingDetail() {
-        DispatchQueue.main.async {
-            self.isPresented = false
-        }
+    @MainActor
+    func closePlayingDetail(navigationPath: inout NavigationPath) {
+        navigationPath.append(PlayingDetailPath.playing)
+        self.isPresented = false
     }
 }
 
 struct ContentView: View {
     @StateObject var playController = PlayController()
-    @State private var selection: Sidebar = .account
+    @State private var selection: NavigationScreen = .account
     @StateObject private var userInfo = UserInfo()
     @StateObject private var playingDetailModel = PlayingDetailModel()
+
+    @State private var navigationPath = NavigationPath()
 
     var body: some View {
         ZStack(
@@ -115,26 +121,30 @@ struct ContentView: View {
                 NavigationSplitView {
                     List(selection: $selection) {
                         TextWithImage("Account", image: "person.crop.circle")
-                            .tag(Sidebar.account)
+                            .tag(NavigationScreen.account)
                         TextWithImage("Now Playing", image: "dot.radiowaves.left.and.right")
-                            .tag(Sidebar.nowPlaying)
+                            .tag(NavigationScreen.nowPlaying)
                         TextWithImage("Explore", image: "music.house")
-                            .tag(Sidebar.explore)
+                            .tag(NavigationScreen.explore)
 
                         if userInfo.profile != nil {
                             Section(header: Text("Created Playlists")) {
                                 ForEach(userInfo.playlists.filter { !$0.subscribed }) {
                                     playlist in
+                                    let metadata = PlaylistMetadata.netease(
+                                        playlist.id, playlist.name)
                                     TextWithImage(playlist.name, image: "music.note.list")
-                                        .tag(Sidebar.playlist(playlist: playlist))
+                                        .tag(NavigationScreen.playlist(playlist: metadata))
                                 }
                             }
 
                             Section(header: Text("Favored Playlists")) {
                                 ForEach(userInfo.playlists.filter { $0.subscribed }) {
                                     playlist in
+                                    let metadata = PlaylistMetadata.netease(
+                                        playlist.id, playlist.name)
                                     TextWithImage(playlist.name, image: "music.note.list")
-                                        .tag(Sidebar.playlist(playlist: playlist))
+                                        .tag(NavigationScreen.playlist(playlist: metadata))
                                 }
                             }
                         }
@@ -142,43 +152,51 @@ struct ContentView: View {
                     .listStyle(SidebarListStyle())
                     .frame(minWidth: 200, idealWidth: 250)
                 } detail: {
-                    if playingDetailModel.isPresented {
-                        PlayingDetailView()
-                            .environmentObject(playController)
-                            .navigationTitle("Detail")
-                    } else {
+                    NavigationStack(path: $navigationPath) {
                         switch selection {
                         case .account:
                             AccountView()
                                 .environmentObject(userInfo)
                                 .environmentObject(playController)
                                 .navigationTitle("Account")
+                                .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                    PlayingDetailView()
+                                        .environmentObject(playController)
+                                }
                         case .nowPlaying:
                             NowPlayingView()
                                 .environmentObject(playController)
                                 .navigationTitle("Now Playing")
+                                .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                    PlayingDetailView()
+                                        .environmentObject(playController)
+                                }
                         case .explore:
-                            ExploreView()
+                            ExploreView(navigationPath: $navigationPath)
                                 .environmentObject(userInfo)
                                 .environmentObject(playController)
                                 .navigationTitle("Explore")
+                                .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                    PlayingDetailView()
+                                        .environmentObject(playController)
+                                }
                         case let .playlist(playlist):
-                            let metadata = PlaylistMetadata.netease(playlist.id, playlist.name)
+                            let metadata = PlaylistMetadata.netease(
+                                playlist.id, playlist.name)
                             PlayListView(playlistMetadata: metadata)
                                 .environmentObject(userInfo)
                                 .environmentObject(playController)
                                 .navigationTitle(playlist.name)
+                                .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                    PlayingDetailView()
+                                        .environmentObject(playController)
+                                }
                         }
-                    }
-                }
-                .onChange(of: selection) {
-                    if playingDetailModel.isPresented {
-                        playingDetailModel.closePlayingDetail()
                     }
                 }
                 .padding(.bottom, 80)
 
-                PlayerControlView()
+                PlayerControlView(navigationPath: $navigationPath)
                     .environmentObject(playController)
                     .environmentObject(userInfo)
                     .environmentObject(playingDetailModel)

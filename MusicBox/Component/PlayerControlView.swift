@@ -79,6 +79,12 @@ struct PlayerControlView: View {
     @State var errorText: String = ""
     @State var isHovered: Bool = false
 
+    @Binding private var navigationPath: NavigationPath
+
+    init(navigationPath: Binding<NavigationPath>) {
+        _navigationPath = navigationPath
+    }
+
     func secondsToMinutesAndSeconds(seconds: Double) -> String {
         let seconds_int = Int(seconds)
         let minutes = (seconds_int % 3600) / 60
@@ -130,7 +136,7 @@ struct PlayerControlView: View {
                         isHovered = hovering
                     }
                     .onTapGesture {
-                        playingDetailModel.togglePlayingDetail()
+                        playingDetailModel.togglePlayingDetail(navigationPath: &navigationPath)
                     }
                 } else {
                     Image(systemName: "music.note")

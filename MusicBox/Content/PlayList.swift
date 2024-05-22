@@ -12,7 +12,15 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
-enum PlaylistMetadata {
+enum PlaylistMetadata: Hashable, Equatable {
+    static func == (lhs: PlaylistMetadata, rhs: PlaylistMetadata) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    static func hash(into hasher: inout Hasher, value: PlaylistMetadata) {
+        hasher.combine(value.id)
+    }
+
     case netease(UInt64, String)  // id, name
     case songs([CloudMusicApi.Song], UInt64, String)  // all songs, id, name
 

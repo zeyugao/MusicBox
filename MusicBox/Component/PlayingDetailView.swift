@@ -132,6 +132,7 @@ struct PlayingDetailView: View {
                     await updateLyric()
                 }
             }
+            .navigationTitle(playController.currentItem?.title ?? "Playing")
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Toggle(isOn: $showTimestamp) {
