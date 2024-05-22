@@ -31,7 +31,6 @@
 		2DC8FDB72BF7C58900D21F6A /* URLExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDB12BF7C58900D21F6A /* URLExtension.swift */; };
 		2DC8FDB92BF8A8A400D21F6A /* Explore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDB82BF8A8A400D21F6A /* Explore.swift */; };
 		2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CA2BD2823E00F9D181 /* PlayList.swift */; };
-		2DED51CD2BD2AD7A00F9D181 /* Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CC2BD2AD7A00F9D181 /* Debug.swift */; };
 		2DED51CF2BD3806D00F9D181 /* CloudMusicApi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */; };
 		2DED51EE2BD3F62100F9D181 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DED51ED2BD3F62100F9D181 /* Extensions.swift */; };
 		2DFB58D72BF0744100D488F4 /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFB58D62BF0744100D488F4 /* Account.swift */; };
@@ -103,7 +102,6 @@
 		2DC8FDB12BF7C58900D21F6A /* URLExtension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLExtension.swift; sourceTree = "<group>"; };
 		2DC8FDB82BF8A8A400D21F6A /* Explore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Explore.swift; sourceTree = "<group>"; };
 		2DED51CA2BD2823E00F9D181 /* PlayList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayList.swift; sourceTree = "<group>"; };
-		2DED51CC2BD2AD7A00F9D181 /* Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debug.swift; sourceTree = "<group>"; };
 		2DED51CE2BD3806D00F9D181 /* CloudMusicApi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudMusicApi.swift; sourceTree = "<group>"; };
 		2DED51ED2BD3F62100F9D181 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		2DFB58D62BF0744100D488F4 /* Account.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
@@ -246,7 +244,6 @@
 				2D3A45A72BE916C8006CD909 /* NowPlaying.swift */,
 				2DED51CA2BD2823E00F9D181 /* PlayList.swift */,
 				2DC8FDB82BF8A8A400D21F6A /* Explore.swift */,
-				2DED51CC2BD2AD7A00F9D181 /* Debug.swift */,
 			);
 			path = Content;
 			sourceTree = "<group>";
@@ -334,7 +331,6 @@
 				2D2800DC2BD21FE9007A55D5 /* NowPlayingCenter.swift in Sources */,
 				2D3A45A82BE916C8006CD909 /* NowPlaying.swift in Sources */,
 				2D3A45842BE3A90F006CD909 /* QCloudMusicApi.h in Sources */,
-				2DED51CD2BD2AD7A00F9D181 /* Debug.swift in Sources */,
 				2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */,
 				2D2800962BCE1F20007A55D5 /* ContentView.swift in Sources */,
 				2D3A45A62BE86F75006CD909 /* Player.swift in Sources */,

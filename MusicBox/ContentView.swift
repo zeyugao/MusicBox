@@ -57,7 +57,6 @@ enum Sidebar: Hashable {
     case account
     case nowPlaying
     case explore
-    case debug
     case playlist(playlist: CloudMusicApi.PlayListItem)
 }
 
@@ -121,10 +120,6 @@ struct ContentView: View {
                             .tag(Sidebar.nowPlaying)
                         TextWithImage("Explore", image: "music.house")
                             .tag(Sidebar.explore)
-                        #if DEBUG
-                            TextWithImage("Debug", image: "skew")
-                                .tag(Sidebar.debug)
-                        #endif
 
                         if userInfo.profile != nil {
                             Section(header: Text("Created Playlists")) {
@@ -167,10 +162,6 @@ struct ContentView: View {
                                 .environmentObject(userInfo)
                                 .environmentObject(playController)
                                 .navigationTitle("Explore")
-                        case .debug:
-                            DebugView()
-                                .environmentObject(playController)
-                                .navigationTitle("Debug")
                         case let .playlist(playlist):
                             let metadata = PlaylistMetadata.netease(playlist.id, playlist.name)
                             PlayListView(playlistMetadata: metadata)
