@@ -109,7 +109,7 @@ struct PlayerControlView: View {
                     .overlay(
                         Group {
                             if isHovered {
-                                Color.white.opacity(0.2)
+                                Color.gray.opacity(0.4)
                                     .transition(.opacity)
                                     .animation(.easeInOut, value: isHovered)
                             }
@@ -123,7 +123,7 @@ struct PlayerControlView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: height * 0.5, height: height * 0.5)
-                        .foregroundColor(Color.white.opacity(isHovered ? 0.8 : 0)),
+                        .foregroundColor(Color.white.opacity(isHovered ? 1.0 : 0)),
                         alignment: .center
                     )
                     .onHover { hovering in
