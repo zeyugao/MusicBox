@@ -605,16 +605,18 @@ struct PlayListView: View {
             .navigationTitle((playlistMetadata?.name) ?? "Playlist")
             .searchable(text: $searchText, prompt: "Search in Playlist")
             .toolbar {
-                PlayAllButton(songs: model.songs ?? [])
-                DownloadAllButton(songs: model.songs ?? [])
-                Button(action: {
-                    Task {
-                        updatePlaylist(force: true)
+                ToolbarItemGroup {
+                    PlayAllButton(songs: model.songs ?? [])
+                    DownloadAllButton(songs: model.songs ?? [])
+                    Button(action: {
+                        Task {
+                            updatePlaylist(force: true)
+                        }
+                    }) {
+                        Image(systemName: "arrow.clockwise")
                     }
-                }) {
-                    Image(systemName: "arrow.clockwise")
+                    .help("Refresh Playlist")
                 }
-                .help("Refresh Playlist")
             }
             .onChange(of: playlistMetadata?.id) {
                 updatePlaylist()
