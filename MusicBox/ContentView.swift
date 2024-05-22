@@ -113,7 +113,6 @@ struct ContentView: View {
         ZStack(
             alignment: Alignment(horizontal: .trailing, vertical: .bottom),
             content: {
-
                 NavigationSplitView {
                     List(selection: $selection) {
                         TextWithImage("Account", image: "person.crop.circle")
