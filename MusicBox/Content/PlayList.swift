@@ -105,22 +105,27 @@ class PlaylistDetailModel: ObservableObject {
     }
 
     func update() {
-        guard let originalSongs = originalSongs else { return }
-        var songs = originalSongs
-        if !searchText.isEmpty {
-            let keyword = searchText.lowercased()
-            songs = songs.filter { song in
-                song.name.lowercased().contains(keyword)
-                    || song.ar.map(\.name).joined(separator: "").lowercased().contains(keyword)
-                    || song.al.name.lowercased().contains(keyword)
+        Task {
+            guard let originalSongs = originalSongs else { return }
+            var songs = originalSongs
+            if !searchText.isEmpty {
+                let keyword = searchText.lowercased()
+                songs = songs.filter { song in
+                    song.name.lowercased().contains(keyword)
+                        || song.ar.map(\.name).joined(separator: "").lowercased().contains(keyword)
+                        || song.al.name.lowercased().contains(keyword)
+                }
+            }
+
+            if let sortOrder = sortOrder {
+                songs = songs.sorted(using: sortOrder)
+            }
+            let newSongs = songs
+
+            DispatchQueue.main.async {
+                self.songs = newSongs
             }
         }
-
-        if let sortOrder = sortOrder {
-            songs = songs.sorted(using: sortOrder)
-        }
-
-        self.songs = songs
     }
 }
 
