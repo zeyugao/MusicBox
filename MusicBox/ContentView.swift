@@ -152,6 +152,20 @@ struct ContentView: View {
                     .listStyle(SidebarListStyle())
                     .frame(minWidth: 200, idealWidth: 250)
                 } detail: {
+                    // Backward
+                    Button(action: {
+                        playController.seekByOffset(offset: -15)
+                    }) {}
+                        .hidden()
+                        .keyboardShortcut(.leftArrow, modifiers: [])
+
+                    // Forward
+                    Button(action: {
+                        playController.seekByOffset(offset: 15)
+                    }) {}
+                        .hidden()
+                        .keyboardShortcut(.rightArrow, modifiers: [])
+
                     NavigationStack(path: $navigationPath) {
                         switch selection {
                         case .account:
