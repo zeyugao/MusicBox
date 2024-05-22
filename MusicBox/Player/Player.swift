@@ -97,6 +97,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         playerState = .paused
         updateCurrentPlaybackInfo()
         NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
+        savePlayedSecond()
     }
 
     func startPlaying() async {
@@ -368,6 +369,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     private func loadPlayedSecond() {
         let newPlayedSecond = UserDefaults.standard.object(forKey: "playedSecond") as? Double ?? 0.0
+        print("Loaded playedSecond: \(newPlayedSecond)")
         seekToOffset(offset: newPlayedSecond)
     }
 
