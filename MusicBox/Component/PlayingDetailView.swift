@@ -33,17 +33,14 @@ struct LyricView: View {
 
                         if showRoma, let romalrc = line.romalrc {
                             Text(romalrc)
-                                .lineLimit(1)
                                 .font(currentPlaying ? .title2 : .body)
                         }
 
                         Text(line.lyric)
-                            .lineLimit(1)
                             .font(currentPlaying ? .title : .body)
 
                         if let tlyric = line.tlyric {
                             Text(tlyric)
-                                .lineLimit(1)
                                 .font(currentPlaying ? .title : .body)
                         }
                     }
