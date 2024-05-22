@@ -37,7 +37,7 @@ struct RecommendResourceIcon: View {
     }
 }
 
-enum ExploreNavigationPath: Hashable {
+enum ExploreNavigationPath: Hashable, Codable {
     static func hash(into hasher: inout Hasher, for value: ExploreNavigationPath) {
         hasher.combine(value.id)
     }
@@ -61,6 +61,21 @@ enum ExploreNavigationPath: Hashable {
         case let .searchResult(songs):
             return songs.map { $0.id }.reduce(0, +)
         }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case playlist, searchResult
+    }
+
+    func encode(to encoder: Encoder) throws {
+        let _ = encoder.container(keyedBy: CodingKeys.self)
+        // var container = encoder.container(keyedBy: CodingKeys.self)
+        // switch self {
+        // case .playlist:
+        //     try container.encode(0, forKey: .playlist)
+        // case .searchResult:
+        //     try container.encode(0, forKey: .searchResult)
+        // }
     }
 }
 

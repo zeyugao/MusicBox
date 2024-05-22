@@ -53,15 +53,47 @@ class UserInfo: ObservableObject {
     @Published var playlists: [CloudMusicApi.PlayListItem] = []
 }
 
-enum NavigationScreen: Hashable, Equatable {
+enum NavigationScreen: Hashable, Equatable, Encodable {
     case account
     case nowPlaying
     case explore
     case playlist(playlist: PlaylistMetadata)
+
+    enum CodingKeys: String, CodingKey {
+        case account, nowPlaying, explore, playlist
+    }
+
+    func encode(to encoder: Encoder) throws {
+        let _ = encoder.container(keyedBy: CodingKeys.self)
+        //        var container = encoder.container(keyedBy: CodingKeys.self)
+        //        switch self {
+        //        case .account:
+        //            try container.encode(0, forKey: .account)
+        //        case .nowPlaying:
+        //            try container.encode(0, forKey: .nowPlaying)
+        //        case .explore:
+        //            try container.encode(0, forKey: .explore)
+        //        case .playlist:
+        //            try container.encode(0, forKey: .playlist)
+        //        }
+    }
 }
 
-enum PlayingDetailPath: Hashable {
+enum PlayingDetailPath: Hashable, Codable {
     case playing
+
+    enum CodingKeys: String, CodingKey {
+        case playing
+    }
+
+    func encode(to encoder: Encoder) throws {
+        let _ = encoder.container(keyedBy: CodingKeys.self)
+        //        var container = encoder.container(keyedBy: CodingKeys.self)
+        //        switch self {
+        //        case .playing:
+        //            try container.encode(0, forKey: .playing)
+        //        }
+    }
 }
 
 struct TextWithImage: View {
@@ -84,25 +116,71 @@ struct TextWithImage: View {
     }
 }
 
+// final class NavigationStore: ObservableObject {
+//     @Published var path = NavigationPath()
+
+//     private let decoder = JSONDecoder()
+//     private let encoder = JSONEncoder()
+
+//     func encoded() -> Data? {
+//         try? path.codable.map(encoder.encode)
+//     }
+
+//     func restore(from data: Data) {
+//         do {
+//             let codable = try decoder.decode(
+//                 NavigationPath.CodableRepresentation.self, from: data
+//             )
+//             path = NavigationPath(codable)
+//         } catch {
+//             path = NavigationPath()
+//         }
+//     }
+// }
+
 class PlayingDetailModel: ObservableObject {
     @Published var isPresented = false
 
+    static let targetName = String(reflecting: PlayingDetailPath.self)
+
+    func checkIsDetailFront(navigationPath: NavigationPath) {
+        if let data = try? navigationPath.codable.map(JSONEncoder().encode),
+            let items = data.asType([String].self)
+        {
+            let newIsPresented: Bool
+            if items.first == Self.targetName {
+                newIsPresented = true
+            } else {
+                newIsPresented = false
+            }
+
+            DispatchQueue.main.async {
+                self.isPresented = newIsPresented
+            }
+        }
+    }
+
     @MainActor
     func togglePlayingDetail(navigationPath: inout NavigationPath) {
-        navigationPath.append(PlayingDetailPath.playing)
-        self.isPresented.toggle()
+        if isPresented {
+            navigationPath.removeLast()
+        } else {
+            navigationPath.append(PlayingDetailPath.playing)
+        }
     }
 
     @MainActor
     func openPlayingDetail(navigationPath: inout NavigationPath) {
-        navigationPath.append(PlayingDetailPath.playing)
-        self.isPresented = true
+        if !isPresented {
+            navigationPath.append(PlayingDetailPath.playing)
+        }
     }
 
     @MainActor
     func closePlayingDetail(navigationPath: inout NavigationPath) {
-        navigationPath.append(PlayingDetailPath.playing)
-        self.isPresented = false
+        if isPresented {
+            navigationPath.removeLast()
+        }
     }
 }
 
@@ -152,20 +230,6 @@ struct ContentView: View {
                     .listStyle(SidebarListStyle())
                     .frame(minWidth: 200, idealWidth: 250)
                 } detail: {
-                    // Backward
-                    Button(action: {
-                        playController.seekByOffset(offset: -15)
-                    }) {}
-                        .hidden()
-                        .keyboardShortcut(.leftArrow, modifiers: [])
-
-                    // Forward
-                    Button(action: {
-                        playController.seekByOffset(offset: 15)
-                    }) {}
-                        .hidden()
-                        .keyboardShortcut(.rightArrow, modifiers: [])
-
                     NavigationStack(path: $navigationPath) {
                         switch selection {
                         case .account:
@@ -207,6 +271,9 @@ struct ContentView: View {
                                 }
                         }
                     }
+                }
+                .onChange(of: navigationPath) { _, newValue in
+                    playingDetailModel.checkIsDetailFront(navigationPath: newValue)
                 }
                 .padding(.bottom, 80)
 
