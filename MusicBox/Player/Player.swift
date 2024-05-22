@@ -525,11 +525,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         }
         playerStateObserver?.invalidate()
         timeControlStautsObserver?.invalidate()
-
-        if let obs = playerShouldNextObserver {
-            NotificationCenter.default.removeObserver(obs)
-            playerShouldNextObserver = nil
-        }
     }
 
     init() {
