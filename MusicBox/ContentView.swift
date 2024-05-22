@@ -108,7 +108,7 @@ class PlayingDetailModel: ObservableObject {
 
 struct ContentView: View {
     @StateObject var playController = PlayController()
-    @State private var selection: NavigationScreen = .account
+    @State private var selection: NavigationScreen = .explore
     @StateObject private var userInfo = UserInfo()
     @StateObject private var playingDetailModel = PlayingDetailModel()
 
@@ -120,12 +120,12 @@ struct ContentView: View {
             content: {
                 NavigationSplitView {
                     List(selection: $selection) {
+                        TextWithImage("Explore", image: "music.house")
+                            .tag(NavigationScreen.explore)
                         TextWithImage("Account", image: "person.crop.circle")
                             .tag(NavigationScreen.account)
                         TextWithImage("Now Playing", image: "dot.radiowaves.left.and.right")
                             .tag(NavigationScreen.nowPlaying)
-                        TextWithImage("Explore", image: "music.house")
-                            .tag(NavigationScreen.explore)
 
                         if userInfo.profile != nil {
                             Section(header: Text("Created Playlists")) {
