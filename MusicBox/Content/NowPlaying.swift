@@ -64,7 +64,7 @@ struct NowPlayingView: View {
                     }
             }
         }
-        .onAppear {
+        .task {
             playlist = playController.playlist
         }
     }

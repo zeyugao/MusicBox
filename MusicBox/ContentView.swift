@@ -195,14 +195,12 @@ struct ContentView: View {
                     .frame(minWidth: 800)
             }
         )
-        .onAppear {
-            Task {
-                await initUserData(userInfo: userInfo)
-            }
+        .task {
+            async let initUserDataTask: () = initUserData(userInfo: userInfo)
+            async let loadStateTask: () = playController.loadState(continuePlaying: false)
 
-            Task {
-                await playController.loadState(continuePlaying: false)
-            }
+            await initUserDataTask
+            await loadStateTask
         }
     }
 }

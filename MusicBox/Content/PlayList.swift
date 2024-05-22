@@ -621,7 +621,7 @@ struct PlayListView: View {
             .onChange(of: playlistMetadata?.id) {
                 updatePlaylist()
             }
-            .onAppear {
+            .task {
                 updatePlaylist()
             }
             .onDisappear {

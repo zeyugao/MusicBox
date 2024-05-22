@@ -62,26 +62,24 @@ struct AlbumListView: View {
                     }
                 }
             }
-            .onAppear {
-                Task {
-                    let currentDate = Date()
-                    let calendar = Calendar.current
-                    let day = calendar.component(.day, from: currentDate)
-                    let dialyRecommend = CloudMusicApi.RecommandPlaylistItem(
-                        creator: nil,
-                        picUrl: "\(day).square",
-                        userId: 0,
-                        id: CloudMusicApi.RecommandSongPlaylistId,
-                        name: "每日歌曲推荐",
-                        playcount: 0,
-                        trackCount: 0
-                    )
-                    var newRes = [dialyRecommend]
-                    if let res = await CloudMusicApi(cacheTtl: 5 * 60).recommend_resource() {
-                        newRes.append(contentsOf: res)
-                    }
-                    recommendResource = newRes
+            .task {
+                let currentDate = Date()
+                let calendar = Calendar.current
+                let day = calendar.component(.day, from: currentDate)
+                let dialyRecommend = CloudMusicApi.RecommandPlaylistItem(
+                    creator: nil,
+                    picUrl: "\(day).square",
+                    userId: 0,
+                    id: CloudMusicApi.RecommandSongPlaylistId,
+                    name: "每日歌曲推荐",
+                    playcount: 0,
+                    trackCount: 0
+                )
+                var newRes = [dialyRecommend]
+                if let res = await CloudMusicApi(cacheTtl: 5 * 60).recommend_resource() {
+                    newRes.append(contentsOf: res)
                 }
+                recommendResource = newRes
             }
             .navigationDestination(
                 isPresented: Binding<Bool>(
@@ -124,8 +122,7 @@ struct AlbumListView: View {
                         return
                     }
 
-                    if let res = await CloudMusicApi(cacheTtl: 5 * 60).search(keyword: searchText)
-                    {
+                    if let res = await CloudMusicApi(cacheTtl: 5 * 60).search(keyword: searchText) {
                         let res = res.map { $0.convertToSong() }
                         searchResult = res
                     }

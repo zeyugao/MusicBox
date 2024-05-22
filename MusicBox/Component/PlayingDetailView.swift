@@ -124,10 +124,8 @@ struct PlayingDetailView: View {
                         .frame(width: geometry.size.width * 0.66, height: geometry.size.height)
                     }
                 }
-            }.onAppear {
-                Task {
-                    await updateLyric()
-                }
+            }.task {
+                await updateLyric()
             }
             .onChange(of: playController.currentItem) {
                 Task {
