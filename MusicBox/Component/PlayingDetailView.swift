@@ -11,6 +11,7 @@ import SwiftUI
 struct LyricView: View {
     var lyric: [CloudMusicApi.LyricLine]
     @Binding var showRoma: Bool
+    @Binding var showTimestamp: Bool
     @EnvironmentObject var playController: PlayController
 
     var body: some View {
@@ -23,10 +24,12 @@ struct LyricView: View {
                     let currentPlaying = playController.currentLyricIndex == index
 
                     VStack(alignment: .leading) {
-                        Text(String(format: "%.2f", line.time))
-                            .lineLimit(1)
-                            .font(currentPlaying ? .title2 : .body)
-                            .foregroundColor(.gray)
+                        if showTimestamp {
+                            Text(String(format: "%.2f", line.time))
+                                .lineLimit(1)
+                                .font(currentPlaying ? .title2 : .body)
+                                .foregroundColor(.gray)
+                        }
 
                         if showRoma, let romalrc = line.romalrc {
                             Text(romalrc)
@@ -69,6 +72,7 @@ struct PlayingDetailView: View {
     @EnvironmentObject var playController: PlayController
     @State var showRoma: Bool = false
     @State var hasRoma: Bool = false
+    @State var showTimestamp: Bool = false
 
     func updateLyric() async {
         if let currentId = playController.currentItem?.id,
@@ -110,7 +114,9 @@ struct PlayingDetailView: View {
                         Spacer()
                         VStack {
                             if let lyric = lyric {
-                                LyricView(lyric: lyric, showRoma: $showRoma)
+                                LyricView(
+                                    lyric: lyric, showRoma: $showRoma, showTimestamp: $showTimestamp
+                                )
                             } else {
                                 Text("还没有歌词")
                             }
@@ -129,7 +135,10 @@ struct PlayingDetailView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Toggle(isOn: $showTimestamp) {
+                        Image(systemName: "clock")
+                    }
                     if hasRoma {
                         Toggle(isOn: $showRoma) {
                             Image(systemName: "quote.bubble")
