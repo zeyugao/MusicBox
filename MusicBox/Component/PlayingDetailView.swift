@@ -93,6 +93,7 @@ struct PlayingDetailView: View {
                                 AsyncImage(url: artworkUrl) { image in
                                     image.resizable()
                                         .interpolation(.high)
+                                        .scaledToFit()
                                 } placeholder: {
                                     Color.white
                                 }
