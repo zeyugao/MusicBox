@@ -231,9 +231,11 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 let savePath = item.getPotentialLocalUrl(),
                 let ext = item.ext
             {
-                playerItem = CachingPlayerItem(
+                let cacheItem = CachingPlayerItem(
                     url: url, saveFilePath: savePath.path, customFileExtension: ext,
                     avUrlAssetOptions: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+                cacheItem.delegate = self
+                playerItem = cacheItem
             } else {
                 return
             }
@@ -549,5 +551,45 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     deinit {
         deinitPlayerObservers()
+    }
+}
+
+extension PlayController: CachingPlayerItemDelegate {
+    func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
+        // guard let video = playerItem.playable as? VideoModel else { return }
+
+        // print("Caching player item ready to play for \(video.id).")
+    }
+
+    func playerItemDidFailToPlay(_ playerItem: CachingPlayerItem, withError error: Error?) {
+        // guard let _ = playerItem.playable as? VideoModel else { return }
+
+        print(error?.localizedDescription ?? "")
+    }
+
+    func playerItemPlaybackStalled(_ playerItem: CachingPlayerItem) {
+        print("Caching player item stalled.")
+    }
+
+    func playerItem(
+        _ playerItem: CachingPlayerItem, didDownloadBytesSoFar bytesDownloaded: Int,
+        outOf bytesExpected: Int
+    ) {
+        // downloadProgressView.alpha = 1.0
+        // downloadProgressView.setProgress(
+        //     Float(Double(bytesDownloaded) / Double(bytesExpected)), animated: true)
+        print("Download progress \(bytesDownloaded) / \(bytesExpected).")
+    }
+
+    func playerItem(_ playerItem: CachingPlayerItem, didFinishDownloadingFileAt filePath: String) {
+        // animateProgressViewToCompletion()
+
+        print("Caching player item file downloaded.")
+    }
+
+    func playerItem(_ playerItem: CachingPlayerItem, downloadingFailedWith error: Error) {
+        // animateProgressViewToCompletion()
+
+        print("Caching player item file download failed with error: \(error.localizedDescription).")
     }
 }
