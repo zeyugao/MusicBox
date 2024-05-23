@@ -558,13 +558,16 @@ extension PlayController: CachingPlayerItemDelegate {
     func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
         // guard let video = playerItem.playable as? VideoModel else { return }
 
-        // print("Caching player item ready to play for \(video.id).")
+         print("Caching player item ready to play.")
     }
 
     func playerItemDidFailToPlay(_ playerItem: CachingPlayerItem, withError error: Error?) {
         // guard let _ = playerItem.playable as? VideoModel else { return }
 
         print(error?.localizedDescription ?? "")
+        Task {
+            await self.nextTrack()
+        }
     }
 
     func playerItemPlaybackStalled(_ playerItem: CachingPlayerItem) {
