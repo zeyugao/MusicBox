@@ -96,7 +96,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         player.pause()
         playerState = .paused
         updateCurrentPlaybackInfo()
-        NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
+        NowPlayingCenter.handleSetPlaybackState(playing: false)
         savePlayedSecond()
     }
 
@@ -107,7 +107,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         player.play()
         playerState = .playing
         updateCurrentPlaybackInfo()
-        NowPlayingCenter.handleSetPlaybackState(playing: isPlaying)
+        NowPlayingCenter.handleSetPlaybackState(playing: true)
     }
 
     func performRemoteCommand(_ command: RemoteCommand) {
@@ -200,6 +200,11 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 updateCurrentPlaybackInfo()
             }
         }
+
+        NowPlayingCenter.handleItemChange(
+            item: currentItem,
+            index: currentItemIndex ?? 0,
+            count: playlist.count)
 
         saveState()
     }
@@ -558,13 +563,13 @@ extension PlayController: CachingPlayerItemDelegate {
     func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
         // guard let video = playerItem.playable as? VideoModel else { return }
 
-         print("Caching player item ready to play.")
+        print("Caching player item ready to play.")
     }
 
     func playerItemDidFailToPlay(_ playerItem: CachingPlayerItem, withError error: Error?) {
         // guard let _ = playerItem.playable as? VideoModel else { return }
 
-        print(error?.localizedDescription ?? "")
+        print("playerItemDidFailToPlay", error?.localizedDescription ?? "")
         Task {
             await self.nextTrack()
         }
