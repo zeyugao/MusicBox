@@ -36,6 +36,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     @Published var loopMode: LoopMode = .sequence
 
     @Published var loadingProgress: Double? = nil
+    @Published var isLoading: Bool = false
 
     var scrobbled: Bool = false
     private var switchingItem: Bool = false
@@ -213,6 +214,9 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     private func setLoadingProgress(_ progress: Double?) {
         DispatchQueue.main.async {
             self.loadingProgress = progress
+            if (progress != nil) != self.isLoading {
+                self.isLoading = progress != nil
+            }
         }
     }
 

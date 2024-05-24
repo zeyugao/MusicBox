@@ -42,7 +42,7 @@ struct PlaySliderView: View {
         Slider(
             value: Binding(
                 get: {
-                    guard self.playController.loadingProgress == nil else {
+                    guard !self.playController.isLoading else {
                         return self.playController.playedSecond
                     }
 
@@ -54,7 +54,7 @@ struct PlaySliderView: View {
                 },
                 set: {
                     newValue in
-                    guard self.playController.loadingProgress == nil else { return }
+                    guard !self.playController.isLoading else { return }
 
                     if isEditing {
                         targetValue = newValue
@@ -68,7 +68,7 @@ struct PlaySliderView: View {
             in: 0...self.playController.duration
         ) {
             editing in
-            guard self.playController.loadingProgress == nil else { return }
+            guard !self.playController.isLoading else { return }
 
             if !editing && self.isEditing != editing {
                 Task {
@@ -77,6 +77,7 @@ struct PlaySliderView: View {
             }
             self.isEditing = editing
         }
+        .disabled(self.playController.isLoading)
         .controlSize(.mini)
         .tint(Color(red: 0.745, green: 0.745, blue: 0.745))
     }
