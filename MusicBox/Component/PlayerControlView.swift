@@ -42,6 +42,10 @@ struct PlaySliderView: View {
         Slider(
             value: Binding(
                 get: {
+                    guard self.playController.loadingProgress == nil else {
+                        return self.playController.playedSecond
+                    }
+
                     if self.isEditing {
                         return targetValue
                     } else {
@@ -50,25 +54,31 @@ struct PlaySliderView: View {
                 },
                 set: {
                     newValue in
+                    guard self.playController.loadingProgress == nil else { return }
+
                     if isEditing {
                         targetValue = newValue
                     } else {
-                        self.playController.seekToOffset(offset: newValue)
+                        Task {
+                            await self.playController.seekToOffset(offset: newValue)
+                        }
                     }
                 }
             ),
             in: 0...self.playController.duration
         ) {
             editing in
+            guard self.playController.loadingProgress == nil else { return }
+
             if !editing && self.isEditing != editing {
-                self.playController.seekToOffset(offset: targetValue)
+                Task {
+                    await self.playController.seekToOffset(offset: targetValue)
+                }
             }
             self.isEditing = editing
         }
-
         .controlSize(.mini)
         .tint(Color(red: 0.745, green: 0.745, blue: 0.745))
-
     }
 }
 
@@ -160,7 +170,7 @@ struct PlayerControlView: View {
                         }
                         .buttonStyle(PlayControlButtonStyle())
 
-                        if playController.isLoading {
+                        if !playController.readyToPlay {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle())
                                 .frame(width: 20, height: 20)

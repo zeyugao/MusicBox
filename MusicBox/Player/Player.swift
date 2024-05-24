@@ -35,7 +35,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     @Published var loopMode: LoopMode = .sequence
 
-    @Published var isLoading = false
+    @Published var loadingProgress: Double? = nil
 
     var scrobbled: Bool = false
     private var switchingItem: Bool = false
@@ -69,6 +69,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     var timeControlStatus: AVPlayer.TimeControlStatus = .waitingToPlayAtSpecifiedRate
     var timeControlStautsObserver: NSKeyValueObservation?
 
+    @Published var readyToPlay: Bool = true
     @Published var lyricTimeline: [Int] = []  // We align to 0.1s, 12.32 -> 123
     @Published var currentLyricIndex: Int? = nil
 
@@ -124,11 +125,11 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             case .previousTrack:
                 await previousTrack()
             case .skipForward(let distance):
-                seekByOffset(offset: distance)
+                await seekByOffset(offset: distance)
             case .skipBackward(let distance):
-                seekByOffset(offset: -distance)
+                await seekByOffset(offset: -distance)
             case .changePlaybackPosition(let offset):
-                seekToOffset(offset: offset)
+                await seekToOffset(offset: offset)
             }
         }
     }
@@ -209,15 +210,25 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         saveState()
     }
 
-    func seekToItem(offset: Int?) async {
+    private func setLoadingProgress(_ progress: Double?) {
+        DispatchQueue.main.async {
+            self.loadingProgress = progress
+        }
+    }
+
+    func seekToItem(offset: Int?, playedSecond: Double? = nil) async {
         if switchingItem {
             return
         }
         switchingItem = true
-        DispatchQueue.main.async {
-            self.playedSecond = 0.0
-        }
         defer { switchingItem = false }
+        DispatchQueue.main.async {
+            if let playedSecond = playedSecond {
+                self.playedSecond = playedSecond
+            } else {
+                self.playedSecond = 0.0
+            }
+        }
         if let offset = offset {
             print("seek to #\(offset)")
             guard offset < playlist.count else { return }
@@ -228,18 +239,24 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
             let playerItem: AVPlayerItem
             if let url = item.getLocalUrl() {
+                print("local url: \(url)")
                 let asset = AVURLAsset(
                     url: url,
                     options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
-
+                setLoadingProgress(nil)
                 playerItem = AVPlayerItem(asset: asset)
             } else if let url = await item.getUrl(),
                 let savePath = item.getPotentialLocalUrl(),
                 let ext = item.ext
             {
+                print("remote url: \(url)")
+                DispatchQueue.main.async {
+                    self.readyToPlay = false
+                }
+                assert(playedSecond == nil)
                 let cacheItem = CachingPlayerItem(
-                    url: url, saveFilePath: savePath.path, customFileExtension: ext,
-                    avUrlAssetOptions: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+                    url: url, saveFilePath: savePath.path, customFileExtension: ext)
+                setLoadingProgress(0.0)
                 cacheItem.delegate = self
                 playerItem = cacheItem
             } else {
@@ -254,6 +271,11 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 count: playlist.count)
 
             saveCurrentPlayingItemIndex()
+
+            if let playedSecond = playedSecond {
+                await seekToOffset(offset: playedSecond)
+            }
+
         } else {
             updateDuration(duration: 0.0)
             currentItemIndex = nil
@@ -271,19 +293,43 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         }
     }
 
-    func seekToOffset(offset: Double) {
-        let newTime = CMTime(seconds: offset, preferredTimescale: timeScale)
-        player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
-        self.currentLyricIndex = nil
+    private var inSeeking = false
+
+    func seekToOffset(offset newTime: CMTime) async {
+        guard loadingProgress == nil else {
+            print("Seeking while loading")
+            return
+        }
+
+        if player.currentItem is CachingPlayerItem {
+            if inSeeking {
+                return
+            }
+            inSeeking = true
+            defer { inSeeking = false }
+
+            await seekToItem(offset: currentItemIndex, playedSecond: newTime.seconds)
+            print("Seek a caching item to \(newTime.seconds)")
+            await startPlaying()
+            return
+        }
+
+        await player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        DispatchQueue.main.async {
+            self.currentLyricIndex = nil
+        }
         updateCurrentPlaybackInfo()
     }
 
-    func seekByOffset(offset: Double) {
+    func seekToOffset(offset: Double) async {
+        let newTime = CMTime(seconds: offset, preferredTimescale: timeScale)
+        await seekToOffset(offset: newTime)
+    }
+
+    func seekByOffset(offset: Double) async {
         let currentTime = player.currentTime()
         let newTime = CMTimeAdd(currentTime, CMTime(seconds: offset, preferredTimescale: timeScale))
-        player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
-        self.currentLyricIndex = 0
-        updateCurrentPlaybackInfo()
+        await seekToOffset(offset: newTime)
     }
 
     private func findIdIndex(_ id: UInt64) -> Int {
@@ -375,10 +421,10 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         player.volume = volume
     }
 
-    private func loadPlayedSecond() {
+    private func loadPlayedSecond() async {
         let newPlayedSecond = UserDefaults.standard.object(forKey: "playedSecond") as? Double ?? 0.0
         print("Loaded playedSecond: \(newPlayedSecond)")
-        seekToOffset(offset: newPlayedSecond)
+        await seekToOffset(offset: newPlayedSecond)
     }
 
     private func savePlayedSecond() {
@@ -418,7 +464,9 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         await self.loadCurrentPlayingItemIndex()
 
         DispatchQueue.main.async {
-            self.loadPlayedSecond()
+            Task {
+                await self.loadPlayedSecond()
+            }
         }
     }
 
@@ -562,14 +610,13 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
 extension PlayController: CachingPlayerItemDelegate {
     func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
-        // guard let video = playerItem.playable as? VideoModel else { return }
-
+        DispatchQueue.main.async {
+            self.readyToPlay = true
+        }
         print("Caching player item ready to play.")
     }
 
     func playerItemDidFailToPlay(_ playerItem: CachingPlayerItem, withError error: Error?) {
-        // guard let _ = playerItem.playable as? VideoModel else { return }
-
         print("playerItemDidFailToPlay", error?.localizedDescription ?? "")
         Task {
             await self.nextTrack()
@@ -584,21 +631,18 @@ extension PlayController: CachingPlayerItemDelegate {
         _ playerItem: CachingPlayerItem, didDownloadBytesSoFar bytesDownloaded: Int,
         outOf bytesExpected: Int
     ) {
-        // downloadProgressView.alpha = 1.0
-        // downloadProgressView.setProgress(
-        //     Float(Double(bytesDownloaded) / Double(bytesExpected)), animated: true)
-        print("Download progress \(bytesDownloaded) / \(bytesExpected).")
+        if let _ = loadingProgress {
+            setLoadingProgress(Double(bytesDownloaded) / Double(bytesExpected))
+        }
     }
 
     func playerItem(_ playerItem: CachingPlayerItem, didFinishDownloadingFileAt filePath: String) {
-        // animateProgressViewToCompletion()
-
+        setLoadingProgress(nil)
         print("Caching player item file downloaded.")
     }
 
     func playerItem(_ playerItem: CachingPlayerItem, downloadingFailedWith error: Error) {
-        // animateProgressViewToCompletion()
-
+        setLoadingProgress(nil)
         print("Caching player item file download failed with error: \(error.localizedDescription).")
     }
 }
