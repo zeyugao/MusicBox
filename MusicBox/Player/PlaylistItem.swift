@@ -140,7 +140,7 @@ class PlaylistItem: Identifiable, Codable, Equatable {
     static func == (lhs: PlaylistItem, rhs: PlaylistItem) -> Bool {
         return lhs.id == rhs.id
     }
-    
+
     let id: UInt64
 
     /// URL of the local file containing the track's audio.
@@ -253,23 +253,7 @@ class PlaylistItem: Identifiable, Codable, Equatable {
         return nil
     }
 
-    func getUrl() -> URL? {
-        return runBlocking {
-            async let fileUrl = getUrlAsync()
-            async let artworkUrl = getArtworkAsync()
-            let (file, _) = (await fileUrl, await artworkUrl)
-
-            return file
-        }
-    }
-
-    func getArtwork() -> URL? {
-        return runBlocking {
-            return await getArtworkAsync()
-        }
-    }
-
-    func getArtworkAsync() async -> URL? {
+    func getArtworkUrl() async -> URL? {
         if let artworkUrl = self.artworkUrl {
             if isLocalURL(artworkUrl) {
                 return artworkUrl
@@ -282,7 +266,7 @@ class PlaylistItem: Identifiable, Codable, Equatable {
         return nil
     }
 
-    func getUrlAsync() async -> URL? {
+    func getUrl() async -> URL? {
         if let url = self.url {
             if isLocalURL(url) {
                 return self.url

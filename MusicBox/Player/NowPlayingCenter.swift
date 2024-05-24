@@ -11,7 +11,7 @@ import MediaPlayer
 class NowPlayingCenter {
 
     /// Updates the information in the MPNowPlayingInfoCenter when the current item changes.
-    static func handleItemChange(item: PlaylistItem?, index: Int, count: Int) {
+    static func handleItemChange(item: PlaylistItem?, index: Int, count: Int) async {
 
         let nowPlayingInfoCenter = MPNowPlayingInfoCenter.default()
         var nowPlayingInfo = [String: Any]()
@@ -31,7 +31,7 @@ class NowPlayingCenter {
                 nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = nsSong.al.name
             }
 
-            if let artworkUrl = currentItem.getArtwork(),
+            if let artworkUrl = await currentItem.getArtworkUrl(),
                 let imageData = try? Data(contentsOf: artworkUrl),
                 let image = NSImage(data: imageData)
             {

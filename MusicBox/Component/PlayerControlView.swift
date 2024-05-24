@@ -79,6 +79,8 @@ struct PlayerControlView: View {
     @State var errorText: String = ""
     @State var isHovered: Bool = false
 
+    @State var artworkUrl: URL?
+
     @Binding private var navigationPath: NavigationPath
 
     init(navigationPath: Binding<NavigationPath>) {
@@ -96,9 +98,7 @@ struct PlayerControlView: View {
         GeometryReader { geometry in
             let height = geometry.size.height
             HStack(spacing: 16) {
-                if let currentItem = playController.currentItem,
-                    let url = currentItem.getArtwork()
-                {
+                if let url = artworkUrl {
                     AsyncImage(url: url) { image in
                         image.resizable()
                             .scaledToFit()
@@ -223,7 +223,6 @@ struct PlayerControlView: View {
                 }
                 .layoutPriority(1)
                 .frame(minWidth: 300)
-                // .padding(.vertical, 16)
 
                 Spacer()
 
@@ -290,6 +289,13 @@ struct PlayerControlView: View {
                 }
                 .padding(.trailing, 32)
 
+            }
+            .onChange(of: playController.currentItem) { _, item in
+                if let item = item {
+                    Task {
+                        artworkUrl = await item.getArtworkUrl()
+                    }
+                }
             }
             .alert(
                 isPresented: Binding<Bool>(

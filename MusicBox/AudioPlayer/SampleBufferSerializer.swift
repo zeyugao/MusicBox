@@ -338,7 +338,7 @@ class SampleBufferSerializer {
                 let rate = renderSynchronizer.rate
                 renderSynchronizer.rate = 0
                 NotificationCenter.default.post(name: SampleBufferSerializer.playbackRateDidChange, object: self, userInfo: [SampleBufferSerializer.isLoadingKey: true])
-                guard let _ = playlistItem.getUrl() else { return }
+                // guard let _ = playlistItem.getUrl() else { return }
                 renderSynchronizer.rate = rate
                 NotificationCenter.default.post(name: SampleBufferSerializer.playbackRateDidChange, object: self, userInfo: [SampleBufferSerializer.isLoadingKey: false])
             }

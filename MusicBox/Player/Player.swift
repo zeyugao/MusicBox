@@ -201,7 +201,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             }
         }
 
-        NowPlayingCenter.handleItemChange(
+        await NowPlayingCenter.handleItemChange(
             item: currentItem,
             index: currentItemIndex ?? 0,
             count: playlist.count)
@@ -219,6 +219,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         }
         defer { switchingItem = false }
         if let offset = offset {
+            print("seek to #\(offset)")
             guard offset < playlist.count else { return }
 
             let item = playlist[offset]
@@ -232,7 +233,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                     options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
 
                 playerItem = AVPlayerItem(asset: asset)
-            } else if let url = await item.getUrlAsync(),
+            } else if let url = await item.getUrl(),
                 let savePath = item.getPotentialLocalUrl(),
                 let ext = item.ext
             {
@@ -247,7 +248,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
             replaceCurrentItem(item: playerItem)
 
-            NowPlayingCenter.handleItemChange(
+            await NowPlayingCenter.handleItemChange(
                 item: currentItem,
                 index: currentItemIndex ?? 0,
                 count: playlist.count)
