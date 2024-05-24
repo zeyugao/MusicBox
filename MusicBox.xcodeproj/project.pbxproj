@@ -24,6 +24,13 @@
 		2D3A45A62BE86F75006CD909 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45A52BE86F75006CD909 /* Player.swift */; };
 		2D3A45A82BE916C8006CD909 /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45A72BE916C8006CD909 /* NowPlaying.swift */; };
 		2DC73A7E2BFA38BF0015EB06 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A7D2BFA38BF0015EB06 /* Utils.swift */; };
+		2DC73A872BFF7E520015EB06 /* SampleBufferItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A822BFF7E520015EB06 /* SampleBufferItem.swift */; };
+		2DC73A882BFF7E520015EB06 /* SampleBufferPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A832BFF7E520015EB06 /* SampleBufferPlayer.swift */; };
+		2DC73A892BFF7E520015EB06 /* SampleBufferSerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A842BFF7E520015EB06 /* SampleBufferSerializer.swift */; };
+		2DC73A8A2BFF7E520015EB06 /* SampleBufferSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A852BFF7E520015EB06 /* SampleBufferSource.swift */; };
+		2DC73A8F2BFF7ED00015EB06 /* ADTSFormatHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A8B2BFF7ED00015EB06 /* ADTSFormatHelper.swift */; };
+		2DC73A902BFF7ED00015EB06 /* ADTSHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A8C2BFF7ED00015EB06 /* ADTSHeader.swift */; };
+		2DC73A912BFF7ED00015EB06 /* ADTSSampleBufferSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A8D2BFF7ED00015EB06 /* ADTSSampleBufferSource.swift */; };
 		2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */; };
 		2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */; };
 		2DC8FDB52BF7C58900D21F6A /* MediaFileHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAF2BF7C58900D21F6A /* MediaFileHandle.swift */; };
@@ -95,6 +102,13 @@
 		2D3A45A52BE86F75006CD909 /* Player.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		2D3A45A72BE916C8006CD909 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		2DC73A7D2BFA38BF0015EB06 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
+		2DC73A822BFF7E520015EB06 /* SampleBufferItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferItem.swift; sourceTree = "<group>"; };
+		2DC73A832BFF7E520015EB06 /* SampleBufferPlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferPlayer.swift; sourceTree = "<group>"; };
+		2DC73A842BFF7E520015EB06 /* SampleBufferSerializer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferSerializer.swift; sourceTree = "<group>"; };
+		2DC73A852BFF7E520015EB06 /* SampleBufferSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferSource.swift; sourceTree = "<group>"; };
+		2DC73A8B2BFF7ED00015EB06 /* ADTSFormatHelper.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSFormatHelper.swift; sourceTree = "<group>"; };
+		2DC73A8C2BFF7ED00015EB06 /* ADTSHeader.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSHeader.swift; sourceTree = "<group>"; };
+		2DC73A8D2BFF7ED00015EB06 /* ADTSSampleBufferSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSSampleBufferSource.swift; sourceTree = "<group>"; };
 		2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItem.swift; sourceTree = "<group>"; };
 		2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItemConfiguration.swift; sourceTree = "<group>"; };
 		2DC8FDAF2BF7C58900D21F6A /* MediaFileHandle.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MediaFileHandle.swift; sourceTree = "<group>"; };
@@ -151,6 +165,8 @@
 		2D2800922BCE1F20007A55D5 /* MusicBox */ = {
 			isa = PBXGroup;
 			children = (
+				2DC73A8E2BFF7ED00015EB06 /* AAC */,
+				2DC73A862BFF7E520015EB06 /* AudioPlayer */,
 				2D2800972BCE1F21007A55D5 /* Assets.xcassets */,
 				2DC73A812BFA3D840015EB06 /* Api */,
 				2D2800DB2BD21FE9007A55D5 /* General */,
@@ -223,6 +239,27 @@
 				2D3A45832BE3A90F006CD909 /* QCloudMusicApi.h */,
 			);
 			path = Api;
+			sourceTree = "<group>";
+		};
+		2DC73A862BFF7E520015EB06 /* AudioPlayer */ = {
+			isa = PBXGroup;
+			children = (
+				2DC73A822BFF7E520015EB06 /* SampleBufferItem.swift */,
+				2DC73A832BFF7E520015EB06 /* SampleBufferPlayer.swift */,
+				2DC73A842BFF7E520015EB06 /* SampleBufferSerializer.swift */,
+				2DC73A852BFF7E520015EB06 /* SampleBufferSource.swift */,
+			);
+			path = AudioPlayer;
+			sourceTree = "<group>";
+		};
+		2DC73A8E2BFF7ED00015EB06 /* AAC */ = {
+			isa = PBXGroup;
+			children = (
+				2DC73A8B2BFF7ED00015EB06 /* ADTSFormatHelper.swift */,
+				2DC73A8C2BFF7ED00015EB06 /* ADTSHeader.swift */,
+				2DC73A8D2BFF7ED00015EB06 /* ADTSSampleBufferSource.swift */,
+			);
+			path = AAC;
 			sourceTree = "<group>";
 		};
 		2DC8FDB22BF7C58900D21F6A /* CachingPlayerItem */ = {
@@ -327,22 +364,29 @@
 			files = (
 				2DC73A7E2BFA38BF0015EB06 /* Utils.swift in Sources */,
 				2DED51CF2BD3806D00F9D181 /* CloudMusicApi.swift in Sources */,
+				2DC73A8F2BFF7ED00015EB06 /* ADTSFormatHelper.swift in Sources */,
 				2DC8FDB62BF7C58900D21F6A /* ResourceLoaderDelegate.swift in Sources */,
 				2D2800DC2BD21FE9007A55D5 /* NowPlayingCenter.swift in Sources */,
 				2D3A45A82BE916C8006CD909 /* NowPlaying.swift in Sources */,
+				2DC73A892BFF7E520015EB06 /* SampleBufferSerializer.swift in Sources */,
 				2D3A45842BE3A90F006CD909 /* QCloudMusicApi.h in Sources */,
 				2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */,
 				2D2800962BCE1F20007A55D5 /* ContentView.swift in Sources */,
 				2D3A45A62BE86F75006CD909 /* Player.swift in Sources */,
 				2D2800DE2BD21FE9007A55D5 /* RemoteCommandCenter.swift in Sources */,
+				2DC73A882BFF7E520015EB06 /* SampleBufferPlayer.swift in Sources */,
 				2DFB58E52BF5997B00D488F4 /* PlayingDetailView.swift in Sources */,
 				2D2800DD2BD21FE9007A55D5 /* PlaylistItem.swift in Sources */,
 				2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */,
+				2DC73A912BFF7ED00015EB06 /* ADTSSampleBufferSource.swift in Sources */,
 				2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */,
+				2DC73A872BFF7E520015EB06 /* SampleBufferItem.swift in Sources */,
+				2DC73A8A2BFF7E520015EB06 /* SampleBufferSource.swift in Sources */,
 				2DC8FDB52BF7C58900D21F6A /* MediaFileHandle.swift in Sources */,
 				2DC8FDB92BF8A8A400D21F6A /* Explore.swift in Sources */,
 				2D2800942BCE1F20007A55D5 /* MusicBoxApp.swift in Sources */,
 				2DED51EE2BD3F62100F9D181 /* Extensions.swift in Sources */,
+				2DC73A902BFF7ED00015EB06 /* ADTSHeader.swift in Sources */,
 				2DC8FDB72BF7C58900D21F6A /* URLExtension.swift in Sources */,
 				2D2800A32BCF6998007A55D5 /* PlayerControlView.swift in Sources */,
 				2DFB58D72BF0744100D488F4 /* Account.swift in Sources */,
