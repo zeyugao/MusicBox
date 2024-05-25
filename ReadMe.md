@@ -51,7 +51,7 @@
 解压后执行来签名
 
 ```shell
-codesign -fs - MusicBox.app
+codesign -fs - -f --entitlements ./MusicBox.entitlements ./MusicBox.app
 ```
 
 ## Acknowledgment
