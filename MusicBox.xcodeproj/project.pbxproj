@@ -24,62 +24,6 @@
 		2D3A45A62BE86F75006CD909 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45A52BE86F75006CD909 /* Player.swift */; };
 		2D3A45A82BE916C8006CD909 /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3A45A72BE916C8006CD909 /* NowPlaying.swift */; };
 		2DC73A7E2BFA38BF0015EB06 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A7D2BFA38BF0015EB06 /* Utils.swift */; };
-		2DC73A872BFF7E520015EB06 /* SampleBufferItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A822BFF7E520015EB06 /* SampleBufferItem.swift */; };
-		2DC73A882BFF7E520015EB06 /* SampleBufferPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A832BFF7E520015EB06 /* SampleBufferPlayer.swift */; };
-		2DC73A892BFF7E520015EB06 /* SampleBufferSerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A842BFF7E520015EB06 /* SampleBufferSerializer.swift */; };
-		2DC73A8A2BFF7E520015EB06 /* SampleBufferSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A852BFF7E520015EB06 /* SampleBufferSource.swift */; };
-		2DC73A8F2BFF7ED00015EB06 /* ADTSFormatHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A8B2BFF7ED00015EB06 /* ADTSFormatHelper.swift */; };
-		2DC73A902BFF7ED00015EB06 /* ADTSHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A8C2BFF7ED00015EB06 /* ADTSHeader.swift */; };
-		2DC73A912BFF7ED00015EB06 /* ADTSSampleBufferSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A8D2BFF7ED00015EB06 /* ADTSSampleBufferSource.swift */; };
-		2DC73AD32C0041170015EB06 /* AudioConverter+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A922C0041170015EB06 /* AudioConverter+Helpers.swift */; };
-		2DC73AD42C0041170015EB06 /* AudioFileStream+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A932C0041170015EB06 /* AudioFileStream+Helpers.swift */; };
-		2DC73AD52C0041170015EB06 /* AVAudioFormat+Convenience.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A942C0041170015EB06 /* AVAudioFormat+Convenience.swift */; };
-		2DC73AD62C0041170015EB06 /* AVAudioUnit+Convenience.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A952C0041170015EB06 /* AVAudioUnit+Convenience.swift */; };
-		2DC73AD72C0041170015EB06 /* DispatchQueue+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A962C0041170015EB06 /* DispatchQueue+Helpers.swift */; };
-		2DC73AD82C0041170015EB06 /* UnsafeMutablePointer+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A972C0041170015EB06 /* UnsafeMutablePointer+Helpers.swift */; };
-		2DC73AD92C0041170015EB06 /* Atomic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A992C0041170015EB06 /* Atomic.swift */; };
-		2DC73ADA2C0041170015EB06 /* ByteBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A9A2C0041170015EB06 /* ByteBuffer.swift */; };
-		2DC73ADB2C0041170015EB06 /* DispatchTimerSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A9B2C0041170015EB06 /* DispatchTimerSource.swift */; };
-		2DC73ADC2C0041170015EB06 /* Lock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A9C2C0041170015EB06 /* Lock.swift */; };
-		2DC73ADD2C0041170015EB06 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A9D2C0041170015EB06 /* Logger.swift */; };
-		2DC73ADE2C0041170015EB06 /* Retrier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A9E2C0041170015EB06 /* Retrier.swift */; };
-		2DC73ADF2C0041170015EB06 /* NetStatusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AA02C0041170015EB06 /* NetStatusService.swift */; };
-		2DC73AE02C0041170015EB06 /* NetworkDataStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AA12C0041170015EB06 /* NetworkDataStream.swift */; };
-		2DC73AE12C0041170015EB06 /* NetworkingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AA22C0041170015EB06 /* NetworkingClient.swift */; };
-		2DC73AE22C0041170015EB06 /* NetworkSessionDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AA32C0041170015EB06 /* NetworkSessionDelegate.swift */; };
-		2DC73AE32C0041170015EB06 /* BiMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AA52C0041170015EB06 /* BiMap.swift */; };
-		2DC73AE42C0041170015EB06 /* Queue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AA62C0041170015EB06 /* Queue.swift */; };
-		2DC73AE52C0041170015EB06 /* AudioStreamState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AA92C0041170015EB06 /* AudioStreamState.swift */; };
-		2DC73AE62C0041170015EB06 /* EntryFrames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AAA2C0041170015EB06 /* EntryFrames.swift */; };
-		2DC73AE72C0041170015EB06 /* ProcessedPackets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AAB2C0041170015EB06 /* ProcessedPackets.swift */; };
-		2DC73AE82C0041170015EB06 /* SeekRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AAC2C0041170015EB06 /* SeekRequest.swift */; };
-		2DC73AE92C0041170015EB06 /* AudioEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AAE2C0041170015EB06 /* AudioEntry.swift */; };
-		2DC73AEA2C0041170015EB06 /* AudioEntryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AAF2C0041170015EB06 /* AudioEntryProvider.swift */; };
-		2DC73AEB2C0041170015EB06 /* Mp4Restructure.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AB12C0041170015EB06 /* Mp4Restructure.swift */; };
-		2DC73AEC2C0041170015EB06 /* RemoteMp4Restructure.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AB22C0041170015EB06 /* RemoteMp4Restructure.swift */; };
-		2DC73AED2C0041170015EB06 /* AudioStreamSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AB42C0041170015EB06 /* AudioStreamSource.swift */; };
-		2DC73AEE2C0041170015EB06 /* FileAudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AB52C0041170015EB06 /* FileAudioSource.swift */; };
-		2DC73AEF2C0041170015EB06 /* RemoteAudioSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AB62C0041170015EB06 /* RemoteAudioSource.swift */; };
-		2DC73AF02C0041170015EB06 /* AudioFileStreamProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AB82C0041170015EB06 /* AudioFileStreamProcessor.swift */; };
-		2DC73AF12C0041170015EB06 /* AudioPlayerRenderProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AB92C0041170015EB06 /* AudioPlayerRenderProcessor.swift */; };
-		2DC73AF22C0041170015EB06 /* FrameFilterProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73ABA2C0041170015EB06 /* FrameFilterProcessor.swift */; };
-		2DC73AF32C0041170015EB06 /* IcycastHeadersProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73ABB2C0041170015EB06 /* IcycastHeadersProcessor.swift */; };
-		2DC73AF42C0041170015EB06 /* MetadataStreamProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73ABC2C0041170015EB06 /* MetadataStreamProcessor.swift */; };
-		2DC73AF52C0041170015EB06 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73ABE2C0041170015EB06 /* AudioPlayer.swift */; };
-		2DC73AF62C0041170015EB06 /* AudioPlayerConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73ABF2C0041170015EB06 /* AudioPlayerConfiguration.swift */; };
-		2DC73AF72C0041170015EB06 /* AudioPlayerContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AC02C0041170015EB06 /* AudioPlayerContext.swift */; };
-		2DC73AF82C0041170015EB06 /* AudioPlayerDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AC12C0041170015EB06 /* AudioPlayerDelegate.swift */; };
-		2DC73AF92C0041170015EB06 /* AudioPlayerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AC22C0041170015EB06 /* AudioPlayerState.swift */; };
-		2DC73AFA2C0041170015EB06 /* AudioRendererContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AC32C0041170015EB06 /* AudioRendererContext.swift */; };
-		2DC73AFB2C0041170015EB06 /* UnitDescriptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AC42C0041170015EB06 /* UnitDescriptions.swift */; };
-		2DC73AFC2C0041170015EB06 /* AudioFileType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AC62C0041170015EB06 /* AudioFileType.swift */; };
-		2DC73AFD2C0041170015EB06 /* BufferContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AC72C0041170015EB06 /* BufferContext.swift */; };
-		2DC73AFE2C0041170015EB06 /* PlayerQueueEntries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73AC82C0041170015EB06 /* PlayerQueueEntries.swift */; };
-		2DC73AFF2C0041170015EB06 /* HTTPHeaderParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73ACA2C0041170015EB06 /* HTTPHeaderParser.swift */; };
-		2DC73B002C0041170015EB06 /* IcycastHeaderParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73ACB2C0041170015EB06 /* IcycastHeaderParser.swift */; };
-		2DC73B012C0041170015EB06 /* MetadataParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73ACC2C0041170015EB06 /* MetadataParser.swift */; };
-		2DC73B022C0041170015EB06 /* Parser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73ACD2C0041170015EB06 /* Parser.swift */; };
-		2DC73B032C0041170015EB06 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2DC73AD12C0041170015EB06 /* Info.plist */; };
 		2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */; };
 		2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */; };
 		2DC8FDB52BF7C58900D21F6A /* MediaFileHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAF2BF7C58900D21F6A /* MediaFileHandle.swift */; };
@@ -151,63 +95,6 @@
 		2D3A45A52BE86F75006CD909 /* Player.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		2D3A45A72BE916C8006CD909 /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		2DC73A7D2BFA38BF0015EB06 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
-		2DC73A822BFF7E520015EB06 /* SampleBufferItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferItem.swift; sourceTree = "<group>"; };
-		2DC73A832BFF7E520015EB06 /* SampleBufferPlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferPlayer.swift; sourceTree = "<group>"; };
-		2DC73A842BFF7E520015EB06 /* SampleBufferSerializer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferSerializer.swift; sourceTree = "<group>"; };
-		2DC73A852BFF7E520015EB06 /* SampleBufferSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleBufferSource.swift; sourceTree = "<group>"; };
-		2DC73A8B2BFF7ED00015EB06 /* ADTSFormatHelper.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSFormatHelper.swift; sourceTree = "<group>"; };
-		2DC73A8C2BFF7ED00015EB06 /* ADTSHeader.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSHeader.swift; sourceTree = "<group>"; };
-		2DC73A8D2BFF7ED00015EB06 /* ADTSSampleBufferSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADTSSampleBufferSource.swift; sourceTree = "<group>"; };
-		2DC73A922C0041170015EB06 /* AudioConverter+Helpers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AudioConverter+Helpers.swift"; sourceTree = "<group>"; };
-		2DC73A932C0041170015EB06 /* AudioFileStream+Helpers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AudioFileStream+Helpers.swift"; sourceTree = "<group>"; };
-		2DC73A942C0041170015EB06 /* AVAudioFormat+Convenience.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AVAudioFormat+Convenience.swift"; sourceTree = "<group>"; };
-		2DC73A952C0041170015EB06 /* AVAudioUnit+Convenience.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AVAudioUnit+Convenience.swift"; sourceTree = "<group>"; };
-		2DC73A962C0041170015EB06 /* DispatchQueue+Helpers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "DispatchQueue+Helpers.swift"; sourceTree = "<group>"; };
-		2DC73A972C0041170015EB06 /* UnsafeMutablePointer+Helpers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UnsafeMutablePointer+Helpers.swift"; sourceTree = "<group>"; };
-		2DC73A992C0041170015EB06 /* Atomic.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Atomic.swift; sourceTree = "<group>"; };
-		2DC73A9A2C0041170015EB06 /* ByteBuffer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ByteBuffer.swift; sourceTree = "<group>"; };
-		2DC73A9B2C0041170015EB06 /* DispatchTimerSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DispatchTimerSource.swift; sourceTree = "<group>"; };
-		2DC73A9C2C0041170015EB06 /* Lock.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Lock.swift; sourceTree = "<group>"; };
-		2DC73A9D2C0041170015EB06 /* Logger.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
-		2DC73A9E2C0041170015EB06 /* Retrier.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Retrier.swift; sourceTree = "<group>"; };
-		2DC73AA02C0041170015EB06 /* NetStatusService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NetStatusService.swift; sourceTree = "<group>"; };
-		2DC73AA12C0041170015EB06 /* NetworkDataStream.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NetworkDataStream.swift; sourceTree = "<group>"; };
-		2DC73AA22C0041170015EB06 /* NetworkingClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NetworkingClient.swift; sourceTree = "<group>"; };
-		2DC73AA32C0041170015EB06 /* NetworkSessionDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NetworkSessionDelegate.swift; sourceTree = "<group>"; };
-		2DC73AA52C0041170015EB06 /* BiMap.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BiMap.swift; sourceTree = "<group>"; };
-		2DC73AA62C0041170015EB06 /* Queue.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Queue.swift; sourceTree = "<group>"; };
-		2DC73AA92C0041170015EB06 /* AudioStreamState.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioStreamState.swift; sourceTree = "<group>"; };
-		2DC73AAA2C0041170015EB06 /* EntryFrames.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EntryFrames.swift; sourceTree = "<group>"; };
-		2DC73AAB2C0041170015EB06 /* ProcessedPackets.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProcessedPackets.swift; sourceTree = "<group>"; };
-		2DC73AAC2C0041170015EB06 /* SeekRequest.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SeekRequest.swift; sourceTree = "<group>"; };
-		2DC73AAE2C0041170015EB06 /* AudioEntry.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioEntry.swift; sourceTree = "<group>"; };
-		2DC73AAF2C0041170015EB06 /* AudioEntryProvider.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioEntryProvider.swift; sourceTree = "<group>"; };
-		2DC73AB12C0041170015EB06 /* Mp4Restructure.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Mp4Restructure.swift; sourceTree = "<group>"; };
-		2DC73AB22C0041170015EB06 /* RemoteMp4Restructure.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RemoteMp4Restructure.swift; sourceTree = "<group>"; };
-		2DC73AB42C0041170015EB06 /* AudioStreamSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioStreamSource.swift; sourceTree = "<group>"; };
-		2DC73AB52C0041170015EB06 /* FileAudioSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FileAudioSource.swift; sourceTree = "<group>"; };
-		2DC73AB62C0041170015EB06 /* RemoteAudioSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RemoteAudioSource.swift; sourceTree = "<group>"; };
-		2DC73AB82C0041170015EB06 /* AudioFileStreamProcessor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioFileStreamProcessor.swift; sourceTree = "<group>"; };
-		2DC73AB92C0041170015EB06 /* AudioPlayerRenderProcessor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioPlayerRenderProcessor.swift; sourceTree = "<group>"; };
-		2DC73ABA2C0041170015EB06 /* FrameFilterProcessor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FrameFilterProcessor.swift; sourceTree = "<group>"; };
-		2DC73ABB2C0041170015EB06 /* IcycastHeadersProcessor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IcycastHeadersProcessor.swift; sourceTree = "<group>"; };
-		2DC73ABC2C0041170015EB06 /* MetadataStreamProcessor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MetadataStreamProcessor.swift; sourceTree = "<group>"; };
-		2DC73ABE2C0041170015EB06 /* AudioPlayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
-		2DC73ABF2C0041170015EB06 /* AudioPlayerConfiguration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioPlayerConfiguration.swift; sourceTree = "<group>"; };
-		2DC73AC02C0041170015EB06 /* AudioPlayerContext.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioPlayerContext.swift; sourceTree = "<group>"; };
-		2DC73AC12C0041170015EB06 /* AudioPlayerDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioPlayerDelegate.swift; sourceTree = "<group>"; };
-		2DC73AC22C0041170015EB06 /* AudioPlayerState.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioPlayerState.swift; sourceTree = "<group>"; };
-		2DC73AC32C0041170015EB06 /* AudioRendererContext.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioRendererContext.swift; sourceTree = "<group>"; };
-		2DC73AC42C0041170015EB06 /* UnitDescriptions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UnitDescriptions.swift; sourceTree = "<group>"; };
-		2DC73AC62C0041170015EB06 /* AudioFileType.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioFileType.swift; sourceTree = "<group>"; };
-		2DC73AC72C0041170015EB06 /* BufferContext.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BufferContext.swift; sourceTree = "<group>"; };
-		2DC73AC82C0041170015EB06 /* PlayerQueueEntries.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlayerQueueEntries.swift; sourceTree = "<group>"; };
-		2DC73ACA2C0041170015EB06 /* HTTPHeaderParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HTTPHeaderParser.swift; sourceTree = "<group>"; };
-		2DC73ACB2C0041170015EB06 /* IcycastHeaderParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IcycastHeaderParser.swift; sourceTree = "<group>"; };
-		2DC73ACC2C0041170015EB06 /* MetadataParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MetadataParser.swift; sourceTree = "<group>"; };
-		2DC73ACD2C0041170015EB06 /* Parser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Parser.swift; sourceTree = "<group>"; };
-		2DC73AD02C0041170015EB06 /* AudioStreaming.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AudioStreaming.h; sourceTree = "<group>"; };
-		2DC73AD12C0041170015EB06 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItem.swift; sourceTree = "<group>"; };
 		2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItemConfiguration.swift; sourceTree = "<group>"; };
 		2DC8FDAF2BF7C58900D21F6A /* MediaFileHandle.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MediaFileHandle.swift; sourceTree = "<group>"; };
@@ -264,10 +151,7 @@
 		2D2800922BCE1F20007A55D5 /* MusicBox */ = {
 			isa = PBXGroup;
 			children = (
-				2DC73A8E2BFF7ED00015EB06 /* AAC */,
-				2DC73A862BFF7E520015EB06 /* AudioPlayer */,
 				2D2800972BCE1F21007A55D5 /* Assets.xcassets */,
-				2DC73AD22C0041170015EB06 /* AudioStreaming */,
 				2DC73A812BFA3D840015EB06 /* Api */,
 				2D2800DB2BD21FE9007A55D5 /* General */,
 				2D28009C2BCE1F21007A55D5 /* MusicBox.entitlements */,
@@ -339,196 +223,6 @@
 				2D3A45832BE3A90F006CD909 /* QCloudMusicApi.h */,
 			);
 			path = Api;
-			sourceTree = "<group>";
-		};
-		2DC73A862BFF7E520015EB06 /* AudioPlayer */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73A822BFF7E520015EB06 /* SampleBufferItem.swift */,
-				2DC73A832BFF7E520015EB06 /* SampleBufferPlayer.swift */,
-				2DC73A842BFF7E520015EB06 /* SampleBufferSerializer.swift */,
-				2DC73A852BFF7E520015EB06 /* SampleBufferSource.swift */,
-			);
-			path = AudioPlayer;
-			sourceTree = "<group>";
-		};
-		2DC73A8E2BFF7ED00015EB06 /* AAC */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73A8B2BFF7ED00015EB06 /* ADTSFormatHelper.swift */,
-				2DC73A8C2BFF7ED00015EB06 /* ADTSHeader.swift */,
-				2DC73A8D2BFF7ED00015EB06 /* ADTSSampleBufferSource.swift */,
-			);
-			path = AAC;
-			sourceTree = "<group>";
-		};
-		2DC73A982C0041170015EB06 /* Extensions */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73A922C0041170015EB06 /* AudioConverter+Helpers.swift */,
-				2DC73A932C0041170015EB06 /* AudioFileStream+Helpers.swift */,
-				2DC73A942C0041170015EB06 /* AVAudioFormat+Convenience.swift */,
-				2DC73A952C0041170015EB06 /* AVAudioUnit+Convenience.swift */,
-				2DC73A962C0041170015EB06 /* DispatchQueue+Helpers.swift */,
-				2DC73A972C0041170015EB06 /* UnsafeMutablePointer+Helpers.swift */,
-			);
-			path = Extensions;
-			sourceTree = "<group>";
-		};
-		2DC73A9F2C0041170015EB06 /* Helpers */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73A992C0041170015EB06 /* Atomic.swift */,
-				2DC73A9A2C0041170015EB06 /* ByteBuffer.swift */,
-				2DC73A9B2C0041170015EB06 /* DispatchTimerSource.swift */,
-				2DC73A9C2C0041170015EB06 /* Lock.swift */,
-				2DC73A9D2C0041170015EB06 /* Logger.swift */,
-				2DC73A9E2C0041170015EB06 /* Retrier.swift */,
-			);
-			path = Helpers;
-			sourceTree = "<group>";
-		};
-		2DC73AA42C0041170015EB06 /* Network */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73AA02C0041170015EB06 /* NetStatusService.swift */,
-				2DC73AA12C0041170015EB06 /* NetworkDataStream.swift */,
-				2DC73AA22C0041170015EB06 /* NetworkingClient.swift */,
-				2DC73AA32C0041170015EB06 /* NetworkSessionDelegate.swift */,
-			);
-			path = Network;
-			sourceTree = "<group>";
-		};
-		2DC73AA72C0041170015EB06 /* Structures */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73AA52C0041170015EB06 /* BiMap.swift */,
-				2DC73AA62C0041170015EB06 /* Queue.swift */,
-			);
-			path = Structures;
-			sourceTree = "<group>";
-		};
-		2DC73AA82C0041170015EB06 /* Core */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73A982C0041170015EB06 /* Extensions */,
-				2DC73A9F2C0041170015EB06 /* Helpers */,
-				2DC73AA42C0041170015EB06 /* Network */,
-				2DC73AA72C0041170015EB06 /* Structures */,
-			);
-			path = Core;
-			sourceTree = "<group>";
-		};
-		2DC73AAD2C0041170015EB06 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73AA92C0041170015EB06 /* AudioStreamState.swift */,
-				2DC73AAA2C0041170015EB06 /* EntryFrames.swift */,
-				2DC73AAB2C0041170015EB06 /* ProcessedPackets.swift */,
-				2DC73AAC2C0041170015EB06 /* SeekRequest.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		2DC73AB02C0041170015EB06 /* Audio Entry */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73AAD2C0041170015EB06 /* Models */,
-				2DC73AAE2C0041170015EB06 /* AudioEntry.swift */,
-				2DC73AAF2C0041170015EB06 /* AudioEntryProvider.swift */,
-			);
-			path = "Audio Entry";
-			sourceTree = "<group>";
-		};
-		2DC73AB32C0041170015EB06 /* Mp4 */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73AB12C0041170015EB06 /* Mp4Restructure.swift */,
-				2DC73AB22C0041170015EB06 /* RemoteMp4Restructure.swift */,
-			);
-			path = Mp4;
-			sourceTree = "<group>";
-		};
-		2DC73AB72C0041170015EB06 /* Audio Source */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73AB32C0041170015EB06 /* Mp4 */,
-				2DC73AB42C0041170015EB06 /* AudioStreamSource.swift */,
-				2DC73AB52C0041170015EB06 /* FileAudioSource.swift */,
-				2DC73AB62C0041170015EB06 /* RemoteAudioSource.swift */,
-			);
-			path = "Audio Source";
-			sourceTree = "<group>";
-		};
-		2DC73ABD2C0041170015EB06 /* Processors */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73AB82C0041170015EB06 /* AudioFileStreamProcessor.swift */,
-				2DC73AB92C0041170015EB06 /* AudioPlayerRenderProcessor.swift */,
-				2DC73ABA2C0041170015EB06 /* FrameFilterProcessor.swift */,
-				2DC73ABB2C0041170015EB06 /* IcycastHeadersProcessor.swift */,
-				2DC73ABC2C0041170015EB06 /* MetadataStreamProcessor.swift */,
-			);
-			path = Processors;
-			sourceTree = "<group>";
-		};
-		2DC73AC52C0041170015EB06 /* AudioPlayer */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73ABD2C0041170015EB06 /* Processors */,
-				2DC73ABE2C0041170015EB06 /* AudioPlayer.swift */,
-				2DC73ABF2C0041170015EB06 /* AudioPlayerConfiguration.swift */,
-				2DC73AC02C0041170015EB06 /* AudioPlayerContext.swift */,
-				2DC73AC12C0041170015EB06 /* AudioPlayerDelegate.swift */,
-				2DC73AC22C0041170015EB06 /* AudioPlayerState.swift */,
-				2DC73AC32C0041170015EB06 /* AudioRendererContext.swift */,
-				2DC73AC42C0041170015EB06 /* UnitDescriptions.swift */,
-			);
-			path = AudioPlayer;
-			sourceTree = "<group>";
-		};
-		2DC73AC92C0041170015EB06 /* Helpers */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73AC62C0041170015EB06 /* AudioFileType.swift */,
-				2DC73AC72C0041170015EB06 /* BufferContext.swift */,
-				2DC73AC82C0041170015EB06 /* PlayerQueueEntries.swift */,
-			);
-			path = Helpers;
-			sourceTree = "<group>";
-		};
-		2DC73ACE2C0041170015EB06 /* Parsers */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73ACA2C0041170015EB06 /* HTTPHeaderParser.swift */,
-				2DC73ACB2C0041170015EB06 /* IcycastHeaderParser.swift */,
-				2DC73ACC2C0041170015EB06 /* MetadataParser.swift */,
-				2DC73ACD2C0041170015EB06 /* Parser.swift */,
-			);
-			path = Parsers;
-			sourceTree = "<group>";
-		};
-		2DC73ACF2C0041170015EB06 /* Streaming */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73AB02C0041170015EB06 /* Audio Entry */,
-				2DC73AB72C0041170015EB06 /* Audio Source */,
-				2DC73AC52C0041170015EB06 /* AudioPlayer */,
-				2DC73AC92C0041170015EB06 /* Helpers */,
-				2DC73ACE2C0041170015EB06 /* Parsers */,
-			);
-			path = Streaming;
-			sourceTree = "<group>";
-		};
-		2DC73AD22C0041170015EB06 /* AudioStreaming */ = {
-			isa = PBXGroup;
-			children = (
-				2DC73AA82C0041170015EB06 /* Core */,
-				2DC73ACF2C0041170015EB06 /* Streaming */,
-				2DC73AD02C0041170015EB06 /* AudioStreaming.h */,
-				2DC73AD12C0041170015EB06 /* Info.plist */,
-			);
-			path = AudioStreaming;
 			sourceTree = "<group>";
 		};
 		2DC8FDB22BF7C58900D21F6A /* CachingPlayerItem */ = {
@@ -621,7 +315,6 @@
 			files = (
 				2D28009B2BCE1F21007A55D5 /* Preview Assets.xcassets in Resources */,
 				2D2800982BCE1F21007A55D5 /* Assets.xcassets in Resources */,
-				2DC73B032C0041170015EB06 /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -632,82 +325,27 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DC73AE52C0041170015EB06 /* AudioStreamState.swift in Sources */,
-				2DC73AF92C0041170015EB06 /* AudioPlayerState.swift in Sources */,
-				2DC73AED2C0041170015EB06 /* AudioStreamSource.swift in Sources */,
-				2DC73AD42C0041170015EB06 /* AudioFileStream+Helpers.swift in Sources */,
-				2DC73ADA2C0041170015EB06 /* ByteBuffer.swift in Sources */,
-				2DC73AFB2C0041170015EB06 /* UnitDescriptions.swift in Sources */,
-				2DC73ADC2C0041170015EB06 /* Lock.swift in Sources */,
 				2DC73A7E2BFA38BF0015EB06 /* Utils.swift in Sources */,
 				2DED51CF2BD3806D00F9D181 /* CloudMusicApi.swift in Sources */,
-				2DC73A8F2BFF7ED00015EB06 /* ADTSFormatHelper.swift in Sources */,
-				2DC73AE12C0041170015EB06 /* NetworkingClient.swift in Sources */,
-				2DC73B012C0041170015EB06 /* MetadataParser.swift in Sources */,
-				2DC73AEC2C0041170015EB06 /* RemoteMp4Restructure.swift in Sources */,
-				2DC73AF72C0041170015EB06 /* AudioPlayerContext.swift in Sources */,
 				2DC8FDB62BF7C58900D21F6A /* ResourceLoaderDelegate.swift in Sources */,
-				2DC73AFF2C0041170015EB06 /* HTTPHeaderParser.swift in Sources */,
-				2DC73ADF2C0041170015EB06 /* NetStatusService.swift in Sources */,
-				2DC73AFE2C0041170015EB06 /* PlayerQueueEntries.swift in Sources */,
-				2DC73AEF2C0041170015EB06 /* RemoteAudioSource.swift in Sources */,
-				2DC73AF82C0041170015EB06 /* AudioPlayerDelegate.swift in Sources */,
 				2D2800DC2BD21FE9007A55D5 /* NowPlayingCenter.swift in Sources */,
 				2D3A45A82BE916C8006CD909 /* NowPlaying.swift in Sources */,
-				2DC73AEB2C0041170015EB06 /* Mp4Restructure.swift in Sources */,
-				2DC73AFC2C0041170015EB06 /* AudioFileType.swift in Sources */,
-				2DC73AFA2C0041170015EB06 /* AudioRendererContext.swift in Sources */,
-				2DC73AFD2C0041170015EB06 /* BufferContext.swift in Sources */,
-				2DC73A892BFF7E520015EB06 /* SampleBufferSerializer.swift in Sources */,
 				2D3A45842BE3A90F006CD909 /* QCloudMusicApi.h in Sources */,
 				2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */,
-				2DC73AE82C0041170015EB06 /* SeekRequest.swift in Sources */,
-				2DC73AF52C0041170015EB06 /* AudioPlayer.swift in Sources */,
-				2DC73AF12C0041170015EB06 /* AudioPlayerRenderProcessor.swift in Sources */,
-				2DC73AE92C0041170015EB06 /* AudioEntry.swift in Sources */,
-				2DC73AF32C0041170015EB06 /* IcycastHeadersProcessor.swift in Sources */,
 				2D2800962BCE1F20007A55D5 /* ContentView.swift in Sources */,
-				2DC73ADE2C0041170015EB06 /* Retrier.swift in Sources */,
-				2DC73ADB2C0041170015EB06 /* DispatchTimerSource.swift in Sources */,
 				2D3A45A62BE86F75006CD909 /* Player.swift in Sources */,
 				2D2800DE2BD21FE9007A55D5 /* RemoteCommandCenter.swift in Sources */,
-				2DC73A882BFF7E520015EB06 /* SampleBufferPlayer.swift in Sources */,
 				2DFB58E52BF5997B00D488F4 /* PlayingDetailView.swift in Sources */,
 				2D2800DD2BD21FE9007A55D5 /* PlaylistItem.swift in Sources */,
-				2DC73AF02C0041170015EB06 /* AudioFileStreamProcessor.swift in Sources */,
 				2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */,
-				2DC73A912BFF7ED00015EB06 /* ADTSSampleBufferSource.swift in Sources */,
 				2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */,
-				2DC73ADD2C0041170015EB06 /* Logger.swift in Sources */,
-				2DC73AD92C0041170015EB06 /* Atomic.swift in Sources */,
-				2DC73AE62C0041170015EB06 /* EntryFrames.swift in Sources */,
-				2DC73A872BFF7E520015EB06 /* SampleBufferItem.swift in Sources */,
-				2DC73A8A2BFF7E520015EB06 /* SampleBufferSource.swift in Sources */,
 				2DC8FDB52BF7C58900D21F6A /* MediaFileHandle.swift in Sources */,
-				2DC73AD72C0041170015EB06 /* DispatchQueue+Helpers.swift in Sources */,
 				2DC8FDB92BF8A8A400D21F6A /* Explore.swift in Sources */,
 				2D2800942BCE1F20007A55D5 /* MusicBoxApp.swift in Sources */,
-				2DC73AE32C0041170015EB06 /* BiMap.swift in Sources */,
-				2DC73AEA2C0041170015EB06 /* AudioEntryProvider.swift in Sources */,
 				2DED51EE2BD3F62100F9D181 /* Extensions.swift in Sources */,
-				2DC73AF62C0041170015EB06 /* AudioPlayerConfiguration.swift in Sources */,
-				2DC73AF42C0041170015EB06 /* MetadataStreamProcessor.swift in Sources */,
-				2DC73AEE2C0041170015EB06 /* FileAudioSource.swift in Sources */,
-				2DC73AD62C0041170015EB06 /* AVAudioUnit+Convenience.swift in Sources */,
-				2DC73A902BFF7ED00015EB06 /* ADTSHeader.swift in Sources */,
-				2DC73AE22C0041170015EB06 /* NetworkSessionDelegate.swift in Sources */,
-				2DC73AF22C0041170015EB06 /* FrameFilterProcessor.swift in Sources */,
-				2DC73B002C0041170015EB06 /* IcycastHeaderParser.swift in Sources */,
 				2DC8FDB72BF7C58900D21F6A /* URLExtension.swift in Sources */,
 				2D2800A32BCF6998007A55D5 /* PlayerControlView.swift in Sources */,
 				2DFB58D72BF0744100D488F4 /* Account.swift in Sources */,
-				2DC73AD52C0041170015EB06 /* AVAudioFormat+Convenience.swift in Sources */,
-				2DC73AD82C0041170015EB06 /* UnsafeMutablePointer+Helpers.swift in Sources */,
-				2DC73AE02C0041170015EB06 /* NetworkDataStream.swift in Sources */,
-				2DC73B022C0041170015EB06 /* Parser.swift in Sources */,
-				2DC73AD32C0041170015EB06 /* AudioConverter+Helpers.swift in Sources */,
-				2DC73AE42C0041170015EB06 /* Queue.swift in Sources */,
-				2DC73AE72C0041170015EB06 /* ProcessedPackets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
