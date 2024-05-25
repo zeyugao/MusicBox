@@ -40,6 +40,7 @@
 - 点左下角的歌曲封面会切换到歌词界面
   - 歌词界面右上角 ![timestamp_roma](./Screenshots/timestamp_roma.png) 分别是显示某一句歌词的时间戳和显示罗马音（如果有）
   - 歌词的上下句切换可能存在一些延迟
+- 将本地文件拖动到歌单的某一歌曲上面即可将文件上传到云盘，并与该歌曲进行匹配，或使用右键菜单里面的 "Upload to Cloud"
 
 ## Acknowledgment
 
