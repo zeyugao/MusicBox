@@ -141,12 +141,16 @@ class PlayController: ObservableObject, RemoteCommandHandler {
             await seekToItem(offset: nil)
         }
 
-        let offset =
-            if loopMode == .shuffle {
-                Int.random(in: 0..<playlist.count)
-            } else {
-                1
+        let offset: Int
+        if loopMode == .shuffle {
+            var nextIdx = Int.random(in: 0..<playlist.count)
+            while nextIdx == currentItemIndex && playlist.count > 1 {
+                nextIdx = Int.random(in: 0..<playlist.count)
             }
+            offset = nextIdx
+        } else {
+            offset = 1
+        }
         await seekByItem(offset: offset)
         await startPlaying()
     }
