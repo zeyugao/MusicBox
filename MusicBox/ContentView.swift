@@ -198,14 +198,16 @@ struct ContentView: View {
             content: {
                 NavigationSplitView {
                     List(selection: $selection) {
-                        TextWithImage("Explore", image: "music.house")
-                            .tag(NavigationScreen.explore)
+                        if userInfo.profile != nil {
+                            TextWithImage("Explore", image: "music.house")
+                                .tag(NavigationScreen.explore)
+                        }
                         TextWithImage("Account", image: "person.crop.circle")
                             .tag(NavigationScreen.account)
-                        TextWithImage("Now Playing", image: "dot.radiowaves.left.and.right")
-                            .tag(NavigationScreen.nowPlaying)
-
                         if userInfo.profile != nil {
+                            TextWithImage("Now Playing", image: "dot.radiowaves.left.and.right")
+                                .tag(NavigationScreen.nowPlaying)
+
                             Section(header: Text("Created Playlists")) {
                                 ForEach(userInfo.playlists.filter { !$0.subscribed }) {
                                     playlist in
