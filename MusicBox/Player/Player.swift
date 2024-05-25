@@ -523,9 +523,10 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         self.currentLyricIndex = monotonouslyUpdateLyric(lyricIndex: 0)
     }
 
-    func monotonouslyUpdateLyric(lyricIndex: Int) -> Int? {
+    func monotonouslyUpdateLyric(lyricIndex: Int, newTime: Double? = nil) -> Int? {
         var lyricIndex = lyricIndex
-        let roundedPlayedSecond = Int(playedSecond * 10)
+
+        let roundedPlayedSecond = Int((newTime ?? playedSecond) * 10)
         while lyricIndex < self.lyricTimeline.count
             && roundedPlayedSecond >= self.lyricTimeline[lyricIndex]
         {
@@ -566,7 +567,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 }
 
                 let initIdx = self?.currentLyricIndex
-                let newIdx = self?.monotonouslyUpdateLyric(lyricIndex: initIdx ?? 0)
+                let newIdx = self?.monotonouslyUpdateLyric(lyricIndex: initIdx ?? 0, newTime: newTime)
 
                 if newIdx != initIdx {
                     withAnimation {
