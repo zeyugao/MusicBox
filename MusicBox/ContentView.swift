@@ -110,6 +110,7 @@ struct TextWithImage: View {
             if let image = image {
                 Image(systemName: image)
                     .foregroundStyle(.blue)
+                    .frame(width: 16)
             }
             Text(text)
         }
