@@ -299,7 +299,8 @@ class CloudMusicApi {
         setenv("QT_LOGGING_RULES", "*.debug=false", 1)  // Reduce log
         return try await withCheckedThrowingContinuation { continuation in
             do {
-                let jsonData = try JSONSerialization.data(withJSONObject: data, options: [.sortedKeys])
+                let jsonData = try JSONSerialization.data(
+                    withJSONObject: data, options: [.sortedKeys])
 
                 let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
 
@@ -664,7 +665,7 @@ class CloudMusicApi {
 
     func scrobble(id: UInt64, sourceid: UInt64, time: Int64) async {
         guard
-            let _ = try? await doRequest(
+            let res = try? await doRequest(
                 memberName: "scrobble",
                 data: [
                     "id": id,
@@ -674,6 +675,20 @@ class CloudMusicApi {
         else {
             print("scrobble failed")
             return
+        }
+
+        struct Result: Decodable {
+            let code: Int
+            let data: String
+        }
+
+        if let parsed = res.asType(Result.self),
+            parsed.code == 200
+        {
+            print("scrobble success")
+        } else {
+            print("scrobble failed")
+            print(res.asAny() ?? "")
         }
     }
 

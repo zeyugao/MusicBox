@@ -139,6 +139,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         if loopMode == .once && currentItemIndex == playlist.count - 1 {
             stopPlaying()
             await seekToItem(offset: nil)
+
+            return
         }
 
         let offset: Int
@@ -156,13 +158,17 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     func previousTrack() async {
-        let offset =
-            if loopMode == .shuffle {
-                Int.random(in: 0..<playlist.count)
-            } else {
-                -1
+        let offset: Int
+        if loopMode == .shuffle {
+            var nextIdx = Int.random(in: 0..<playlist.count)
+            while nextIdx == currentItemIndex && playlist.count > 1 {
+                nextIdx = Int.random(in: 0..<playlist.count)
             }
-        await seekToItem(offset: offset)
+            offset = nextIdx
+        } else {
+            offset = -1
+        }
+        await seekByItem(offset: offset)
         await startPlaying()
     }
 
@@ -240,6 +246,10 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         if let offset = offset {
             print("seek to #\(offset)")
             guard offset < playlist.count else { return }
+
+            if offset != currentItemIndex {
+                scrobbled = false
+            }
 
             let item = playlist[offset]
             currentItemIndex = offset
