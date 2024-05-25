@@ -563,7 +563,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         periodicTimeObserverToken = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.1, preferredTimescale: timeScale), queue: .main
         ) { [weak self] time in
-            if !(self?.switchingItem ?? true) {
+            if !(self?.switchingItem ?? true) && (self?.readyToPlay ?? false) {
                 let newTime = self?.player.currentTime().seconds ?? 0.0
                 if Int(self?.playedSecond ?? 0) != Int(newTime) {
                     self?.playedSecond = newTime
@@ -571,7 +571,8 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                 }
 
                 let initIdx = self?.currentLyricIndex
-                let newIdx = self?.monotonouslyUpdateLyric(lyricIndex: initIdx ?? 0, newTime: newTime)
+                let newIdx = self?.monotonouslyUpdateLyric(
+                    lyricIndex: initIdx ?? 0, newTime: newTime)
 
                 if newIdx != initIdx {
                     withAnimation {
