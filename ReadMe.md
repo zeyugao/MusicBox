@@ -42,6 +42,18 @@
   - 歌词的上下句切换可能存在一些延迟
 - 将本地文件拖动到歌单的某一歌曲上面即可将文件上传到云盘，并与该歌曲进行匹配，或使用右键菜单里面的 "Upload to Cloud"
 
+## Installation
+
+要求 macOS 14 及以上
+
+下载 [Github Action Release](https://github.com/zeyugao/MusicBox/actions/workflows/build.yml) 里面的 Artifacts
+
+解压后执行来签名
+
+```shell
+codesign -fs - MusicBox.app
+```
+
 ## Acknowledgment
 
 - [QCloudMusicApi](https://github.com/s12mmm3/QCloudMusicApi): 网易云 API 接口
