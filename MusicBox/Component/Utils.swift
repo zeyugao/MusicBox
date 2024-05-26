@@ -18,7 +18,7 @@ struct LoadingIndicatorView: View {
             .progressViewStyle(CircularProgressViewStyle())
             .controlSize(.small)
             .frame(width: 48, height: 48)
-            .background(Color.black.opacity(0.75))
+            .background(Color(nsColor: NSColor.textColor).opacity(0.75))
             .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }

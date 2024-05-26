@@ -589,6 +589,10 @@ struct PlayListView: View {
 
                 handleSortChange(sortOrder: self.sortOrder)
             }
+            .onChange(of: searchText) { prevSearchText, searchText in
+                model.applySearch(by: searchText)
+                model.update()
+            }
             .sheet(
                 isPresented: Binding<Bool>(
                     get: { selectedSongToAdd != nil },
@@ -611,24 +615,23 @@ struct PlayListView: View {
                     }
                 }
             }
-            .onChange(of: searchText) { prevSearchText, searchText in
-                model.applySearch(by: searchText)
-                model.update()
-            }
             .navigationTitle((playlistMetadata?.name) ?? "Playlist")
             .searchable(text: $searchText, prompt: "Search in Playlist")
             .toolbar {
                 ToolbarItemGroup {
                     PlayAllButton(songs: model.songs ?? [])
                     DownloadAllButton(songs: model.songs ?? [])
-                    Button(action: {
-                        Task {
-                            updatePlaylist(force: true)
+
+                    if case .netease = playlistMetadata {
+                        Button(action: {
+                            Task {
+                                updatePlaylist(force: true)
+                            }
+                        }) {
+                            Image(systemName: "arrow.clockwise")
                         }
-                    }) {
-                        Image(systemName: "arrow.clockwise")
+                        .help("Refresh Playlist")
                     }
-                    .help("Refresh Playlist")
                 }
             }
             .onChange(of: playlistMetadata?.id) {

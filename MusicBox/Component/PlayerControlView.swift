@@ -79,7 +79,7 @@ struct PlaySliderView: View {
         }
         .disabled(self.playController.isLoading)
         .controlSize(.mini)
-        .tint(Color(red: 0.745, green: 0.745, blue: 0.745))
+        .tint(Color(nsColor: NSColor.systemFill))
     }
 }
 
@@ -213,13 +213,13 @@ struct PlayerControlView: View {
                     Text("\(playController.currentItem?.artist ?? "Artists")")
                         .font(.system(size: 12))
                         .lineLimit(1)
-                        .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
+                        .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
                         .padding(.bottom, -2)
                     HStack {
                         Text(secondsToMinutesAndSeconds(seconds: playController.playedSecond))
                             .font(.system(size: 12))
                             .lineLimit(1)
-                            .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
+                            .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
                             .frame(width: 40)
 
                         PlaySliderView()
@@ -228,7 +228,7 @@ struct PlayerControlView: View {
                         Text(secondsToMinutesAndSeconds(seconds: playController.duration))
                             .font(.system(size: 12))
                             .lineLimit(1)
-                            .foregroundStyle(Color(red: 0.745, green: 0.745, blue: 0.745))
+                            .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
                             .frame(width: 40)
                     }
                 }
@@ -295,7 +295,6 @@ struct PlayerControlView: View {
                         }
                         .frame(width: 100)
                         .controlSize(.mini)
-                        .tint(Color(red: 0.678, green: 0.678, blue: 0.678))
                     }
                 }
                 .padding(.trailing, 32)

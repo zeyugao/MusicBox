@@ -109,7 +109,7 @@ struct TextWithImage: View {
         HStack {
             if let image = image {
                 Image(systemName: image)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.accentColor)
                     .frame(width: 16)
             }
             Text(text)
@@ -289,15 +289,7 @@ struct ContentView: View {
                     .environmentObject(userInfo)
                     .environmentObject(playingDetailModel)
                     .frame(height: 80)
-                    .overlay(
-                        Rectangle()
-                            .frame(height: 1)
-                            .foregroundStyle(
-                                Color(red: 0.925, green: 0.925, blue: 0.925)
-                            ),
-                        alignment: .top
-                    )
-                    .background(Color.white)
+                    .background(Color(nsColor: NSColor.textBackgroundColor))
                     .frame(minWidth: 800)
             }
         )
