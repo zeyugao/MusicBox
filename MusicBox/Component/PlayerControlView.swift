@@ -295,6 +295,7 @@ struct PlayerControlView: View {
                         }
                         .frame(width: 100)
                         .controlSize(.mini)
+                        .tint(Color(nsColor: NSColor.systemFill))
                     }
                 }
                 .padding(.trailing, 32)

@@ -33,7 +33,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     @Published var playedSecond: Double = 0.0
     @Published var duration: Double = 0.0
 
-    @Published var loopMode: LoopMode = .sequence
+    @AppStorage("loopMode") var loopMode: LoopMode = .sequence
 
     @Published var loadingProgress: Double? = nil
     @Published var isLoading: Bool = false
@@ -91,7 +91,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         case .shuffle:
             loopMode = .once
         }
-        saveLoopMode()
     }
 
     func stopPlaying() {
@@ -421,15 +420,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
         }
     }
 
-    func saveLoopMode() {
-        UserDefaults.standard.set(loopMode.rawValue, forKey: "LoopMode")
-    }
-
-    func loadLoopMode() {
-        let loopMode = UserDefaults.standard.integer(forKey: "LoopMode")
-        self.loopMode = LoopMode(rawValue: loopMode) ?? .sequence
-    }
-
     func saveVolume() {
         UserDefaults.standard.set(player.volume, forKey: "playerVolume")
     }
@@ -450,12 +440,10 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     private func saveMisc() {
-        saveLoopMode()
         saveVolume()
     }
 
     private func loadMisc() {
-        loadLoopMode()
         loadVolume()
     }
 

@@ -27,7 +27,7 @@ struct LyricView: View {
                         if showTimestamp {
                             Text(String(format: "%.2f", line.time))
                                 .lineLimit(1)
-                                .font(currentPlaying ? .title2 : .body)
+                                .font(.body)
                                 .foregroundColor(.gray)
                         }
 
@@ -67,9 +67,9 @@ struct LyricView: View {
 struct PlayingDetailView: View {
     @State private var lyric: [CloudMusicApi.LyricLine]?
     @EnvironmentObject var playController: PlayController
-    @State var showRoma: Bool = false
+    @AppStorage("showRoma") var showRoma: Bool = false
     @State var hasRoma: Bool = false
-    @State var showTimestamp: Bool = false
+    @AppStorage("showTimestamp") var showTimestamp: Bool = false
 
     func updateLyric() async {
         if let currentId = playController.currentItem?.id,
