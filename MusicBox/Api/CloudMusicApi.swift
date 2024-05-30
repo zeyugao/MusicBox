@@ -663,7 +663,78 @@ class CloudMusicApi {
         return nil
     }
 
-    func scrobble(id: UInt64, sourceid: UInt64, time: Int64) async {
+    private var seq: Int {
+        var ret_seq = UserDefaults.standard.integer(forKey: "scrobble_seq")
+        if ret_seq == 0 {
+            ret_seq = Int.random(in: 1000..<3000)
+        }
+        ret_seq += 1
+        UserDefaults.standard.set(ret_seq, forKey: "scrobble_seq")
+        return ret_seq
+    }
+
+    private var mspm: String {
+        let ret =
+            UserDefaults.standard.string(forKey: "mspm")
+            ?? {
+                var ret: String
+                if getenv("MSPM") != nil {
+                    ret = String(cString: getenv("MSPM"))
+                } else {
+                    ret = {
+                        let characters = "0123456789abcdef"
+                        var result = ""
+
+                        let length = 24
+
+                        for _ in 0..<length {
+                            let randomIndex = Int(arc4random_uniform(UInt32(characters.count)))
+                            let randomCharacter = characters[
+                                characters.index(characters.startIndex, offsetBy: randomIndex)]
+                            result.append(randomCharacter)
+                        }
+
+                        return result
+                    }()
+                }
+
+                UserDefaults.standard.set(ret, forKey: "mspm")
+                return ret
+            }()
+
+        return ret
+    }
+
+    func scrobble(song: Song) async {
+        let req = [
+            [
+                "id": song.id,
+                "artistid": song.ar.first?.id ?? 0,
+                "sourceId": song.al.id,
+                "fee": song.fee.rawValue,
+                "time": Int(song.dt / 1000),
+                "bitrate": Double(song.getHighestQuality()?.br ?? 0) / 1000.0,
+                "seq": seq,
+                "mspm": mspm,
+                "sessionid": 3333,
+                "timestamp": Int(Date().timeIntervalSince1970),
+            ]
+        ]
+        guard
+            let res = try? await doRequest(
+                memberName: "scrobble_pc",
+                data: [
+                    "actions": req
+                ])
+        else {
+            print("scrobble failed")
+            return
+        }
+
+        print(res.asAny() ?? "")
+    }
+
+    func scrobble_legacy(id: UInt64, sourceid: UInt64, time: Int64) async {
         guard
             let res = try? await doRequest(
                 memberName: "scrobble",

@@ -29,6 +29,7 @@ jobs:
           install-deps: 'true'
           cache: 'true'
           aqtversion: '==3.1.*'
+          modules: 'qt5compat'
       - name: Fetch QCloudMusicApi
         run: |
           git clone --recurse-submodules --depth=1 https://github.com/s12mmm3/QCloudMusicApi.git ../QCloudMusicApi \
