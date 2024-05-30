@@ -198,7 +198,7 @@ class PlaylistItem: Identifiable, Codable, Equatable {
         artist = try container.decode(String.self, forKey: .artist)
         ext = try container.decodeIfPresent(String.self, forKey: .ext)
         let seconds = try container.decode(Double.self, forKey: .duration)
-        duration = CMTime(seconds: seconds, preferredTimescale: 1)
+        duration = CMTime(seconds: seconds, preferredTimescale: 1000)
         albumId = try container.decode(UInt64.self, forKey: .albumId)
         artworkUrl = try container.decodeIfPresent(URL.self, forKey: .artworkUrl)
         nsSong = try container.decodeIfPresent(CloudMusicApi.Song.self, forKey: .nsSong)
