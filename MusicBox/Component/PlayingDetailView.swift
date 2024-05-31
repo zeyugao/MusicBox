@@ -10,9 +10,11 @@ import SwiftUI
 
 struct LyricView: View {
     var lyric: [CloudMusicApi.LyricLine]
-    @Binding var showRoma: Bool
-    @Binding var showTimestamp: Bool
     @EnvironmentObject var playController: PlayController
+    @Binding var hasRoma: Bool
+    
+    @AppStorage("showRoma") var showRoma: Bool = false
+    @AppStorage("showTimestamp") var showTimestamp: Bool = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -33,15 +35,21 @@ struct LyricView: View {
 
                         if showRoma, let romalrc = line.romalrc {
                             Text(romalrc)
-                                .font(currentPlaying ? .title2 : .body)
+                                .font(.title2)
+                                .foregroundStyle(Color(nsColor: currentPlaying ? NSColor.textColor : NSColor.placeholderTextColor))
+                                // .font(currentPlaying ? .title2 : .body)
                         }
 
                         Text(line.lyric)
-                            .font(currentPlaying ? .title : .body)
+                            .font(.title2)
+                            .foregroundStyle(Color(nsColor: currentPlaying ? NSColor.textColor : NSColor.placeholderTextColor))
+                            // .font(currentPlaying ? .title : .body)
 
                         if let tlyric = line.tlyric {
                             Text(tlyric)
-                                .font(currentPlaying ? .title : .body)
+                                .font(.title2)
+                                .foregroundStyle(Color(nsColor: currentPlaying ? NSColor.textColor : NSColor.placeholderTextColor))
+                                // .font(currentPlaying ? .title : .body)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -53,6 +61,19 @@ struct LyricView: View {
             }
             .padding()
         }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Toggle(isOn: $showTimestamp) {
+                    Image(systemName: "clock")
+                }
+                if hasRoma {
+                    Toggle(isOn: $showRoma) {
+                        Image(systemName: "quote.bubble")
+                    }
+                }
+            }
+        }
+        // TODO: Scroll with animation
         .scrollPosition(
             id: Binding(
                 get: {
@@ -67,9 +88,7 @@ struct LyricView: View {
 struct PlayingDetailView: View {
     @State private var lyric: [CloudMusicApi.LyricLine]?
     @EnvironmentObject var playController: PlayController
-    @AppStorage("showRoma") var showRoma: Bool = false
     @State var hasRoma: Bool = false
-    @AppStorage("showTimestamp") var showTimestamp: Bool = false
 
     func updateLyric() async {
         if let currentId = playController.currentItem?.id,
@@ -113,7 +132,8 @@ struct PlayingDetailView: View {
                         VStack {
                             if let lyric = lyric {
                                 LyricView(
-                                    lyric: lyric, showRoma: $showRoma, showTimestamp: $showTimestamp
+                                    lyric: lyric,
+                                    hasRoma: $hasRoma
                                 )
                             } else {
                                 Text("还没有歌词")
@@ -131,18 +151,6 @@ struct PlayingDetailView: View {
                 }
             }
             .navigationTitle(playController.currentItem?.title ?? "Playing")
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Toggle(isOn: $showTimestamp) {
-                        Image(systemName: "clock")
-                    }
-                    if hasRoma {
-                        Toggle(isOn: $showRoma) {
-                            Image(systemName: "quote.bubble")
-                        }
-                    }
-                }
-            }
         }
     }
 }

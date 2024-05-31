@@ -577,9 +577,9 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                     lyricIndex: initIdx ?? 0, newTime: newTime)
 
                 if newIdx != initIdx {
-                    withAnimation {
-                        self?.currentLyricIndex = newIdx
-                    }
+                    // withAnimation {
+                    self?.currentLyricIndex = newIdx
+                    // }
                 }
             }
         }
