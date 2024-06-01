@@ -18,7 +18,11 @@ struct LyricView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-
+            let scrollToIdx: (Int) -> Void = { idx in
+                withAnimation(.spring) {
+                    proxy.scrollTo(idx, anchor: .center)
+                }
+            }
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading) {
                     ForEach(
@@ -69,20 +73,24 @@ struct LyricView: View {
                 }
                 .padding()
                 .onChange(of: playController.currentLyricIndex) { _, newIndex in
-                    withAnimation(.spring) {
-                        proxy.scrollTo(newIndex ?? 0, anchor: .center)
-                    }
+                    scrollToIdx(newIndex ?? 0)
                 }
             }
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Toggle(isOn: $showTimestamp) {
-                    Image(systemName: "clock")
-                }
-                if hasRoma {
-                    Toggle(isOn: $showRoma) {
-                        Image(systemName: "quote.bubble")
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Toggle(isOn: $showTimestamp) {
+                        Image(systemName: "clock")
+                    }
+                    .onChange(of: showTimestamp) {
+                        scrollToIdx(playController.currentLyricIndex ?? 0)
+                    }
+                    if hasRoma {
+                        Toggle(isOn: $showRoma) {
+                            Image(systemName: "quote.bubble")
+                        }
+                        .onChange(of: showRoma) {
+                            scrollToIdx(playController.currentLyricIndex ?? 0)
+                        }
                     }
                 }
             }
