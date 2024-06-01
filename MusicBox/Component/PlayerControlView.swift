@@ -79,7 +79,7 @@ struct PlaySliderView: View {
         }
         .disabled(self.playController.isLoading)
         .controlSize(.mini)
-        .tint(Color(nsColor: NSColor.systemFill))
+        .tint(.primary)
     }
 }
 
@@ -293,9 +293,9 @@ struct PlayerControlView: View {
                         } maximumValueLabel: {
                             Image(systemName: "speaker.3.fill")
                         }
+                        .tint(.primary)
                         .frame(width: 100)
                         .controlSize(.mini)
-                        .tint(Color(nsColor: NSColor.systemFill))
                     }
                 }
                 .padding(.trailing, 32)
