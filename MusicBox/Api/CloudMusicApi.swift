@@ -1148,7 +1148,7 @@ class CloudMusicApi {
                     romalrcIndex += 1
                 }
 
-                if time >= 0 {
+                if time >= 0 && lyricStr != nil && lyricStr != "" {
                     result.append(
                         LyricLine(
                             time: time,
