@@ -32,7 +32,7 @@ jobs:
           modules: 'qt5compat'
       - name: Fetch QCloudMusicApi
         run: |
-          git clone --recurse-submodules --depth=1 https://github.com/s12mmm3/QCloudMusicApi.git ../QCloudMusicApi \
+          git clone --recurse-submodules --depth=1 https://github.com/elsagranger/QCloudMusicApi.git ../QCloudMusicApi \
           && cd ../QCloudMusicApi \
           && cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_PREFIX_PATH=$(pwd)/../Qt/6.7.0/macos/lib/cmake -GXcode -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
           && cd build \
