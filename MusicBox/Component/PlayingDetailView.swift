@@ -71,7 +71,7 @@ struct LyricView: View {
                             .id(index)
                     }
                 }
-                .padding()
+                .padding(.vertical)
                 .onChange(of: playController.currentLyricIndex) { _, newIndex in
                     scrollToIdx(newIndex ?? 0)
                 }
@@ -138,10 +138,10 @@ struct PlayingDetailView: View {
                             Text(item.artist)
                                 .font(.title2)
                         }
-                        .padding()
-
                         .frame(width: geometry.size.width * 0.33, height: geometry.size.height)
+
                         Spacer()
+
                         VStack {
                             if let lyric = lyric {
                                 LyricView(
@@ -154,6 +154,7 @@ struct PlayingDetailView: View {
                         }
                         .frame(width: geometry.size.width * 0.66, height: geometry.size.height)
                     }
+                    .padding()
                 }
             }.task {
                 await updateLyric()
