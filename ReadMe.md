@@ -43,7 +43,7 @@
   - 歌词的上下句切换可能存在一些延迟
 - 将本地文件拖动到歌单的某一歌曲上面即可将文件上传到云盘，并与该歌曲进行匹配，或使用右键菜单里面的 "Upload to Cloud"
 
-## Installation
+## Installation from GitHub Action
 
 要求 macOS 14 及以上
 
@@ -52,6 +52,7 @@
 解压后执行来签名
 
 ```shell
+xattr -dr com.apple.quarantine ./MusicBox.app
 codesign -fs - -f --entitlements ./MusicBox.entitlements ./MusicBox.app
 ```
 
