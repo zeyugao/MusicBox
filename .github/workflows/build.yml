@@ -30,6 +30,9 @@ jobs:
           cache: 'true'
           aqtversion: '==3.1.*'
           modules: 'qt5compat'
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
       - name: Fetch QCloudMusicApi
         run: |
           git clone --recurse-submodules --depth=1 https://github.com/elsagranger/QCloudMusicApi.git ../QCloudMusicApi \
