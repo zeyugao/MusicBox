@@ -184,9 +184,8 @@ struct TableContextMenu: View {
     }
 }
 
-@MainActor
 func likeSong(
-    likelist: inout Set<UInt64>, songId: UInt64, favored: Bool, errorText: Binding<String>
+    likelist: inout Set<UInt64>, songId: UInt64, favored: Bool
 )
     async
 {
@@ -198,9 +197,9 @@ func likeSong(
             likelist.insert(songId)
         }
     } catch let error as RequestError {
-        errorText.wrappedValue = error.localizedDescription
+        AlertModel.showAlert(error.localizedDescription)
     } catch {
-        errorText.wrappedValue = error.localizedDescription
+        AlertModel.showAlert(error.localizedDescription)
     }
 }
 
@@ -402,7 +401,6 @@ struct PlayListView: View {
     @State private var isLoading = false
 
     @State private var searchText = ""
-    @State private var errorText = ""
     @State private var selectedSongToAdd: CloudMusicApi.Song?
 
     var playlistMetadata: PlaylistMetadata?
@@ -462,8 +460,7 @@ struct PlayListView: View {
                             await likeSong(
                                 likelist: &likelist,
                                 songId: song.id,
-                                favored: favored,
-                                errorText: $errorText
+                                favored: favored
                             )
                             userInfo.likelist = likelist
                         }
@@ -548,9 +545,9 @@ struct PlayListView: View {
                                                     trackIds: [song.id])
                                                 updatePlaylist()
                                             } catch let error as RequestError {
-                                                errorText = error.localizedDescription
+                                                AlertModel.showAlert(error.localizedDescription)
                                             } catch {
-                                                errorText = error.localizedDescription
+                                                AlertModel.showAlert(error.localizedDescription)
                                             }
                                         }
                                     }
@@ -607,9 +604,9 @@ struct PlayListView: View {
                                     op: .add, playlistId: selectedPlaylist.id,
                                     trackIds: [selectedSong.id])
                             } catch let error as RequestError {
-                                errorText = error.localizedDescription
+                                AlertModel.showAlert(error.localizedDescription)
                             } catch {
-                                errorText = error.localizedDescription
+                                AlertModel.showAlert(error.localizedDescription)
                             }
                         }
                     }
@@ -642,14 +639,6 @@ struct PlayListView: View {
             }
             .onDisappear {
                 loadingTask?.cancel()
-            }
-            .alert(
-                isPresented: Binding<Bool>(
-                    get: { !errorText.isEmpty },
-                    set: { if !$0 { errorText = "" } }
-                )
-            ) {
-                Alert(title: Text("Error"), message: Text(errorText))
             }
 
             if isLoading {

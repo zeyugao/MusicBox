@@ -243,14 +243,18 @@ struct AccountView: View {
                                 do
                                 {
                                     try FileManager.default.removeItem(at: tmpFolderPath)
+                                    
+                                    AlertModel.showAlert("Info", "Clean successful")
                                 }
                                 catch {
                                     print("Error when deleting \(tmpFolderPath): \(error)")
+                                    
+                                    AlertModel.showAlert("Error", "Clean failed: \(error)")
                                 }
                             }
                         }
                     }) {
-                        Text("Clear cache")
+                        Text("Clean cache")
                     }
                 }
             }

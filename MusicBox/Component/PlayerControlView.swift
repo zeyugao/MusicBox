@@ -87,7 +87,6 @@ struct PlayerControlView: View {
     @EnvironmentObject var playController: PlayController
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject private var playingDetailModel: PlayingDetailModel
-    @State var errorText: String = ""
     @State var isHovered: Bool = false
 
     @State var artworkUrl: URL?
@@ -246,8 +245,7 @@ struct PlayerControlView: View {
                         await likeSong(
                             likelist: &likelist,
                             songId: currentId,
-                            favored: favored,
-                            errorText: $errorText
+                            favored: favored
                         )
                         userInfo.likelist = likelist
                     }
@@ -307,14 +305,6 @@ struct PlayerControlView: View {
                         artworkUrl = await item.getArtworkUrl()
                     }
                 }
-            }
-            .alert(
-                isPresented: Binding<Bool>(
-                    get: { !errorText.isEmpty },
-                    set: { if !$0 { errorText = "" } }
-                )
-            ) {
-                Alert(title: Text("Error"), message: Text(errorText))
             }
         }
     }

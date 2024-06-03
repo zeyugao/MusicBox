@@ -185,11 +185,52 @@ class PlayingDetailModel: ObservableObject {
     }
 }
 
+class AlertModel: ObservableObject {
+    @Published var text: String = ""
+    @Published var title: String = ""
+
+    static let showAlertName = Notification.Name("showAlertName")
+
+    static func showAlert(_ title: String, _ text: String) {
+        NotificationCenter.default.post(
+            name: AlertModel.showAlertName,
+            object: nil,
+            userInfo: [
+                "title": title,
+                "text": text,
+            ]
+        )
+    }
+
+    static func showAlert(_ text: String) {
+        showAlert("Alert", text)
+    }
+
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: AlertModel.showAlertName,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            if let title = notification.userInfo?["title"] as? String {
+                self?.title = title
+            } else {
+                self?.title = "Alert"
+            }
+            if let text = notification.userInfo?["text"] as? String {
+                self?.text = text
+            }
+        }
+    }
+}
+
 struct ContentView: View {
     @StateObject var playController = PlayController()
     @State private var selection: NavigationScreen = .explore
     @StateObject private var userInfo = UserInfo()
     @StateObject private var playingDetailModel = PlayingDetailModel()
+
+    @StateObject private var alertModel = AlertModel()
 
     @State private var navigationPath = NavigationPath()
 
@@ -299,6 +340,19 @@ struct ContentView: View {
 
             await initUserDataTask
             await loadStateTask
+        }
+        .alert(
+            isPresented: Binding<Bool>(
+                get: { !alertModel.text.isEmpty },
+                set: {
+                    if !$0 {
+                        alertModel.text = ""
+                        alertModel.title = ""
+                    }
+                }
+            )
+        ) {
+            Alert(title: Text(alertModel.title), message: Text(alertModel.text))
         }
     }
 }
