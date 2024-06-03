@@ -142,12 +142,12 @@ struct LoginView: View {
                 Spacer()
                 Button(action: {
                     Task {
-                        if await CloudMusicApi().login_cellphone(
+                        let res = await CloudMusicApi().login_cellphone(
                             phone: username, password: password)
-                        {
-                            await initUserData(userInfo: userInfo)
+                        if let error = res {
+                            AlertModel.showAlert("Login failed. Please use QR Login.", error)
                         } else {
-                            print("Login failed")
+                            await initUserData(userInfo: userInfo)
                         }
                     }
                 }) {
@@ -240,18 +240,17 @@ struct AccountView: View {
                         {
                             let tmpFolderPath = containerURL.appendingPathComponent("tmp")
                             if FileManager.default.fileExists(atPath: tmpFolderPath.path) {
-                                do
-                                {
+                                do {
                                     try FileManager.default.removeItem(at: tmpFolderPath)
-                                    
-                                    AlertModel.showAlert("Info", "Clean successful")
-                                }
-                                catch {
+                                } catch {
                                     print("Error when deleting \(tmpFolderPath): \(error)")
-                                    
+
                                     AlertModel.showAlert("Error", "Clean failed: \(error)")
+
+                                    return
                                 }
                             }
+                            AlertModel.showAlert("Info", "Clean successful")
                         }
                     }) {
                         Text("Clean cache")

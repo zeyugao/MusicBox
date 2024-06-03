@@ -134,7 +134,6 @@ class CloudMusicApi {
         let avatarUrl: String
         let nickname: String
         let userId: UInt64
-        
     }
 
     struct PlayListItem: Identifiable, Codable, Equatable, Hashable {
@@ -482,7 +481,7 @@ class CloudMusicApi {
     }
 
     func login_cellphone(phone: String, countrycode: Int = 86, password: String) async
-        -> Bool
+        -> String?
     {
         guard
             let ret = try? await doRequest(
@@ -494,24 +493,30 @@ class CloudMusicApi {
                 ])
         else {
             print("login_cellphone failed")
-            return false
-        }
-
-        struct Result: Decodable {
-            let code: Int
-            let message: String?
-            let cookie: String?
+            return "Request failed"
         }
 
         print(ret.asAny() ?? "No data")
+        struct Data: Decodable {
+            let blockText: String?
+        }
+
+        struct Result: Decodable {
+            let message: String?
+            let cookie: String?
+            let data: Data?
+        }
 
         if let parsed = ret.asType(Result.self) {
-            if parsed.code == 200, let cookie = parsed.cookie {
+            if let cookie = parsed.cookie {
                 setCookie(cookie)
-                return true
+                return nil
+            }
+            if let data = parsed.data, let blockText = data.blockText {
+                return blockText
             }
         }
-        return false
+        return "Parse failed"
     }
 
     func logout() async {
