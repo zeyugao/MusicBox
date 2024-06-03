@@ -134,6 +134,7 @@ class CloudMusicApi {
         let avatarUrl: String
         let nickname: String
         let userId: UInt64
+        
     }
 
     struct PlayListItem: Identifiable, Codable, Equatable, Hashable {
@@ -520,7 +521,6 @@ class CloudMusicApi {
 
     func user_account() async {
         guard let ret = try? await doRequest(memberName: "user_account", data: [:]) else { return }
-        print(ret)
     }
 
     func user_subcount() async {

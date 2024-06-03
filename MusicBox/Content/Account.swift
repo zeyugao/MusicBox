@@ -212,7 +212,7 @@ struct AccountView: View {
                     }
                     .scaledToFit()
                     .clipShape(Circle())
-                    .frame(width: 100, height: 100)
+                    .frame(width: 64, height: 64)
 
                     Text(profile.nickname)
                         .font(.system(size: 16))
@@ -230,6 +230,27 @@ struct AccountView: View {
                         }
                     }) {
                         Text("Logout")
+                    }
+                }
+
+                HStack {
+                    Button(action: {
+                        if let containerURL = FileManager.default.containerURL(
+                            forSecurityApplicationGroupIdentifier: "me.elsanna.MusicBox")
+                        {
+                            let tmpFolderPath = containerURL.appendingPathComponent("tmp")
+                            if FileManager.default.fileExists(atPath: tmpFolderPath.path) {
+                                do
+                                {
+                                    try FileManager.default.removeItem(at: tmpFolderPath)
+                                }
+                                catch {
+                                    print("Error when deleting \(tmpFolderPath): \(error)")
+                                }
+                            }
+                        }
+                    }) {
+                        Text("Clear cache")
                     }
                 }
             }
