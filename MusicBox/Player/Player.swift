@@ -136,7 +136,6 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     func nextTrack() async {
         doScrobble()
-        
         if loopMode == .once && currentItemIndex == playlist.count - 1 {
             stopPlaying()
             await seekToItem(offset: nil)
@@ -498,7 +497,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
                     let item = playlist[currentItemIndex]
                     Task {
                         print("do scrobble")
-                        if let song = item.nsSong{
+                        if let song = item.nsSong {
                             await CloudMusicApi().scrobble(
                                 song: song,
                                 playedTime: Int(playedSecond)
@@ -526,7 +525,9 @@ class PlayController: ObservableObject, RemoteCommandHandler {
     }
 
     func resetLyricIndex() {
-        self.currentLyricIndex = monotonouslyUpdateLyric(lyricIndex: 0)
+        DispatchQueue.main.async {
+            self.currentLyricIndex = monotonouslyUpdateLyric(lyricIndex: 0)
+        }
     }
 
     func monotonouslyUpdateLyric(lyricIndex: Int, newTime: Double? = nil) -> Int? {

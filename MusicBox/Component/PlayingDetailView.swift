@@ -111,7 +111,7 @@ struct PlayingDetailView: View {
             let lyric = lyric.merge()
             self.lyric = lyric
             self.playController.lyricTimeline = lyric.map { Int($0.time * 10) }
-            self.playController.currentLyricIndex = nil
+            self.playController.resetLyricIndex()
         }
     }
 
