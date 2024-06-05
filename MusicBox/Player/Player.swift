@@ -526,7 +526,7 @@ class PlayController: ObservableObject, RemoteCommandHandler {
 
     func resetLyricIndex() {
         DispatchQueue.main.async {
-            self.currentLyricIndex = monotonouslyUpdateLyric(lyricIndex: 0)
+            self.currentLyricIndex = self.monotonouslyUpdateLyric(lyricIndex: 0)
         }
     }
 
