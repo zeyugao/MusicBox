@@ -8,7 +8,7 @@ xcodebuild archive -project MusicBox.xcodeproj -scheme MusicBox -archivePath Mus
 
 cd release
 
-hdiutil create -size 200m -fs HFS+ -volname "MusicBox" -o MusicBox-tmp.dmg
+hdiutil create -size 200m -fs APFS -volname "MusicBox" -o MusicBox-tmp.dmg
 hdiutil attach MusicBox-tmp.dmg -noverify -mountpoint /Volumes/MusicBox
 
 cp -r ../musicbox.xcarchive/Products/Applications/MusicBox.app /Volumes/MusicBox/
