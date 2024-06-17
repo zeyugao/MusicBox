@@ -411,20 +411,30 @@ struct PlayListView: View {
         isLoading = true
         defer { isLoading = false }
         if let metadata = await loadMetadata(url: url) {
-            if let privateSongId = await CloudMusicApi().cloud(
-                filePath: url,
-                songName: metadata.title,
-                artist: metadata.artist,
-                album: metadata.album
-            ) {
-                await CloudMusicApi().cloud_match(
-                    userId: userInfo.profile?.userId ?? 0,
-                    songId: privateSongId,
-                    adjustSongId: songId
-                )
-                updatePlaylist()
-                return
+            do {
+                if let privateSongId = try await CloudMusicApi().cloud(
+                    filePath: url,
+                    songName: metadata.title,
+                    artist: metadata.artist,
+                    album: metadata.album
+                ) {
+                    await CloudMusicApi().cloud_match(
+                        userId: userInfo.profile?.userId ?? 0,
+                        songId: privateSongId,
+                        adjustSongId: songId
+                    )
+                    updatePlaylist(force: true)
+                    return
+                } else {
+                    AlertModel.showAlert("Failed to upload music")
+                }
+            } catch let error as RequestError {
+                AlertModel.showAlert(error.localizedDescription)
+            } catch {
+                AlertModel.showAlert(error.localizedDescription)
             }
+        } else {
+            AlertModel.showAlert("Failed to load metadata for \(url)")
         }
     }
 

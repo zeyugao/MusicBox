@@ -766,14 +766,13 @@ class CloudMusicApi {
         }
     }
 
-    func cloud(filePath: URL, songName: String?, artist: String?, album: String?) async
+    func cloud(filePath: URL, songName: String?, artist: String?, album: String?) async throws
         -> UInt64?
     {
         guard
             let data = try? Data(contentsOf: filePath).base64EncodedString()
         else {
-            print("cloud failed to read file")
-            return nil
+            throw RequestError.Request("cloud failed to read file")
         }
 
         let filename = filePath.lastPathComponent
@@ -794,8 +793,7 @@ class CloudMusicApi {
             let res = try? await doRequest(
                 memberName: "cloud", data: p)
         else {
-            print("cloud failed")
-            return nil
+            throw RequestError.Request("Make request failed")
         }
 
         struct PrivateCloud: Decodable {
@@ -809,7 +807,17 @@ class CloudMusicApi {
         if let parsed = res.asType(Result.self) {
             return parsed.privateCloud.songId
         }
-        return nil
+        
+        struct ErrorResult: Decodable {
+            let code: Int
+            let msg: String
+        }
+        
+        if let parsed = res.asType(ErrorResult.self) {
+            throw RequestError.errorCode((parsed.code, parsed.msg))
+        }
+        
+        throw RequestError.Request("\(res.asAny() ?? "No Data")")
     }
 
     func cloud_match(userId: UInt64, songId: UInt64, adjustSongId: UInt64) async {
