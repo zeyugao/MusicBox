@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		2D01B1372C0A1515004E6102 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2D01B1362C0A1515004E6102 /* Sparkle */; };
+		2D25E3C92C593F1A004BBA33 /* QtGui.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D25E3C82C593F1A004BBA33 /* QtGui.framework */; };
+		2D25E3CA2C593F1A004BBA33 /* QtGui.framework in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2D25E3C82C593F1A004BBA33 /* QtGui.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		2D25E3CC2C593F55004BBA33 /* QtDBus.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D25E3CB2C593F55004BBA33 /* QtDBus.framework */; };
+		2D25E3CD2C593F55004BBA33 /* QtDBus.framework in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2D25E3CB2C593F55004BBA33 /* QtDBus.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		2D2800942BCE1F20007A55D5 /* MusicBoxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800932BCE1F20007A55D5 /* MusicBoxApp.swift */; };
 		2D2800962BCE1F20007A55D5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2800952BCE1F20007A55D5 /* ContentView.swift */; };
 		2D2800982BCE1F21007A55D5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2D2800972BCE1F21007A55D5 /* Assets.xcassets */; };
@@ -56,11 +60,13 @@
 			dstSubfolderSpec = 10;
 			files = (
 				2DFB58DD2BF1B90000D488F4 /* QtNetwork.framework in Embed Libraries */,
+				2D25E3CA2C593F1A004BBA33 /* QtGui.framework in Embed Libraries */,
 				2DFB58E12BF24D7600D488F4 /* libssl.1.1.dylib in Embed Libraries */,
 				2DC91F9A2C086B130052797A /* QtCore5Compat.framework in Embed Libraries */,
 				2DFB58DA2BF1B8EC00D488F4 /* QtCore.framework in Embed Libraries */,
 				2DFB58E32BF24D7600D488F4 /* libcrypto.1.1.dylib in Embed Libraries */,
 				2D3A45912BE3C3A6006CD909 /* QCloudMusicApi.dylib in Embed Libraries */,
+				2D25E3CD2C593F55004BBA33 /* QtDBus.framework in Embed Libraries */,
 			);
 			name = "Embed Libraries";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -82,6 +88,8 @@
 
 /* Begin PBXFileReference section */
 		2D01B1382C0A19A3004E6102 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2D25E3C82C593F1A004BBA33 /* QtGui.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtGui.framework; path = ../Qt/6.7.0/macos/lib/QtGui.framework; sourceTree = "<group>"; };
+		2D25E3CB2C593F55004BBA33 /* QtDBus.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QtDBus.framework; path = ../Qt/6.7.0/macos/lib/QtDBus.framework; sourceTree = "<group>"; };
 		2D2800902BCE1F20007A55D5 /* MusicBox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicBox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D2800932BCE1F20007A55D5 /* MusicBoxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBoxApp.swift; sourceTree = "<group>"; };
 		2D2800952BCE1F20007A55D5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -126,9 +134,11 @@
 			files = (
 				2D01B1372C0A1515004E6102 /* Sparkle in Frameworks */,
 				2DFB58DC2BF1B90000D488F4 /* QtNetwork.framework in Frameworks */,
+				2D25E3CC2C593F55004BBA33 /* QtDBus.framework in Frameworks */,
 				2DFB58E02BF24D7600D488F4 /* libssl.1.1.dylib in Frameworks */,
 				2DC91F992C086B130052797A /* QtCore5Compat.framework in Frameworks */,
 				2DFB58D92BF1B8EC00D488F4 /* QtCore.framework in Frameworks */,
+				2D25E3C92C593F1A004BBA33 /* QtGui.framework in Frameworks */,
 				2DFB58E22BF24D7600D488F4 /* libcrypto.1.1.dylib in Frameworks */,
 				2D3A45902BE3C3A6006CD909 /* QCloudMusicApi.dylib in Frameworks */,
 			);
@@ -187,6 +197,8 @@
 		2D2800A42BCFD231007A55D5 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				2D25E3CB2C593F55004BBA33 /* QtDBus.framework */,
+				2D25E3C82C593F1A004BBA33 /* QtGui.framework */,
 				2DC91F982C086B130052797A /* QtCore5Compat.framework */,
 				2DFB58DF2BF24D7600D488F4 /* libcrypto.1.1.dylib */,
 				2DFB58DE2BF24D7600D488F4 /* libssl.1.1.dylib */,

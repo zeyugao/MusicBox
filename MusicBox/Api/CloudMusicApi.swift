@@ -711,26 +711,15 @@ class CloudMusicApi {
     }
 
     func scrobble(song: Song, playedTime: Int? = nil) async {
-        let req = [
-            [
-                "id": song.id,
-                "artistid": song.ar.first?.id ?? 0,
-                "sourceId": song.al.id,
-                "fee": song.fee.rawValue,
-                "time": playedTime ?? Int(song.dt / 1000),
-                "bitrate": Double(song.getHighestQuality()?.br ?? 0) / 1000.0,
-                "seq": seq,
-                "mspm": mspm,
-                "sessionid": 3333,
-                "timestamp": Int(Date().timeIntervalSince1970),
-            ]
-        ]
         guard
             let _ = try? await doRequest(
-                memberName: "scrobble_pc",
+                memberName: "scrobble",
                 data: [
-                    "actions": req
-                ])
+                    "id": song.id,
+                    "sourceid": song.al.id,
+                    "time": playedTime ?? Int(song.dt / 1000),
+                ]
+            )
         else {
             print("scrobble failed")
             return
