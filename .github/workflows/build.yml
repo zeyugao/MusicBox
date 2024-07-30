@@ -40,7 +40,7 @@ jobs:
           && cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_PREFIX_PATH=$(pwd)/../Qt/6.7.0/macos/lib/cmake -GXcode -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
           && cd build \
           && xcodebuild -project QCloudMusicApiProject.xcodeproj -target QCloudMusicApi build -configuration ${{ env.BUILD_TYPE }} ONLY_ACTIVE_ARCH=NO \
-          && ln -s ${{ env.BUILD_TYPE }}/bin bin
+          && ln -s ${{ env.BUILD_TYPE }}/${{ env.BUILD_TYPE }} bin
       - name: Build
         run: |
           xcodebuild -project MusicBox.xcodeproj -scheme MusicBox build -configuration ${{ env.BUILD_TYPE }} CONFIGURATION_BUILD_DIR=$(pwd)/build CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM="" ONLY_ACTIVE_ARCH=NO \
