@@ -10,7 +10,7 @@ import SwiftUI
 
 struct LyricView: View {
     var lyric: [CloudMusicApi.LyricLine]
-    @EnvironmentObject var playController: PlayController
+    @EnvironmentObject var playStatus: PlayStatus
     @Binding var hasRoma: Bool
 
     @AppStorage("showRoma") var showRoma: Bool = false
@@ -29,7 +29,7 @@ struct LyricView: View {
                         lyric.indices, id: \.self
                     ) { index in
                         let line = lyric[index]
-                        let currentPlaying = playController.currentLyricIndex == index
+                        let currentPlaying = playStatus.currentLyricIndex == index
 
                         VStack(alignment: .leading) {
                             if showTimestamp {
@@ -72,7 +72,7 @@ struct LyricView: View {
                     }
                 }
                 .padding(.vertical)
-                .onChange(of: playController.currentLyricIndex) { _, newIndex in
+                .onChange(of: playStatus.currentLyricIndex) { _, newIndex in
                     scrollToIdx(newIndex ?? 0)
                 }
             }
@@ -82,14 +82,14 @@ struct LyricView: View {
                         Image(systemName: "clock")
                     }
                     .onChange(of: showTimestamp) {
-                        scrollToIdx(playController.currentLyricIndex ?? 0)
+                        scrollToIdx(playStatus.currentLyricIndex ?? 0)
                     }
                     if hasRoma {
                         Toggle(isOn: $showRoma) {
                             Image(systemName: "quote.bubble")
                         }
                         .onChange(of: showRoma) {
-                            scrollToIdx(playController.currentLyricIndex ?? 0)
+                            scrollToIdx(playStatus.currentLyricIndex ?? 0)
                         }
                     }
                 }
@@ -100,25 +100,25 @@ struct LyricView: View {
 
 struct PlayingDetailView: View {
     @State private var lyric: [CloudMusicApi.LyricLine]?
-    @EnvironmentObject var playController: PlayController
+    @EnvironmentObject var playStatus: PlayStatus
     @State var hasRoma: Bool = false
 
     func updateLyric() async {
-        if let currentId = playController.currentItem?.id,
+        if let currentId = playStatus.currentItem?.id,
             let lyric = await CloudMusicApi(cacheTtl: -1).lyric_new(id: currentId)
         {
             self.hasRoma = !lyric.romalrc.lyric.isEmpty
             let lyric = lyric.merge()
             self.lyric = lyric
-            self.playController.lyricTimeline = lyric.map { Int($0.time * 10) }
-            self.playController.resetLyricIndex()
+            self.playStatus.lyricTimeline = lyric.map { Int($0.time * 10) }
+            self.playStatus.resetLyricIndex()
         }
     }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                if let item = playController.currentItem {
+                if let item = playStatus.currentItem {
                     HStack(alignment: .center) {
                         VStack {
                             if let artworkUrl = item.artworkUrl {
@@ -159,12 +159,12 @@ struct PlayingDetailView: View {
             }.task {
                 await updateLyric()
             }
-            .onChange(of: playController.currentItem) {
+            .onChange(of: playStatus.currentItem) {
                 Task {
                     await updateLyric()
                 }
             }
-            .navigationTitle(playController.currentItem?.title ?? "Playing")
+            .navigationTitle(playStatus.currentItem?.title ?? "Playing")
         }
     }
 }

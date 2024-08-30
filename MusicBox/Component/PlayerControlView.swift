@@ -34,7 +34,7 @@ struct PlayControlButton: View {
 }
 
 struct PlaySliderView: View {
-    @EnvironmentObject var playController: PlayController
+    @EnvironmentObject var playStatus: PlayStatus
     @State private var isEditing: Bool = false
     @State private var targetValue: Double = 0.0
 
@@ -42,49 +42,50 @@ struct PlaySliderView: View {
         Slider(
             value: Binding(
                 get: {
-                    guard !self.playController.isLoading else {
-                        return self.playController.playedSecond
+                    guard !self.playStatus.isLoading else {
+                        return self.playStatus.playedSecond
                     }
 
                     if self.isEditing {
                         return targetValue
                     } else {
-                        return self.playController.playedSecond
+                        return self.playStatus.playedSecond
                     }
                 },
                 set: {
                     newValue in
-                    guard !self.playController.isLoading else { return }
+                    guard !self.playStatus.isLoading else { return }
 
                     if isEditing {
                         targetValue = newValue
                     } else {
                         Task {
-                            await self.playController.seekToOffset(offset: newValue)
+                            await self.playStatus.seekToOffset(offset: newValue)
                         }
                     }
                 }
             ),
-            in: 0...self.playController.duration
+            in: 0...self.playStatus.duration
         ) {
             editing in
-            guard !self.playController.isLoading else { return }
+            guard !self.playStatus.isLoading else { return }
 
             if !editing && self.isEditing != editing {
                 Task {
-                    await self.playController.seekToOffset(offset: targetValue)
+                    await self.playStatus.seekToOffset(offset: targetValue)
                 }
             }
             self.isEditing = editing
         }
-        .disabled(self.playController.isLoading)
+        .disabled(self.playStatus.isLoading)
         .controlSize(.mini)
         .tint(.primary)
     }
 }
 
 struct PlayerControlView: View {
-    @EnvironmentObject var playController: PlayController
+    @EnvironmentObject var playStatus: PlayStatus
+    @EnvironmentObject var playlistStatus: PlaylistStatus
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject private var playingDetailModel: PlayingDetailModel
     @State var isHovered: Bool = false
@@ -162,7 +163,7 @@ struct PlayerControlView: View {
 
                     HStack(spacing: 24) {
                         Button(action: {
-                            Task { await playController.previousTrack() }
+                            Task { await playlistStatus.previousTrack() }
                         }) {
                             Image(systemName: "backward.fill")
                                 .resizable()
@@ -170,16 +171,18 @@ struct PlayerControlView: View {
                         }
                         .buttonStyle(PlayControlButtonStyle())
 
-                        if !playController.readyToPlay {
+                        if !playStatus.readyToPlay {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle())
                                 .frame(width: 20, height: 20)
                         } else {
                             Button(action: {
-                                Task { await playController.togglePlayPause() }
+                                Task {
+                                    await playStatus.togglePlayPause()
+                                }
                             }) {
                                 Image(
-                                    systemName: playController.isPlaying
+                                    systemName: playStatus.playerState == .playing
                                         ? "pause.fill" : "play.fill"
                                 )
                                 .resizable()
@@ -191,7 +194,7 @@ struct PlayerControlView: View {
                         }
 
                         Button(action: {
-                            Task { await playController.nextTrack() }
+                            Task { await playlistStatus.nextTrack() }
                         }) {
                             Image(systemName: "forward.fill")
                                 .resizable()
@@ -205,26 +208,26 @@ struct PlayerControlView: View {
                 Spacer()
 
                 VStack {
-                    Text("\(playController.currentItem?.title ?? "Title")")
+                    Text("\(playlistStatus.currentItem?.title ?? "Title")")
                         .font(.system(size: 12))
                         .lineLimit(1)
                         .padding(.bottom, 1)
-                    Text("\(playController.currentItem?.artist ?? "Artists")")
+                    Text("\(playlistStatus.currentItem?.artist ?? "Artists")")
                         .font(.system(size: 12))
                         .lineLimit(1)
                         .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
                         .padding(.bottom, -2)
                     HStack {
-                        Text(secondsToMinutesAndSeconds(seconds: playController.playedSecond))
+                        Text(secondsToMinutesAndSeconds(seconds: playStatus.playedSecond))
                             .font(.system(size: 12))
                             .lineLimit(1)
                             .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
                             .frame(width: 40)
 
                         PlaySliderView()
-                            .environmentObject(playController)
+                            .environmentObject(playStatus)
 
-                        Text(secondsToMinutesAndSeconds(seconds: playController.duration))
+                        Text(secondsToMinutesAndSeconds(seconds: playStatus.duration))
                             .font(.system(size: 12))
                             .lineLimit(1)
                             .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
@@ -236,7 +239,7 @@ struct PlayerControlView: View {
 
                 Spacer()
 
-                let currentId = playController.currentItem?.id ?? 0
+                let currentId = playlistStatus.currentItem?.id ?? 0
                 let favored = (userInfo.likelist.contains(currentId))
                 Button(action: {
                     guard currentId != 0 else { return }
@@ -259,12 +262,12 @@ struct PlayerControlView: View {
                 .buttonStyle(PlayControlButtonStyle())
 
                 Button(action: {
-                    playController.switchToNextLoopMode()
+                    playlistStatus.switchToNextLoopMode()
                 }) {
                     Image(
-                        systemName: playController.loopMode == .once
+                        systemName: playlistStatus.loopMode == .once
                             ? "repeat.1"
-                            : (playController.loopMode == .sequence ? "repeat" : "shuffle")
+                            : (playlistStatus.loopMode == .sequence ? "repeat" : "shuffle")
                     )
                     .resizable()
                     .frame(width: 16, height: 16)
@@ -278,10 +281,10 @@ struct PlayerControlView: View {
                         Slider(
                             value: Binding(
                                 get: {
-                                    playController.volume
+                                    playStatus.volume
                                 },
                                 set: {
-                                    playController.volume = $0
+                                    playStatus.volume = $0
                                 }
                             ),
                             in: 0...1
@@ -299,7 +302,12 @@ struct PlayerControlView: View {
                 .padding(.trailing, 32)
 
             }
-            .onChange(of: playController.currentItem) { _, item in
+            .onAppear {
+                Task {
+                    artworkUrl = await playlistStatus.currentItem?.getArtworkUrl()
+                }
+            }
+            .onChange(of: playlistStatus.currentItem) { _, item in
                 if let item = item {
                     Task {
                         artworkUrl = await item.getArtworkUrl()

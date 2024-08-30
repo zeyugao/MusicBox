@@ -23,7 +23,7 @@ func formatCMTime(_ time: CMTime) -> String {
 }
 
 struct NowPlayingView: View {
-    @EnvironmentObject var playController: PlayController
+    @EnvironmentObject var playController: PlaylistStatus
     @State private var playlist: [PlaylistItem] = []
 
     var body: some View {

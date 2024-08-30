@@ -88,7 +88,7 @@ struct ExploreView: View {
 
     @Binding private var navigationPath: NavigationPath
 
-    @EnvironmentObject var playController: PlayController
+    @EnvironmentObject var playController: PlaylistStatus
     @EnvironmentObject private var userInfo: UserInfo
 
     init(navigationPath: Binding<NavigationPath>) {

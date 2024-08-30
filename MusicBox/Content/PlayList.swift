@@ -161,7 +161,7 @@ func loadItem(song: CloudMusicApi.Song) -> PlaylistItem {
 }
 
 struct TableContextMenu: View {
-    @EnvironmentObject var playController: PlayController
+    @EnvironmentObject var playlistStatus: PlaylistStatus
 
     var song: CloudMusicApi.Song
 
@@ -173,13 +173,12 @@ struct TableContextMenu: View {
         Button("Play") {
             Task {
                 let newItem = loadItem(song: song)
-                let _ = await playController.addItemAndSeekTo(newItem)
-                await playController.startPlaying()
+                let _ = await playlistStatus.addItemAndSeekTo(newItem, shouldPlay: true)
             }
         }
         Button("Add to Now Playing") {
             let newItem = loadItem(song: song)
-            let _ = playController.addItemToPlaylist(newItem)
+            let _ = playlistStatus.addItemToPlaylist(newItem)
         }
     }
 }
@@ -262,7 +261,7 @@ struct ListPlaylistDialogView: View {
 }
 
 struct PlayAllButton: View {
-    @EnvironmentObject var playController: PlayController
+    @EnvironmentObject var playlistStatus: PlaylistStatus
 
     var songs: [CloudMusicApi.Song]
 
@@ -272,8 +271,8 @@ struct PlayAllButton: View {
                 let newItems = songs.map { song in
                     loadItem(song: song)
                 }
-                let _ = await playController.replacePlaylist(newItems, continuePlaying: false)
-                await playController.startPlaying()
+                let _ = await playlistStatus.replacePlaylist(
+                    newItems, continuePlaying: true, shouldSaveState: true)
             }
         }) {
             Image(systemName: "play")
@@ -285,7 +284,8 @@ struct PlayAllButton: View {
                 let newItems = songs.map { song in
                     loadItem(song: song)
                 }
-                let _ = await playController.addItemsToPlaylist(newItems)
+                let _ = await playlistStatus.addItemsToPlaylist(
+                    newItems, continuePlaying: false, shouldSaveState: true)
             }
         }) {
             Image(systemName: "plus")

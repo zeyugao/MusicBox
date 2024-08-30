@@ -225,7 +225,8 @@ class AlertModel: ObservableObject {
 }
 
 struct ContentView: View {
-    @StateObject var playController = PlayController()
+    @StateObject var playlistStatus = PlaylistStatus()
+    @StateObject var playStatus = PlayStatus()
     @State private var selection: NavigationScreen = .explore
     @StateObject private var userInfo = UserInfo()
     @StateObject private var playingDetailModel = PlayingDetailModel()
@@ -283,39 +284,39 @@ struct ContentView: View {
                         case .account:
                             AccountView()
                                 .environmentObject(userInfo)
-                                .environmentObject(playController)
+                                .environmentObject(playlistStatus)
                                 .navigationTitle("Account")
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
-                                        .environmentObject(playController)
+                                        .environmentObject(playStatus)
                                 }
                         case .nowPlaying:
                             NowPlayingView()
-                                .environmentObject(playController)
+                                .environmentObject(playlistStatus)
                                 .navigationTitle("Now Playing")
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
-                                        .environmentObject(playController)
+                                        .environmentObject(playStatus)
                                 }
                         case .explore:
                             ExploreView(navigationPath: $navigationPath)
                                 .environmentObject(userInfo)
-                                .environmentObject(playController)
+                                .environmentObject(playlistStatus)
                                 .navigationTitle("Explore")
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
-                                        .environmentObject(playController)
+                                        .environmentObject(playStatus)
                                 }
                         case let .playlist(playlist):
                             let metadata = PlaylistMetadata.netease(
                                 playlist.id, playlist.name)
                             PlayListView(playlistMetadata: metadata)
                                 .environmentObject(userInfo)
-                                .environmentObject(playController)
+                                .environmentObject(playlistStatus)
                                 .navigationTitle(playlist.name)
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
-                                        .environmentObject(playController)
+                                        .environmentObject(playStatus)
                                 }
                         }
                     }
@@ -326,7 +327,8 @@ struct ContentView: View {
                 .padding(.bottom, 80)
 
                 PlayerControlView(navigationPath: $navigationPath)
-                    .environmentObject(playController)
+                    .environmentObject(playlistStatus)
+                    .environmentObject(playStatus)
                     .environmentObject(userInfo)
                     .environmentObject(playingDetailModel)
                     .frame(height: 80)
@@ -336,7 +338,10 @@ struct ContentView: View {
         )
         .task {
             async let initUserDataTask: () = initUserData(userInfo: userInfo)
-            async let loadStateTask: () = playController.loadState(continuePlaying: false)
+            async let loadStateTask: () = {
+                await playlistStatus.loadState()
+                await playStatus.loadState()
+            }()
 
             await initUserDataTask
             await loadStateTask
