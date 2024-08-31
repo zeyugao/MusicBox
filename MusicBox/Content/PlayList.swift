@@ -160,29 +160,6 @@ func loadItem(song: CloudMusicApi.Song) -> PlaylistItem {
     return newItem
 }
 
-struct TableContextMenu: View {
-    @EnvironmentObject var playlistStatus: PlaylistStatus
-
-    var song: CloudMusicApi.Song
-
-    init(song: CloudMusicApi.Song) {
-        self.song = song
-    }
-
-    var body: some View {
-        Button("Play") {
-            Task {
-                let newItem = loadItem(song: song)
-                let _ = await playlistStatus.addItemAndSeekTo(newItem, shouldPlay: true)
-            }
-        }
-        Button("Add to Now Playing") {
-            let newItem = loadItem(song: song)
-            let _ = playlistStatus.addItemToPlaylist(newItem)
-        }
-    }
-}
-
 func likeSong(
     likelist: inout Set<UInt64>, songId: UInt64, favored: Bool
 )
@@ -257,40 +234,6 @@ struct ListPlaylistDialogView: View {
                 dismiss()
             }
         }.padding()
-    }
-}
-
-struct PlayAllButton: View {
-    @EnvironmentObject var playlistStatus: PlaylistStatus
-
-    var songs: [CloudMusicApi.Song]
-
-    var body: some View {
-        Button(action: {
-            Task {
-                let newItems = songs.map { song in
-                    loadItem(song: song)
-                }
-                let _ = await playlistStatus.replacePlaylist(
-                    newItems, continuePlaying: true, shouldSaveState: true)
-            }
-        }) {
-            Image(systemName: "play")
-        }
-        .help("Play All")
-
-        Button(action: {
-            Task {
-                let newItems = songs.map { song in
-                    loadItem(song: song)
-                }
-                let _ = await playlistStatus.addItemsToPlaylist(
-                    newItems, continuePlaying: false, shouldSaveState: true)
-            }
-        }) {
-            Image(systemName: "plus")
-        }
-        .help("Add All to Playlist")
     }
 }
 
@@ -394,6 +337,7 @@ struct PlayListView: View {
     @StateObject var model = PlaylistDetailModel()
 
     @EnvironmentObject private var userInfo: UserInfo
+    @EnvironmentObject var playlistStatus: PlaylistStatus
 
     @State private var selectedItem: CloudMusicApi.Song.ID?
     @State private var sortOrder = [KeyPathComparator<CloudMusicApi.Song>]()
@@ -540,7 +484,18 @@ struct PlayListView: View {
                     ForEach(songs) { song in
                         TableRow(song)
                             .contextMenu {
-                                TableContextMenu(song: song)
+                                Button("Play") {
+                                    Task {
+                                        let newItem = loadItem(song: song)
+                                        let _ = await playlistStatus.addItemAndSeekTo(
+                                            newItem, shouldPlay: true)
+                                    }
+                                }
+
+                                Button("Add to Now Playing") {
+                                    let newItem = loadItem(song: song)
+                                    let _ = playlistStatus.addItemToPlaylist(newItem)
+                                }
 
                                 Button("Add to Playlist") {
                                     selectedSongToAdd = song
@@ -586,6 +541,9 @@ struct PlayListView: View {
                     }
                 }
             }
+            .onTapGesture(count: 2) { location in
+                print("location: \(location)")
+            }
             .onChange(of: sortOrder) { prevSortOrder, sortOrder in
                 if prevSortOrder.count >= 1, self.sortOrder.count >= 1,
                     prevSortOrder[0].keyPath == self.sortOrder[0].keyPath,
@@ -626,7 +584,34 @@ struct PlayListView: View {
             .searchable(text: $searchText, prompt: "Search in Playlist")
             .toolbar {
                 ToolbarItemGroup {
-                    PlayAllButton(songs: model.songs ?? [])
+                    let songs = model.songs ?? []
+
+                    Button(action: {
+                        Task {
+                            let newItems = songs.map { song in
+                                loadItem(song: song)
+                            }
+                            let _ = await playlistStatus.replacePlaylist(
+                                newItems, continuePlaying: true, shouldSaveState: true)
+                        }
+                    }) {
+                        Image(systemName: "play")
+                    }
+                    .help("Play All")
+
+                    Button(action: {
+                        Task {
+                            let newItems = songs.map { song in
+                                loadItem(song: song)
+                            }
+                            let _ = await playlistStatus.addItemsToPlaylist(
+                                newItems, continuePlaying: false, shouldSaveState: true)
+                        }
+                    }) {
+                        Image(systemName: "plus")
+                    }
+                    .help("Add All to Playlist")
+
                     DownloadAllButton(songs: model.songs ?? [])
 
                     if case .netease = playlistMetadata {
