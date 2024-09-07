@@ -7,6 +7,7 @@ cd "$( dirname "${BASH_SOURCE[0]}" )/.." || exit 1
 xcodebuild archive -project MusicBox.xcodeproj -scheme MusicBox -archivePath MusicBox ONLY_ACTIVE_ARCH=NO
 
 cd release
+hdiutil detach /Volumes/MusicBox || true
 rm -f *.dmg
 hdiutil create -size 200m -fs APFS -volname "MusicBox" -o MusicBox-tmp.dmg
 hdiutil attach MusicBox-tmp.dmg -noverify -mountpoint /Volumes/MusicBox
