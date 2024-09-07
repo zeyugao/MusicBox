@@ -59,7 +59,15 @@ extension URL {
 
 extension Data {
     func asType<T: Decodable>(_ type: T.Type) -> T? {
-        return try? JSONDecoder().decode(type, from: self)
+        do {
+            return try JSONDecoder().decode(type, from: self)
+        } catch {
+            let callStack = Thread.callStackSymbols.joined(separator: "\n")
+            let errorMessage =
+                "Error: \(error.localizedDescription)\n\n\(callStack)"
+            AlertModel.showAlert("Error", errorMessage)
+            return nil
+        }
     }
 
     func asAny() -> Any? {
