@@ -209,12 +209,6 @@ class CloudMusicApi {
         case trial = 8  // 非会员可免费播放低音质，会员可播放高音质及下载
     }
 
-    enum OriginCoverType: Int, Codable {
-        case unknown = 0
-        case origin = 1
-        case cover = 2
-    }
-
     struct Song: Codable, Identifiable, Hashable, Equatable {
         static func == (lhs: CloudMusicApi.Song, rhs: CloudMusicApi.Song) -> Bool {
             return lhs.id == rhs.id
@@ -234,7 +228,7 @@ class CloudMusicApi {
         let tns: [String]?
 
         let fee: Fee
-        let originCoverType: OriginCoverType
+        let originCoverType: Int
 
         let mv: UInt64  // MV id
 
@@ -470,7 +464,6 @@ class CloudMusicApi {
         struct Result: Decodable {
             let playlist: [PlayListItem]
             let more: Bool
-            let version: String
         }
 
         // TODO: Fix more = true
@@ -971,7 +964,7 @@ class CloudMusicApi {
                     alia: alias,
                     tns: nil,
                     fee: fee,
-                    originCoverType: .unknown,
+                    originCoverType: 0,
                     mv: mvid,
                     dt: duration,
                     hr: nil, sq: nil, h: nil, m: nil, l: nil,
