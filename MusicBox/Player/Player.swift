@@ -465,7 +465,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     }
 
     func performRemoteCommand(_ command: RemoteCommand) {
-        runBlocking {
+        Task {
             switch command {
             case .play:
                 startPlay()
