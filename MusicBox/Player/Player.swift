@@ -423,6 +423,49 @@ class PlayStatus: ObservableObject {
     }
 }
 
+extension PlayStatus: CachingPlayerItemDelegate {
+    func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
+        DispatchQueue.main.async {
+            self.readyToPlay = true
+        }
+        print("Caching player item ready to play.")
+    }
+
+    func playerItemDidFailToPlay(_ playerItem: CachingPlayerItem, withError error: Error?) {
+        let message = "playerItemDidFailToPlay: \(error?.localizedDescription ?? "No reason")"
+        print(message)
+        AlertModal.showAlert(message)
+        self.nextTrack()
+    }
+
+    func playerItemPlaybackStalled(_ playerItem: CachingPlayerItem) {
+        print("Caching player item stalled.")
+    }
+
+    func playerItem(
+        _ playerItem: CachingPlayerItem, didDownloadBytesSoFar bytesDownloaded: Int,
+        outOf bytesExpected: Int
+    ) {
+        if let _ = loadingProgress {
+            setLoadingProgress(Double(bytesDownloaded) / Double(bytesExpected))
+        }
+    }
+
+    func playerItem(_ playerItem: CachingPlayerItem, didFinishDownloadingFileAt filePath: String) {
+        setLoadingProgress(nil)
+        print("Caching player item file downloaded.")
+    }
+
+    func playerItem(_ playerItem: CachingPlayerItem, downloadingFailedWith error: Error) {
+        setLoadingProgress(nil)
+        let message = "Caching player item file download failed with error: \(error.localizedDescription)."
+        print(message)
+        AlertModal.showAlert(message)
+        nextTrack()
+    }
+}
+
+
 class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     private let savedCurrentPlaylistKey = "CurrentPlaylist"
     private let savedCurrentPlayingItemIndexKey = "CurrentPlayingItemIndex"
@@ -767,44 +810,5 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         }
 
         saveState()
-    }
-}
-
-extension PlayStatus: CachingPlayerItemDelegate {
-    func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
-        DispatchQueue.main.async {
-            self.readyToPlay = true
-        }
-        print("Caching player item ready to play.")
-    }
-
-    func playerItemDidFailToPlay(_ playerItem: CachingPlayerItem, withError error: Error?) {
-        print("playerItemDidFailToPlay", error?.localizedDescription ?? "")
-        Task {
-            self.nextTrack()
-        }
-    }
-
-    func playerItemPlaybackStalled(_ playerItem: CachingPlayerItem) {
-        print("Caching player item stalled.")
-    }
-
-    func playerItem(
-        _ playerItem: CachingPlayerItem, didDownloadBytesSoFar bytesDownloaded: Int,
-        outOf bytesExpected: Int
-    ) {
-        if let _ = loadingProgress {
-            setLoadingProgress(Double(bytesDownloaded) / Double(bytesExpected))
-        }
-    }
-
-    func playerItem(_ playerItem: CachingPlayerItem, didFinishDownloadingFileAt filePath: String) {
-        setLoadingProgress(nil)
-        print("Caching player item file downloaded.")
-    }
-
-    func playerItem(_ playerItem: CachingPlayerItem, downloadingFailedWith error: Error) {
-        setLoadingProgress(nil)
-        print("Caching player item file download failed with error: \(error.localizedDescription).")
     }
 }

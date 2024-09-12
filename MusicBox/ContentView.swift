@@ -185,7 +185,7 @@ class PlayingDetailModel: ObservableObject {
     }
 }
 
-class AlertModel: ObservableObject {
+class AlertModal: ObservableObject {
     @Published var text: String = ""
     @Published var title: String = ""
 
@@ -193,7 +193,7 @@ class AlertModel: ObservableObject {
 
     static func showAlert(_ title: String, _ text: String) {
         NotificationCenter.default.post(
-            name: AlertModel.showAlertName,
+            name: AlertModal.showAlertName,
             object: nil,
             userInfo: [
                 "title": title,
@@ -208,7 +208,7 @@ class AlertModel: ObservableObject {
 
     init() {
         NotificationCenter.default.addObserver(
-            forName: AlertModel.showAlertName,
+            forName: AlertModal.showAlertName,
             object: nil,
             queue: nil
         ) { [weak self] notification in
@@ -231,7 +231,7 @@ struct ContentView: View {
     @StateObject private var userInfo = UserInfo()
     @StateObject private var playingDetailModel = PlayingDetailModel()
 
-    @StateObject private var alertModel = AlertModel()
+    @StateObject private var alertModel = AlertModal()
 
     @State private var navigationPath = NavigationPath()
 

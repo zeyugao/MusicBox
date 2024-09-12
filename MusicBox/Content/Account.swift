@@ -145,7 +145,7 @@ struct LoginView: View {
                         let res = await CloudMusicApi().login_cellphone(
                             phone: username, password: password)
                         if let error = res {
-                            AlertModel.showAlert("Login failed. Please use QR Login.", error)
+                            AlertModal.showAlert("Login failed. Please use QR Login.", error)
                         } else {
                             await initUserData(userInfo: userInfo)
                         }
@@ -245,12 +245,12 @@ struct AccountView: View {
                                 } catch {
                                     print("Error when deleting \(tmpFolderPath): \(error)")
 
-                                    AlertModel.showAlert("Error", "Clean failed: \(error)")
+                                    AlertModal.showAlert("Error", "Clean failed: \(error)")
 
                                     return
                                 }
                             }
-                            AlertModel.showAlert("Info", "Clean successful")
+                            AlertModal.showAlert("Info", "Clean successful")
                         }
                     }) {
                         Text("Clean cache")

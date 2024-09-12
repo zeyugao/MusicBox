@@ -267,12 +267,8 @@ class PlaylistItem: Identifiable, Codable, Equatable {
     }
 
     func getUrl() async -> URL? {
-        if let url = self.url {
-            if isLocalURL(url) {
-                return self.url
-            } else {
-                return url
-            }
+        if let url = self.url, isLocalURL(url) {
+            return self.url
         } else {
             if let cachedFile = getCachedMusicFile(id: id) {
                 self.url = cachedFile
@@ -285,8 +281,7 @@ class PlaylistItem: Identifiable, Codable, Equatable {
                     self.ext = songData.encodeType
                 }
                 if let url = URL(string: songData.url.https) {
-                    self.url = url
-                    return self.url
+                    return url
                 }
             }
         }

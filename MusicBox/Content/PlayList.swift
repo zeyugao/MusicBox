@@ -173,9 +173,9 @@ func likeSong(
             likelist.insert(songId)
         }
     } catch let error as RequestError {
-        AlertModel.showAlert(error.localizedDescription)
+        AlertModal.showAlert(error.localizedDescription)
     } catch {
-        AlertModel.showAlert(error.localizedDescription)
+        AlertModal.showAlert(error.localizedDescription)
     }
 }
 
@@ -370,15 +370,15 @@ struct PlayListView: View {
                     updatePlaylist(force: true)
                     return
                 } else {
-                    AlertModel.showAlert("Failed to upload music")
+                    AlertModal.showAlert("Failed to upload music")
                 }
             } catch let error as RequestError {
-                AlertModel.showAlert(error.localizedDescription)
+                AlertModal.showAlert(error.localizedDescription)
             } catch {
-                AlertModel.showAlert(error.localizedDescription)
+                AlertModal.showAlert(error.localizedDescription)
             }
         } else {
-            AlertModel.showAlert("Failed to load metadata for \(url)")
+            AlertModal.showAlert("Failed to load metadata for \(url)")
         }
     }
 
@@ -510,9 +510,9 @@ struct PlayListView: View {
                                                     trackIds: [song.id])
                                                 updatePlaylist()
                                             } catch let error as RequestError {
-                                                AlertModel.showAlert(error.localizedDescription)
+                                                AlertModal.showAlert(error.localizedDescription)
                                             } catch {
-                                                AlertModel.showAlert(error.localizedDescription)
+                                                AlertModal.showAlert(error.localizedDescription)
                                             }
                                         }
                                     }
@@ -572,9 +572,9 @@ struct PlayListView: View {
                                     op: .add, playlistId: selectedPlaylist.id,
                                     trackIds: [selectedSong.id])
                             } catch let error as RequestError {
-                                AlertModel.showAlert(error.localizedDescription)
+                                AlertModal.showAlert(error.localizedDescription)
                             } catch {
-                                AlertModel.showAlert(error.localizedDescription)
+                                AlertModal.showAlert(error.localizedDescription)
                             }
                         }
                     }

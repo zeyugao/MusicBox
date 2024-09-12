@@ -61,7 +61,7 @@ extension Data {
             let callStack = Thread.callStackSymbols.joined(separator: "\n")
             let errorMessage =
                 "Error: \(error.localizedDescription)\n\n\(callStack)"
-            AlertModel.showAlert("Error", errorMessage)
+            AlertModal.showAlert("Error", errorMessage)
             return nil
         }
     }
