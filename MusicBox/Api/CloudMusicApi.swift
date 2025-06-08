@@ -234,13 +234,13 @@ class CloudMusicApi {
 
         let dt: Int64  // 歌曲时长
 
-        let hr: Quality?  // Hi-Res质量文件信息
+        let hr: Quality?  // Hi-Res 质量文件信息
         let sq: Quality?  // 无损质量文件信息
         let h: Quality?  // 高质量文件信息
         let m: Quality?  // 中等质量文件信息
         let l: Quality?  // 低质量文件信息
 
-        let publishTime: Int64  // 毫秒为单位的Unix时间戳
+        let publishTime: Int64  // 毫秒为单位的 Unix 时间戳
 
         let pc: CloudMusic?
 

@@ -76,20 +76,20 @@ class LoginViewModel: ObservableObject {
     var isChecking = false
 
     private func updateLoginMessage(message: String) {
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.loginMessage = message
         }
     }
 
     func fetchQRCode() async {
         do {
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.qrCodeImageURL = nil
                 self.loginMessage = nil
             }
             let keyResponse = try await CloudMusicApi().login_qr_key()
             let url = try await CloudMusicApi().login_qr_create(key: keyResponse)
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.qrCodeImageURL = URL(string: url)
                 self.loginMessage = "等待扫码"
             }

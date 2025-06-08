@@ -59,7 +59,7 @@ class PlayStatus: ObservableObject {
 
     func pausePlay() {
         player.pause()
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.playerState = .paused
         }
         updateCurrentPlaybackInfo()
@@ -72,7 +72,7 @@ class PlayStatus: ObservableObject {
             return
         }
         player.play()
-        DispatchQueue.main.async {
+        await MainActor.run {
             self.playerState = .playing
         }
         updateCurrentPlaybackInfo()
@@ -97,7 +97,7 @@ class PlayStatus: ObservableObject {
             return
         }
 
-        DispatchQueue.main.async {
+        await MainActor.run {
             self.playedSecond = newTime.seconds
         }
 
@@ -115,7 +115,7 @@ class PlayStatus: ObservableObject {
         }
 
         await player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
-        DispatchQueue.main.async {
+        await MainActor.run {
             self.currentLyricIndex = nil
         }
         updateCurrentPlaybackInfo()
@@ -129,7 +129,7 @@ class PlayStatus: ObservableObject {
     }
 
     func updateDuration(duration: Double) {
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.duration = duration
         }
     }
@@ -171,7 +171,7 @@ class PlayStatus: ObservableObject {
             let ext = item.ext
         {
             print("remote url: \(url)")
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.readyToPlay = false
             }
             assert(playedSecond == nil || playedSecond == 0.0)
@@ -213,7 +213,7 @@ class PlayStatus: ObservableObject {
     }
 
     func resetLyricIndex() {
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.currentLyricIndex = self.monotonouslyUpdateLyric(lyricIndex: 0)
         }
     }
@@ -234,7 +234,7 @@ class PlayStatus: ObservableObject {
     }
 
     private func setLoadingProgress(_ progress: Double?) {
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.loadingProgress = progress
             if (progress != nil) != self.isLoading {
                 self.isLoading = progress != nil
@@ -269,7 +269,7 @@ class PlayStatus: ObservableObject {
             [weak self] (player, _) in
             guard player.status == .readyToPlay else { return }
 
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self?.playerState = player.rate.isZero ? .paused : .playing
             }
         }
@@ -280,7 +280,7 @@ class PlayStatus: ObservableObject {
             if !(self?.switchingItem ?? true) && (self?.readyToPlay ?? false) {
                 let newTime = self?.player.currentTime().seconds ?? 0.0
                 if Int(self?.playedSecond ?? 0) != Int(newTime) {
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         self?.playedSecond = newTime
                     }
                     self?.updateCurrentPlaybackInfo()
@@ -303,7 +303,7 @@ class PlayStatus: ObservableObject {
         if let timeObserverToken = periodicTimeObserverToken {
             player.removeTimeObserver(timeObserverToken)
             periodicTimeObserverToken = nil
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.playedSecond = 0
             }
         }
@@ -363,7 +363,7 @@ class PlayStatus: ObservableObject {
                                 }
                             }
                         } else {
-                            DispatchQueue.main.async {
+                            Task { @MainActor in
                                 self.currentItem = nil
                                 self.duration = 0.0
                                 self.playedSecond = 0.0
@@ -427,7 +427,7 @@ class PlayStatus: ObservableObject {
 
 extension PlayStatus: CachingPlayerItemDelegate {
     func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.readyToPlay = true
         }
         print("Caching player item ready to play.")
