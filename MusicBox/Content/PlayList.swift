@@ -41,6 +41,10 @@ enum PlaylistMetadata: Hashable, Equatable {
             return id
         }
     }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
 class PlaylistDetailModel: ObservableObject {

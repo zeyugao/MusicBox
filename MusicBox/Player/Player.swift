@@ -175,10 +175,12 @@ class PlayStatus: ObservableObject {
                 self.readyToPlay = false
             }
             assert(playedSecond == nil || playedSecond == 0.0)
-            let cacheItem = CachingPlayerItem(
+            let cacheItem = await CachingPlayerItem(
                 url: url, saveFilePath: savePath.path, customFileExtension: ext)
             setLoadingProgress(0.0)
-            cacheItem.delegate = self
+            await MainActor.run {
+                cacheItem.delegate = self
+            }
             playerItem = cacheItem
         } else {
             return
