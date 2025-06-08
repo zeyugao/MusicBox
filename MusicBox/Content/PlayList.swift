@@ -70,7 +70,7 @@ class PlaylistDetailModel: ObservableObject {
 
                 if trackIds.count == tracks.count {
                     self.originalSongs = tracks
-                    DispatchQueue.main.async {
+                    await MainActor.run {
                         self.songs = tracks
                     }
                 } else {
@@ -78,7 +78,7 @@ class PlaylistDetailModel: ObservableObject {
                         ids: trackIds)
                     {
                         self.originalSongs = playlist
-                        DispatchQueue.main.async {
+                        await MainActor.run {
                             self.songs = playlist
                         }
                     }
@@ -86,7 +86,7 @@ class PlaylistDetailModel: ObservableObject {
             }
         case .songs(let songs, _, _):
             self.originalSongs = songs
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.songs = songs
             }
         }
@@ -126,7 +126,7 @@ class PlaylistDetailModel: ObservableObject {
             }
             let newSongs = songs
 
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.songs = newSongs
             }
         }
