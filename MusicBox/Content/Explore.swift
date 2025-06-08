@@ -130,8 +130,11 @@ struct ExploreView: View {
                     trackCount: 0
                 )
                 var newRes = [dialyRecommend]
-                if let res = await CloudMusicApi(cacheTtl: 5 * 60).recommend_resource() {
-                    newRes.append(contentsOf: res)
+                // Only attempt to get recommendations if the user is logged in
+                if userInfo.profile != nil {
+                    if let res = await CloudMusicApi(cacheTtl: 5 * 60).recommend_resource() {
+                        newRes.append(contentsOf: res)
+                    }
                 }
                 recommendResource = newRes
             }
