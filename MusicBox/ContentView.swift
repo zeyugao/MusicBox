@@ -210,7 +210,7 @@ class AlertModal: ObservableObject {
         NotificationCenter.default.addObserver(
             forName: AlertModal.showAlertName,
             object: nil,
-            queue: nil
+            queue: OperationQueue.main
         ) { [weak self] notification in
             if let title = notification.userInfo?["title"] as? String {
                 self?.title = title
