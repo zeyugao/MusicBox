@@ -54,14 +54,16 @@ extension URL {
 }
 
 extension Data {
-    func asType<T: Decodable>(_ type: T.Type) -> T? {
+    func asType<T: Decodable>(_ type: T.Type, silent: Bool = false) -> T? {
         do {
             return try JSONDecoder().decode(type, from: self)
         } catch {
-            let callStack = Thread.callStackSymbols.joined(separator: "\n")
-            let errorMessage =
-                "Error: \(error.localizedDescription)\n\n\(callStack)"
-            AlertModal.showAlert("Error", errorMessage)
+            if !silent {
+                let callStack = Thread.callStackSymbols.joined(separator: "\n")
+                let errorMessage =
+                    "Error: \(error.localizedDescription)\n\n\(callStack)"
+                AlertModal.showAlert("Error", errorMessage)
+            }
             return nil
         }
     }

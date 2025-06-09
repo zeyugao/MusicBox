@@ -1056,7 +1056,7 @@ class CloudMusicApi {
         case del = "del"
     }
 
-    func playlist_tracks(op: PlaylistTracksOp, playlistId: UInt64, trackIds: [uint64])
+    func playlist_tracks(op: PlaylistTracksOp, playlistId: UInt64, trackIds: [UInt64])
         async throws
     {
         guard
@@ -1074,11 +1074,11 @@ class CloudMusicApi {
 
         struct ErrorResult: Decodable {
             let code: Int
-            let message: String
+            let message: String?
         }
 
-        if let error = res.asType(ErrorResult.self) {
-            throw RequestError.errorCode((error.code, error.message))
+        if let error = res.asType(ErrorResult.self, silent: true) {
+            throw RequestError.errorCode((error.code, error.message ?? "Unknown error"))
         }
     }
 

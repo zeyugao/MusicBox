@@ -144,6 +144,7 @@ class PlayingDetailModel: ObservableObject {
 
     static let targetName = String(reflecting: PlayingDetailPath.self)
 
+    @MainActor
     func checkIsDetailFront(navigationPath: NavigationPath) {
         if let data = try? navigationPath.codable.map(JSONEncoder().encode),
             let items = data.asType([String].self)
@@ -155,7 +156,8 @@ class PlayingDetailModel: ObservableObject {
                 newIsPresented = false
             }
 
-            DispatchQueue.main.async {
+            // Only update if the value actually changed to prevent multiple updates per frame
+            if self.isPresented != newIsPresented {
                 self.isPresented = newIsPresented
             }
         }
