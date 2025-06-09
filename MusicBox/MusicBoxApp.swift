@@ -51,8 +51,10 @@ struct MusicBoxApp: App {
     class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         var mainWindow: NSWindow?
         func applicationDidFinishLaunching(_ notification: Notification) {
-            mainWindow = NSApp.windows[0]
-            mainWindow?.delegate = self
+            if !NSApp.windows.isEmpty {
+                mainWindow = NSApp.windows[0]
+                mainWindow?.delegate = self
+            }
         }
         func windowShouldClose(_ sender: NSWindow) -> Bool {
             mainWindow?.orderOut(nil)
