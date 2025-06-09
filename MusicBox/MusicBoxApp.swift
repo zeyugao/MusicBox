@@ -81,6 +81,10 @@ struct MusicBoxApp: App {
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
+            // Disable the "New Window" command (Cmd+N)
+            CommandGroup(replacing: .newItem) {
+                // Empty command group effectively removes the New command
+            }
         }
         .defaultSize(width: 1000, height: 700)
     }
