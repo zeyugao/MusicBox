@@ -534,6 +534,11 @@ struct PlayListView: View {
                                     NSPasteboard.general.clearContents()
                                     NSPasteboard.general.setString(song.name, forType: .string)
                                 }
+
+                                Button("Copy Link") {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString("https://music.163.com/#/song?id=\(song.id)", forType: .string)
+                                }
                             }
                             .dropDestination(for: URL.self) { urls in
                                 if let url = urls.first {
