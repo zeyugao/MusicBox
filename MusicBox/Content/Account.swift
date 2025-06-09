@@ -11,6 +11,7 @@ import CoreImage.CIFilterBuiltins
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
+import WebKit
 
 @MainActor
 func initUserData(userInfo: UserInfo) async {
@@ -73,11 +74,21 @@ func generateQRCode(str: String, width: CGFloat = 300, height: CGFloat = 300) ->
 class LoginViewModel: ObservableObject {
     @Published var qrCodeImageURL: URL?
     @Published var loginMessage: String?
+    @Published var showAlert = false
+    @Published var alertMessage = ""
     var isChecking = false
+    var closeQRCodeSheet: (() -> Void)?
 
     private func updateLoginMessage(message: String) {
         Task { @MainActor in
             self.loginMessage = message
+        }
+    }
+
+    private func showAlertMessage(message: String) {
+        Task { @MainActor in
+            self.alertMessage = message
+            self.showAlert = true
         }
     }
 
@@ -116,7 +127,18 @@ class LoginViewModel: ObservableObject {
                 updateLoginMessage(message: "Login Successful")
                 isChecking = false
                 return
+            case 8821:
+                // Show alert instead of captcha
+                isChecking = false
+                await MainActor.run {
+                    if let closeSheet = self.closeQRCodeSheet {
+                        closeSheet()
+                    }
+                }
+                showAlertMessage(message: "需要验证码验证，请使用 Cookie 登录")
+                return
             default:
+                //                print("Result: \(checkRes.)")
                 updateLoginMessage(message: checkRes.message + " (Trial \(i))")
             }
         }
@@ -127,6 +149,8 @@ struct LoginView: View {
     @State private var username = ""
     @State private var password = ""
     @State private var showQrCode = false
+    @State private var showCookieLogin = false
+    @State private var cookieText = ""
 
     @StateObject private var loginVM = LoginViewModel()
     @EnvironmentObject private var userInfo: UserInfo
@@ -138,62 +162,124 @@ struct LoginView: View {
             SecureField("Password", text: $password)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
 
-            HStack {
-                Spacer()
-                Button(action: {
-                    Task {
-                        let res = await CloudMusicApi().login_cellphone(
-                            phone: username, password: password)
-                        if let error = res {
-                            AlertModal.showAlert("Login failed. Please use QR Login.", error)
-                        } else {
+            VStack(spacing: 8) {
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        Task {
+                            let res = await CloudMusicApi().login_cellphone(
+                                phone: username, password: password)
+                            if let error = res {
+                                AlertModal.showAlert("Login failed. Please use QR Login.", error)
+                            } else {
+                                await initUserData(userInfo: userInfo)
+                            }
+                        }
+                    }) {
+                        Text("Login")
+                    }
+                    Spacer()
+                    Button(action: {
+                        showQrCode = true
+                        Task {
+                            await loginVM.fetchQRCode()
+                            showQrCode = false
                             await initUserData(userInfo: userInfo)
                         }
+                    }) {
+                        Text("QR Login")
                     }
-                }) {
-                    Text("Login")
+                    Spacer()
                 }
-                Spacer()
-                Button(action: {
-                    showQrCode = true
-                    Task {
-                        await loginVM.fetchQRCode()
-                        showQrCode = false
 
-                        await initUserData(userInfo: userInfo)
-                    }
+                // Cookie Login Button
+                Button(action: {
+                    showCookieLogin = true
                 }) {
-                    Text("QR Login")
+                    Text("Cookie Login")
+                        .font(.caption)
                 }
-                .sheet(isPresented: $showQrCode) {
-                    VStack {
-                        if let qrCodeImageURL = loginVM.qrCodeImageURL {
-                            Image(
-                                nsImage: generateQRCode(
-                                    str: qrCodeImageURL.absoluteString, width: 160, height: 160
-                                )
-                            )
-                        } else {
-                            Text("")
-                                .frame(width: 160, height: 160)
-                        }
-                        if let message = loginVM.loginMessage {
-                            Text(message)
-                        } else {
-                            Text("Loading QR Code")
-                        }
-                        Button(action: {
-                            showQrCode = false
-                            loginVM.cancelCheck()
-                        }) {
-                            Text("Cancel")
+            }
+        }
+        .frame(width: 220)
+        .sheet(isPresented: $showQrCode) {
+            VStack {
+                if let qrCodeImageURL = loginVM.qrCodeImageURL {
+                    Image(
+                        nsImage: generateQRCode(
+                            str: qrCodeImageURL.absoluteString, width: 160, height: 160
+                        )
+                    )
+                } else {
+                    Text("")
+                        .frame(width: 160, height: 160)
+                }
+                if let message = loginVM.loginMessage {
+                    Text(message)
+                } else {
+                    Text("Loading QR Code")
+                }
+                Button(action: {
+                    showQrCode = false
+                    loginVM.cancelCheck()
+                }) {
+                    Text("Cancel")
+                }
+            }
+            .padding()
+            .onAppear {
+                // Set the callback to close this sheet
+                loginVM.closeQRCodeSheet = {
+                    showQrCode = false
+                }
+            }
+        }
+        .sheet(isPresented: $showCookieLogin) {
+            VStack(spacing: 16) {
+                Text("Cookie Login")
+                    .font(.headline)
+
+                Text("请粘贴从浏览器获取的 Cookie")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                TextEditor(text: $cookieText)
+                    .frame(minHeight: 100)
+                    .border(Color.gray, width: 1)
+                    .padding(.horizontal)
+
+                HStack {
+                    Button("Cancel") {
+                        showCookieLogin = false
+                        cookieText = ""
+                    }
+
+                    Spacer()
+
+                    Button("Login") {
+                        if !cookieText.isEmpty {
+                            CloudMusicApi().setCookie(cookieText)
+                            showCookieLogin = false
+                            cookieText = ""
+                            Task {
+                                await initUserData(userInfo: userInfo)
+                            }
                         }
                     }
-                    .padding()
+                    .disabled(cookieText.isEmpty)
                 }
-                Spacer()
+                .padding(.horizontal)
             }
-        }.frame(width: 200)
+            .padding()
+            .frame(width: 400, height: 250)
+        }
+        .alert("验证提示", isPresented: $loginVM.showAlert) {
+            Button("OK") {
+                loginVM.showAlert = false
+            }
+        } message: {
+            Text(loginVM.alertMessage)
+        }
     }
 }
 
