@@ -400,11 +400,14 @@ class CloudMusicApi {
         }
     }
 
-    func login_qr_check(key: String) async throws -> (code: Int, message: String) {
+    func login_qr_check(key: String) async throws -> (
+        code: Int, message: String, cookie: String?, redirectUrl: String?
+    ) {
         struct Result: Decodable {
             let code: Int
             let message: String?
             let cookie: String?
+            let redirectUrl: String?
         }
         let p = [
             "key": key
@@ -412,16 +415,27 @@ class CloudMusicApi {
         guard
             let ret = try? await doRequest(
                 memberName: "login_qr_check", data: p
-            ).asType(Result.self)
+            )
         else {
-            return (0, "No data")
+            return (0, "No data", nil, nil)
         }
 
-        if ret.code == 803, let cookie = ret.cookie {
+        if let jsonString = String(data: ret, encoding: .utf8) {
+            print(jsonString)
+        }
+
+        guard let parsedResult = ret.asType(Result.self) else {
+            return (0, "Parse failed", nil, nil)
+        }
+
+        if parsedResult.code == 803, let cookie = parsedResult.cookie {
             setCookie(cookie)
         }
 
-        return (ret.code, ret.message ?? "No message")
+        return (
+            parsedResult.code, parsedResult.message ?? "No message", parsedResult.cookie,
+            parsedResult.redirectUrl
+        )
     }
 
     func login_status() async -> Profile? {
@@ -513,7 +527,7 @@ class CloudMusicApi {
     }
 
     func logout() async {
-        guard let _ = try? await doRequest(memberName: "logout", data: [:]) else { return }
+        guard (try? await doRequest(memberName: "logout", data: [:])) != nil else { return }
         setCookie("dummy saved cookie")
     }
 
@@ -705,14 +719,14 @@ class CloudMusicApi {
 
     func scrobble(song: Song, playedTime: Int? = nil) async {
         guard
-            let _ = try? await doRequest(
+            (try? await doRequest(
                 memberName: "scrobble",
                 data: [
                     "id": song.id,
                     "sourceid": song.al.id,
                     "time": playedTime ?? Int(song.dt / 1000),
                 ]
-            )
+            )) != nil
         else {
             print("scrobble failed")
             return
@@ -789,16 +803,16 @@ class CloudMusicApi {
         if let parsed = res.asType(Result.self) {
             return parsed.privateCloud.songId
         }
-        
+
         struct ErrorResult: Decodable {
             let code: Int
             let msg: String
         }
-        
+
         if let parsed = res.asType(ErrorResult.self) {
             throw RequestError.errorCode((parsed.code, parsed.msg))
         }
-        
+
         throw RequestError.Request("\(res.asAny() ?? "No Data")")
     }
 
