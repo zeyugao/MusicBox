@@ -800,7 +800,7 @@ class CloudMusicApi {
             let privateCloud: PrivateCloud
         }
 
-        if let parsed = res.asType(Result.self) {
+        if let parsed = res.asType(Result.self, silent: true) {
             return parsed.privateCloud.songId
         }
 
@@ -809,7 +809,7 @@ class CloudMusicApi {
             let msg: String
         }
 
-        if let parsed = res.asType(ErrorResult.self) {
+        if let parsed = res.asType(ErrorResult.self, silent: true) {
             throw RequestError.errorCode((parsed.code, parsed.msg))
         }
 
