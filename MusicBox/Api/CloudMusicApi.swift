@@ -532,7 +532,7 @@ class CloudMusicApi {
     }
 
     func user_account() async {
-        guard let ret = try? await doRequest(memberName: "user_account", data: [:]) else { return }
+        guard (try? await doRequest(memberName: "user_account", data: [:])) != nil else { return }
     }
 
     func user_subcount() async {
