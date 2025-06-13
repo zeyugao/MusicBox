@@ -49,30 +49,6 @@ struct MusicBoxApp: App {
             startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     }
 
-    class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-        var mainWindow: NSWindow?
-        func applicationDidFinishLaunching(_ notification: Notification) {
-            if !NSApp.windows.isEmpty {
-                mainWindow = NSApp.windows[0]
-                mainWindow?.delegate = self
-            }
-        }
-        func windowShouldClose(_ sender: NSWindow) -> Bool {
-            mainWindow?.orderOut(nil)
-
-            return false
-        }
-
-        func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool)
-            -> Bool
-        {
-            if !flag {
-                mainWindow?.makeKeyAndOrderFront(nil)
-            }
-            return true
-        }
-    }
-    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -82,7 +58,6 @@ struct MusicBoxApp: App {
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
-            // Disable the "New Window" command (Cmd+N)
             CommandGroup(replacing: .newItem) {
                 // Empty command group effectively removes the New command
             }
