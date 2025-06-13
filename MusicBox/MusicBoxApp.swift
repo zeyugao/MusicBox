@@ -7,6 +7,7 @@
 
 import Sparkle
 import SwiftUI
+import AppKit
 
 // This view model class publishes when new updates can be checked by the user
 final class CheckForUpdatesViewModel: ObservableObject {
@@ -38,9 +39,42 @@ struct CheckForUpdatesView: View {
     }
 }
 
+// Application delegate to handle app lifecycle
+class AppDelegate: NSObject, NSApplicationDelegate {
+    static var mainWindow: NSWindow?
+    
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // Prevent the app from terminating when the last window is closed
+        return false
+    }
+    
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // Show the main window when user clicks on the dock icon
+        if !flag {
+            // Show the hidden main window if it exists
+            if let mainWindow = AppDelegate.mainWindow, !mainWindow.isVisible {
+                mainWindow.makeKeyAndOrderFront(nil)
+                return false // Prevent creating a new window
+            }
+        }
+        return true
+    }
+}
+
+// Window delegate to handle window closing behavior
+class WindowDelegate: NSObject, NSWindowDelegate {
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        // Hide the window instead of closing it
+        sender.orderOut(nil)
+        return false
+    }
+}
+
 @main
 struct MusicBoxApp: App {
     private let updaterController: SPUStandardUpdaterController
+    @State private var windowDelegate = WindowDelegate()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {
         // If you want to start the updater manually, pass false to startingUpdater and call .startUpdater() later
@@ -50,9 +84,24 @@ struct MusicBoxApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             ContentView()
+                .onAppear {
+                    // Set up window delegate when the view appears
+                    DispatchQueue.main.async {
+                        if let window = NSApplication.shared.windows.last {
+                            AppDelegate.mainWindow = window
+                            window.delegate = windowDelegate
+                            // Set the window size manually since defaultSize might not work with our setup
+                            window.setContentSize(NSSize(width: 1000, height: 700))
+                            // Ensure the app doesn't terminate when the last window is closed
+                            NSApplication.shared.setActivationPolicy(.regular)
+                        }
+                    }
+                }
         }
+        .handlesExternalEvents(matching: Set(arrayLiteral: "main"))
+        .defaultSize(width: 1000, height: 700)
         .commands {
             SidebarCommands()
             CommandGroup(after: .appInfo) {
@@ -61,7 +110,16 @@ struct MusicBoxApp: App {
             CommandGroup(replacing: .newItem) {
                 // Empty command group effectively removes the New command
             }
+            CommandGroup(after: .windowArrangement) {
+                Button("Show MusicBox") {
+                    // Show the main window if it's hidden
+                    if let mainWindow = AppDelegate.mainWindow {
+                        mainWindow.makeKeyAndOrderFront(nil)
+                        NSApplication.shared.activate(ignoringOtherApps: true)
+                    }
+                }
+                .keyboardShortcut("m", modifiers: [.command])
+            }
         }
-        .defaultSize(width: 1000, height: 700)
     }
 }
