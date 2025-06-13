@@ -347,6 +347,7 @@ struct PlayListView: View {
     @State private var sortOrder = [KeyPathComparator<CloudMusicApi.Song>]()
     @State private var loadingTask: Task<Void, Never>? = nil
     @State private var isLoading = false
+    @State private var currentLoadingTaskId = UUID()
 
     @State private var searchText = ""
     @State private var selectedSongToAdd: CloudMusicApi.Song?
@@ -663,9 +664,18 @@ struct PlayListView: View {
 
             model.curId = playlistMetadata.id
             loadingTask?.cancel()
+            
+            // Generate a new task ID for this loading operation
+            let taskId = UUID()
+            currentLoadingTaskId = taskId
+            
             loadingTask = Task {
                 await model.updatePlaylistDetail(metadata: playlistMetadata, force: force)
-                isLoading = false
+                
+                // Only update loading state if this is still the current task
+                if taskId == currentLoadingTaskId {
+                    isLoading = false
+                }
             }
         }
     }
