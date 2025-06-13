@@ -71,4 +71,18 @@ extension Data {
     func asAny() -> Any? {
         return try? JSONSerialization.jsonObject(with: self, options: [])
     }
+
+    func asJSONString() -> String {
+        if let jsonObject = asAny() {
+            do {
+                let jsonData = try JSONSerialization.data(
+                    withJSONObject: jsonObject, options: .prettyPrinted)
+                return String(data: jsonData, encoding: .utf8) ?? "Failed to convert to string"
+            } catch {
+                return "Failed to serialize JSON: \(error.localizedDescription)"
+            }
+        } else {
+            return String(data: self, encoding: .utf8) ?? "Failed to decode as UTF-8"
+        }
+    }
 }

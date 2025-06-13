@@ -813,7 +813,7 @@ class CloudMusicApi {
             throw RequestError.errorCode((parsed.code, parsed.msg))
         }
 
-        throw RequestError.Request("\(res.asAny() ?? "No Data")")
+        throw RequestError.Request(res.asJSONString())
     }
 
     func cloud_match(userId: UInt64, songId: UInt64, adjustSongId: UInt64) async {
