@@ -98,7 +98,7 @@ class PlayStatus: ObservableObject {
         }
 
         await MainActor.run {
-            self.playedSecond = newTime.seconds
+            playedSecond = newTime.seconds
         }
 
         if let item = self.currentItem, player.currentItem is CachingPlayerItem {
@@ -129,8 +129,8 @@ class PlayStatus: ObservableObject {
     }
 
     func updateDuration(duration: Double) {
-        Task { @MainActor in
-            self.duration = duration
+        Task { @MainActor [weak self] in
+            self?.duration = duration
         }
     }
 
@@ -142,6 +142,12 @@ class PlayStatus: ObservableObject {
 
     func replaceCurrentItem(item: AVPlayerItem?) {
         deinitPlayerObservers()
+        
+        // Clear delegate of previous caching player item to break retain cycles
+        if let currentItem = player.currentItem as? CachingPlayerItem {
+            currentItem.delegate = nil
+        }
+        
         player = AVPlayer(playerItem: item)
         player.automaticallyWaitsToMinimizeStalling = false
         initPlayerObservers()
@@ -198,22 +204,24 @@ class PlayStatus: ObservableObject {
     private func doScrobble() {
         if !scrobbled && readyToPlay {
             if playedSecond > 30 {
-                Task {
+                Task { [weak self] in
+                    guard let self = self else { return }
                     print("do scrobble")
-                    if let item = currentItem, let song = item.nsSong {
+                    if let item = self.currentItem, let song = item.nsSong {
                         await CloudMusicApi().scrobble(
                             song: song,
-                            playedTime: Int(playedSecond)
+                            playedTime: Int(self.playedSecond)
                         )
                     }
-                    scrobbled = true
+                    self.scrobbled = true
                 }
             }
         }
     }
 
     func resetLyricIndex() {
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
             self.currentLyricIndex = self.monotonouslyUpdateLyric(lyricIndex: 0)
         }
     }
@@ -234,7 +242,8 @@ class PlayStatus: ObservableObject {
     }
 
     private func setLoadingProgress(_ progress: Double?) {
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
             self.loadingProgress = progress
             if (progress != nil) != self.isLoading {
                 self.isLoading = progress != nil
@@ -262,37 +271,40 @@ class PlayStatus: ObservableObject {
     func initPlayerObservers() {
         timeControlStautsObserver = player.observe(\.timeControlStatus, options: [.initial, .new]) {
             [weak self] (player, changes) in
-            self?.timeControlStatus = player.timeControlStatus
+            guard let self = self else { return }
+            self.timeControlStatus = player.timeControlStatus
         }
 
         playerStateObserver = player.observe(\.rate, options: [.initial, .new]) {
             [weak self] (player, _) in
+            guard let self = self else { return }
             guard player.status == .readyToPlay else { return }
 
             Task { @MainActor in
-                self?.playerState = player.rate.isZero ? .paused : .playing
+                self.playerState = player.rate.isZero ? .paused : .playing
             }
         }
 
         periodicTimeObserverToken = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.1, preferredTimescale: timeScale), queue: .main
         ) { [weak self] time in
-            if !(self?.switchingItem ?? true) && (self?.readyToPlay ?? false) {
-                let newTime = self?.player.currentTime().seconds ?? 0.0
-                if Int(self?.playedSecond ?? 0) != Int(newTime) {
+            guard let self = self else { return }
+            if !self.switchingItem && self.readyToPlay {
+                let newTime = self.player.currentTime().seconds
+                if Int(self.playedSecond) != Int(newTime) {
                     Task { @MainActor in
-                        self?.playedSecond = newTime
+                        self.playedSecond = newTime
                     }
-                    self?.updateCurrentPlaybackInfo()
+                    self.updateCurrentPlaybackInfo()
                 }
 
-                let initIdx = self?.currentLyricIndex
-                let newIdx = self?.monotonouslyUpdateLyric(
+                let initIdx = self.currentLyricIndex
+                let newIdx = self.monotonouslyUpdateLyric(
                     lyricIndex: initIdx ?? 0, newTime: newTime)
 
                 if newIdx != initIdx {
                     // withAnimation {
-                    self?.currentLyricIndex = newIdx
+                    self.currentLyricIndex = newIdx
                     // }
                 }
             }
@@ -303,16 +315,19 @@ class PlayStatus: ObservableObject {
         if let timeObserverToken = periodicTimeObserverToken {
             player.removeTimeObserver(timeObserverToken)
             periodicTimeObserverToken = nil
-            Task { @MainActor in
-                self.playedSecond = 0
+            Task { @MainActor [weak self] in
+                self?.playedSecond = 0
             }
         }
         playerStateObserver?.invalidate()
+        playerStateObserver = nil
         timeControlStautsObserver?.invalidate()
+        timeControlStautsObserver = nil
     }
 
     static let controllPlayerNotificationName = Notification.Name("PlayStatus.controll")
     private var controlPlayerObserver: NSObjectProtocol?
+    private var terminationObserver: NSObjectProtocol?
 
     enum PlayerControlCommand: Int {
         case togglePlayPause, startPlay, pausePlay, seekByOffset, seekToOffset
@@ -332,8 +347,8 @@ class PlayStatus: ObservableObject {
 
         controlPlayerObserver = notificationCenter.addObserver(
             forName: PlayStatus.controllPlayerNotificationName, object: nil, queue: .main
-        ) { notification in
-            guard let userInfo = notification.userInfo else { return }
+        ) { [weak self] notification in
+            guard let self = self, let userInfo = notification.userInfo else { return }
             Task {
                 if let command = userInfo["command"] as? PlayerControlCommand {
                     switch command {
@@ -363,11 +378,11 @@ class PlayStatus: ObservableObject {
                                 }
                             }
                         } else {
-                            Task { @MainActor in
-                                self.currentItem = nil
-                                self.duration = 0.0
-                                self.playedSecond = 0.0
-                                self.playerState = .stopped
+                            Task { @MainActor [weak self] in
+                                self?.currentItem = nil
+                                self?.duration = 0.0
+                                self?.playedSecond = 0.0
+                                self?.playerState = .stopped
                             }
                         }
                     }
@@ -380,6 +395,11 @@ class PlayStatus: ObservableObject {
         let notificationCenter = NotificationCenter.default
         if let ob = controlPlayerObserver {
             notificationCenter.removeObserver(ob)
+            controlPlayerObserver = nil
+        }
+        if let ob = terminationObserver {
+            notificationCenter.removeObserver(ob)
+            terminationObserver = nil
         }
     }
 
@@ -410,7 +430,7 @@ class PlayStatus: ObservableObject {
         initPlayerObservers()
         initNotificationObservers()
 
-        NotificationCenter.default.addObserver(
+        terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in
             self?.saveState()
@@ -420,6 +440,15 @@ class PlayStatus: ObservableObject {
     deinit {
         deinitPlayerObservers()
         deinitNotificationObservers()
+        
+        // Clear delegate of current caching player item to break retain cycles
+        if let currentItem = player.currentItem as? CachingPlayerItem {
+            currentItem.delegate = nil
+        }
+        
+        // Ensure player is stopped and cleaned up
+        player.pause()
+        player.replaceCurrentItem(with: nil)
 
         saveState()
     }
@@ -427,8 +456,8 @@ class PlayStatus: ObservableObject {
 
 extension PlayStatus: CachingPlayerItemDelegate {
     func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
-        Task { @MainActor in
-            self.readyToPlay = true
+        Task { @MainActor [weak self] in
+            self?.readyToPlay = true
         }
         print("Caching player item ready to play.")
     }
@@ -739,6 +768,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     static let controllPlaylistNotificationName = Notification.Name(
         "PlaylistStatus.controllPlaylist")
     private var controlPlaylistObserver: NSObjectProtocol!
+    private var terminationObserver: NSObjectProtocol?
 
     enum PlaylistControlCommand: Int {
         case nextTrack, previousTrack, switchLoopMode
@@ -757,17 +787,17 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
 
         controlPlaylistObserver = notificationCenter.addObserver(
             forName: PlaylistStatus.controllPlaylistNotificationName, object: nil, queue: .main
-        ) { notification in
-            guard let userInfo = notification.userInfo else { return }
+        ) { [weak self] notification in
+            guard let self = self, let userInfo = notification.userInfo else { return }
             if let command = userInfo["command"] as? PlaylistControlCommand {
                 switch command {
                 case .nextTrack:
-                    Task {
-                        await self.nextTrack()
+                    Task { [weak self] in
+                        await self?.nextTrack()
                     }
                 case .previousTrack:
-                    Task {
-                        await self.previousTrack()
+                    Task { [weak self] in
+                        await self?.previousTrack()
                     }
                 case .switchLoopMode:
                     self.switchToNextLoopMode()
@@ -781,6 +811,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         if let ob = controlPlaylistObserver {
             notificationCenter.removeObserver(ob)
         }
+        if let ob = terminationObserver {
+            notificationCenter.removeObserver(ob)
+            terminationObserver = nil
+        }
     }
 
     private var playerShouldNextObserver: NSObjectProtocol?
@@ -790,17 +824,19 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
 
         playerShouldNextObserver = NotificationCenter.default.addObserver(
             forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main
-        ) { _ in
-            Task {
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            
+            Task { [weak self] in
                 print("didPlayToEndTimeNotification")
-                await self.nextTrack()
+                await self?.nextTrack()
             }
         }
 
-        NotificationCenter.default.addObserver(
+        terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
-        ) { _ in
-            self.saveState()
+        ) { [weak self] _ in
+            self?.saveState()
         }
 
         initNotificationObservers()
@@ -810,6 +846,8 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         if let ob = playerShouldNextObserver {
             NotificationCenter.default.removeObserver(ob)
         }
+        
+        deinitNotificationObservers()
 
         saveState()
     }
