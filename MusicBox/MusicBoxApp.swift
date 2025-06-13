@@ -5,9 +5,9 @@
 //  Created by Elsa on 2024/4/16.
 //
 
+import AppKit
 import Sparkle
 import SwiftUI
-import AppKit
 
 // This view model class publishes when new updates can be checked by the user
 final class CheckForUpdatesViewModel: ObservableObject {
@@ -42,19 +42,21 @@ struct CheckForUpdatesView: View {
 // Application delegate to handle app lifecycle
 class AppDelegate: NSObject, NSApplicationDelegate {
     static var mainWindow: NSWindow?
-    
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         // Prevent the app from terminating when the last window is closed
         return false
     }
-    
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool)
+        -> Bool
+    {
         // Show the main window when user clicks on the dock icon
         if !flag {
             // Show the hidden main window if it exists
             if let mainWindow = AppDelegate.mainWindow, !mainWindow.isVisible {
                 mainWindow.makeKeyAndOrderFront(nil)
-                return false // Prevent creating a new window
+                return false  // Prevent creating a new window
             }
         }
         return true
