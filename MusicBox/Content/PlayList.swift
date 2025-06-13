@@ -367,7 +367,7 @@ struct PlayListView: View {
                     artist: metadata.artist,
                     album: metadata.album
                 ) {
-                    await CloudMusicApi().cloud_match(
+                    try await CloudMusicApi().cloud_match(
                         userId: userInfo.profile?.userId ?? 0,
                         songId: privateSongId,
                         adjustSongId: songId

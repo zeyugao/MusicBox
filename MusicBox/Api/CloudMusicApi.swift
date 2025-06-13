@@ -813,10 +813,10 @@ class CloudMusicApi {
             throw RequestError.errorCode((parsed.code, parsed.msg))
         }
 
-        throw RequestError.Request(res.asJSONString())
+        throw RequestError.Request("\(res.asAny() ?? "Unknown error")")
     }
 
-    func cloud_match(userId: UInt64, songId: UInt64, adjustSongId: UInt64) async {
+    func cloud_match(userId: UInt64, songId: UInt64, adjustSongId: UInt64) async throws {
         guard
             let res = try? await doRequest(
                 memberName: "cloud_match",
@@ -826,10 +826,26 @@ class CloudMusicApi {
                     "asid": adjustSongId,
                 ])
         else {
-            print("cloud_match failed")
-            return
+            throw RequestError.Request("cloud_match failed to make request")
         }
-        print(res.asAny() ?? "")
+
+        struct Result: Decodable {
+            let code: Int
+            let data: String
+            let message: String
+        }
+
+        if let parsed = res.asType(Result.self, silent: true) {
+            if parsed.code == 200 {
+                return
+            } else {
+                throw RequestError.errorCode((parsed.code, parsed.message))
+            }
+        }
+
+        throw RequestError.Request(
+            "cloud_match failed: \(res.asAny() ?? "Unknown error")"
+        )
     }
 
     func likelist(userId: UInt64) async -> [UInt64]? {
