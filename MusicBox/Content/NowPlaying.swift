@@ -27,45 +27,71 @@ struct NowPlayingView: View {
     @State private var playlist: [PlaylistItem] = []
 
     var body: some View {
-        Table(of: PlaylistItem.self) {
-            TableColumn("Title") { song in
+        ScrollViewReader { proxy in
+            List(playlist) { item in
                 HStack {
-                    Text(song.title)
-                    if let nsSong = song.nsSong {
-                        if let alia = nsSong.tns?.first ?? nsSong.alia.first {
-                            Text("( \(alia) )")
-                                .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text(item.title)
+                                .font(.body)
+                            if let nsSong = item.nsSong {
+                                if let alia = nsSong.tns?.first ?? nsSong.alia.first {
+                                    Text("( \(alia) )")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                }
+                            }
+                            if item.id == playController.currentItem?.id {
+                                Image(systemName: "speaker.3.fill")
+                                    .foregroundColor(.accentColor)
+                            }
                         }
                     }
-                    if song.id == playController.currentItem?.id {
-                        Image(systemName: "speaker.3.fill")
+                    
+                    Spacer()
+                    
+                    Text(formatCMTime(item.duration))
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                        .frame(width: 60, alignment: .trailing)
+                }
+                .padding(.vertical, 2)
+                .id(item.id)
+                .contextMenu {
+                    Button("Play") {
+                        Task {
+                            await playController.playBySongId(id: item.id)
+                        }
+                    }
+
+                    Button("Delete") {
+                        Task {
+                            await playController.deleteBySongId(id: item.id)
+                            playlist = playController.playlist
+                        }
                     }
                 }
             }
-            TableColumn("Duration") { song in
-                Text(formatCMTime(song.duration))
-            }.width(max: 60)
-        } rows: {
-            ForEach(playlist) { item in
-                TableRow(item)
-                    .contextMenu {
-                        Button("Play") {
-                            Task {
-                                await playController.playBySongId(id: item.id)
-                            }
-                        }
-
-                        Button("Delete") {
-                            Task {
-                                await playController.deleteBySongId(id: item.id)
-                                playlist = playController.playlist
-                            }
+            .listStyle(PlainListStyle())
+            .task {
+                playlist = playController.playlist
+                // 自动滚动到当前播放的歌曲
+                if let currentItem = playController.currentItem {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            proxy.scrollTo(currentItem.id, anchor: .center)
                         }
                     }
+                }
             }
-        }
-        .task {
-            playlist = playController.playlist
+            .onChange(of: playController.currentItem) { _, newItem in
+                // 当播放的歌曲改变时，也自动滚动到新的歌曲
+                if let currentItem = newItem {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        proxy.scrollTo(currentItem.id, anchor: .center)
+                    }
+                }
+            }
         }
     }
 }
