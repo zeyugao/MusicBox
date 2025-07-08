@@ -365,12 +365,11 @@ struct SongTableView: View {
     @Binding var selectedItem: CloudMusicApi.Song.ID?
     @Binding var sortOrder: [KeyPathComparator<CloudMusicApi.Song>]
     let userInfo: UserInfo
+    let playlistStatus: PlaylistStatus
     let playlistMetadata: PlaylistMetadata?
     let onSortChange: ([KeyPathComparator<CloudMusicApi.Song>]) -> Void
-    let onContextMenuPlay: (CloudMusicApi.Song) -> Void
-    let onContextMenuAddToNowPlaying: (CloudMusicApi.Song) -> Void
-    let onContextMenuAddToPlaylist: (CloudMusicApi.Song) -> Void
-    let onContextMenuDeleteFromPlaylist: (CloudMusicApi.Song) -> Void
+    @Binding var selectedSongToAdd: CloudMusicApi.Song?
+    let onDeleteFromPlaylist: (CloudMusicApi.Song) -> Void
     let onUploadToCloud: (CloudMusicApi.Song, URL) -> Void
 
     var body: some View {
@@ -466,10 +465,21 @@ struct SongTableView: View {
                             SongContextMenu(
                                 song: song,
                                 playlistMetadata: playlistMetadata,
-                                onPlay: { onContextMenuPlay(song) },
-                                onAddToNowPlaying: { onContextMenuAddToNowPlaying(song) },
-                                onAddToPlaylist: { onContextMenuAddToPlaylist(song) },
-                                onDeleteFromPlaylist: { onContextMenuDeleteFromPlaylist(song) },
+                                onPlay: {
+                                    Task {
+                                        let newItem = loadItem(song: song)
+                                        let _ = await playlistStatus.addItemAndSeekTo(
+                                            newItem, shouldPlay: true)
+                                    }
+                                },
+                                onAddToNowPlaying: {
+                                    let newItem = loadItem(song: song)
+                                    let _ = playlistStatus.addItemToPlaylist(newItem)
+                                },
+                                onAddToPlaylist: {
+                                    selectedSongToAdd = song
+                                },
+                                onDeleteFromPlaylist: { onDeleteFromPlaylist(song) },
                                 onUploadToCloud: {
                                     Task {
                                         if let url = await selectAudioFile() {
@@ -635,23 +645,11 @@ struct PlayListView: View {
                 selectedItem: $selectedItem,
                 sortOrder: $sortOrder,
                 userInfo: userInfo,
+                playlistStatus: playlistStatus,
                 playlistMetadata: playlistMetadata,
                 onSortChange: handleSortChange,
-                onContextMenuPlay: { song in
-                    Task {
-                        let newItem = loadItem(song: song)
-                        let _ = await playlistStatus.addItemAndSeekTo(
-                            newItem, shouldPlay: true)
-                    }
-                },
-                onContextMenuAddToNowPlaying: { song in
-                    let newItem = loadItem(song: song)
-                    let _ = playlistStatus.addItemToPlaylist(newItem)
-                },
-                onContextMenuAddToPlaylist: { song in
-                    selectedSongToAdd = song
-                },
-                onContextMenuDeleteFromPlaylist: { song in
+                selectedSongToAdd: $selectedSongToAdd,
+                onDeleteFromPlaylist: { song in
                     Task {
                         if case .netease(let songId, _) = playlistMetadata {
                             do {
