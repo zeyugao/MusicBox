@@ -183,6 +183,52 @@ func likeSong(
     }
 }
 
+func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo) async -> Bool {
+    if let metadata = await loadMetadata(url: url) {
+        do {
+            if let privateSongId = try await CloudMusicApi().cloud(
+                filePath: url,
+                songName: metadata.title,
+                artist: metadata.artist,
+                album: metadata.album
+            ) {
+                try await CloudMusicApi().cloud_match(
+                    userId: userInfo.profile?.userId ?? 0,
+                    songId: privateSongId,
+                    adjustSongId: songId
+                )
+                return true
+            } else {
+                AlertModal.showAlert("Failed to upload music")
+            }
+        } catch let error as RequestError {
+            AlertModal.showAlert(error.localizedDescription)
+        } catch {
+            AlertModal.showAlert(error.localizedDescription)
+        }
+    } else {
+        AlertModal.showAlert("Failed to load metadata for \(url)")
+    }
+    return false
+}
+
+@MainActor
+func selectAudioFile() async -> URL? {
+    let openPanel = NSOpenPanel()
+    openPanel.prompt = "Select Audio File"
+    openPanel.allowsMultipleSelection = false
+    openPanel.canChooseDirectories = false
+    openPanel.canChooseFiles = true
+    openPanel.allowedContentTypes = [UTType.mp3, UTType.audio]
+
+    let result = await openPanel.begin()
+
+    if result == .OK, let url = openPanel.url {
+        return url
+    }
+    return nil
+}
+
 struct ListPlaylistDialogView: View {
     @EnvironmentObject var userInfo: UserInfo
     @Environment(\.dismiss) private var dismiss
@@ -269,6 +315,220 @@ struct DownloadProgressDialog: View {
     }
 }
 
+struct SongContextMenu: View {
+    let song: CloudMusicApi.Song
+    let playlistMetadata: PlaylistMetadata?
+    let onPlay: () -> Void
+    let onAddToNowPlaying: () -> Void
+    let onAddToPlaylist: () -> Void
+    let onDeleteFromPlaylist: () -> Void
+    let onUploadToCloud: () -> Void
+
+    var body: some View {
+        Button("Play") {
+            onPlay()
+        }
+
+        Button("Add to Now Playing") {
+            onAddToNowPlaying()
+        }
+
+        Button("Add to Playlist") {
+            onAddToPlaylist()
+        }
+
+        if case .netease = playlistMetadata {
+            Button("Delete from Playlist") {
+                onDeleteFromPlaylist()
+            }
+        }
+
+        Button("Upload to Cloud") {
+            onUploadToCloud()
+        }
+
+        Button("Copy Title") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(song.name, forType: .string)
+        }
+
+        Button("Copy Link") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(
+                "https://music.163.com/#/song?id=\(song.id)", forType: .string)
+        }
+    }
+}
+
+struct SongTableView: View {
+    let songs: [CloudMusicApi.Song]?
+    @Binding var selectedItem: CloudMusicApi.Song.ID?
+    @Binding var sortOrder: [KeyPathComparator<CloudMusicApi.Song>]
+    let userInfo: UserInfo
+    let playlistMetadata: PlaylistMetadata?
+    let onSortChange: ([KeyPathComparator<CloudMusicApi.Song>]) -> Void
+    let onContextMenuPlay: (CloudMusicApi.Song) -> Void
+    let onContextMenuAddToNowPlaying: (CloudMusicApi.Song) -> Void
+    let onContextMenuAddToPlaylist: (CloudMusicApi.Song) -> Void
+    let onContextMenuDeleteFromPlaylist: (CloudMusicApi.Song) -> Void
+    let onContextMenuUploadToCloud: (CloudMusicApi.Song) -> Void
+    let onDropUpload: (CloudMusicApi.Song, URL) -> Void
+
+    var body: some View {
+        Table(
+            of: CloudMusicApi.Song.self,
+            selection: $selectedItem,
+            sortOrder: $sortOrder
+        ) {
+            TableColumn("") { song in
+                let favored = (userInfo.likelist.contains(song.id))
+
+                Button(action: {
+                    Task {
+                        var likelist = userInfo.likelist
+                        await likeSong(
+                            likelist: &likelist,
+                            songId: song.id,
+                            favored: favored
+                        )
+                        await MainActor.run {
+                            // Update the userInfo in a way that won't cause issues
+                            if favored {
+                                userInfo.likelist.remove(song.id)
+                            } else {
+                                userInfo.likelist.insert(song.id)
+                            }
+                        }
+                    }
+                }) {
+                    Image(systemName: favored ? "heart.fill" : "heart")
+                        .resizable()
+                        .frame(width: 16, height: 14)
+                        .help(favored ? "Unfavor" : "Favor")
+                        .padding(.trailing, 4)
+                }
+            }
+            .width(16)
+
+            TableColumn("Title", value: \.name) { song in
+                HStack {
+                    Text(song.name)
+
+                    if let alia = song.tns?.first ?? song.alia.first {
+                        Text("( \(alia) )")
+                            .foregroundColor(.secondary)
+                    }
+
+                    if song.pc != nil {
+                        Spacer()
+                        Image(systemName: "cloud")
+                            .resizable()
+                            .frame(width: 18, height: 12)
+                            .help("Cloud")
+                    } else {
+                        if song.fee == .vip || song.fee == .album {
+                            Spacer()
+                            Image(systemName: "dollarsign.circle")
+                                .resizable()
+                                .frame(width: 16, height: 16)
+                                .help("Need buy")
+                                .padding(.horizontal, 1)
+                                .frame(width: 18, height: 16)
+                        } else if song.fee == .trial {
+                            Spacer()
+                            Image(systemName: "gift")
+                                .resizable()
+                                .frame(width: 16, height: 16)
+                                .help("Trial")
+                                .padding(.horizontal, 1)
+                                .frame(width: 18, height: 16)
+                        }
+                    }
+                }
+            }
+            .width(min: 500)
+
+            TableColumn("Artist", value: \.ar[0].name) { song in
+                Text(song.ar.map(\.name).joined(separator: ", "))
+            }
+
+            TableColumn("Ablum", value: \.al.name)
+
+            TableColumn("Duration", value: \.dt) { song in
+                let ret = song.parseDuration()
+                Text(String(format: "%02d:%02d", ret.minute, ret.second))
+            }
+            .width(max: 60)
+        } rows: {
+            if let songs = songs {
+                ForEach(songs) { song in
+                    TableRow(song)
+                        .contextMenu {
+                            SongContextMenu(
+                                song: song,
+                                playlistMetadata: playlistMetadata,
+                                onPlay: { onContextMenuPlay(song) },
+                                onAddToNowPlaying: { onContextMenuAddToNowPlaying(song) },
+                                onAddToPlaylist: { onContextMenuAddToPlaylist(song) },
+                                onDeleteFromPlaylist: { onContextMenuDeleteFromPlaylist(song) },
+                                onUploadToCloud: { onContextMenuUploadToCloud(song) }
+                            )
+                        }
+                        .dropDestination(for: URL.self) { urls in
+                            if let url = urls.first {
+                                onDropUpload(song, url)
+                            }
+                        }
+                }
+            }
+        }
+        .onTapGesture(count: 2) { location in
+            print("location: \(location)")
+        }
+        .onChange(of: sortOrder) { prevSortOrder, newSortOrder in
+            if prevSortOrder.count >= 1, newSortOrder.count >= 1,
+                prevSortOrder[0].keyPath == newSortOrder[0].keyPath,
+                newSortOrder[0].order == .forward
+            {
+                sortOrder.removeAll()
+            }
+
+            onSortChange(sortOrder)
+        }
+    }
+}
+
+struct PlaylistToolbar: ToolbarContent {
+    let songs: [CloudMusicApi.Song]
+    let playlistMetadata: PlaylistMetadata?
+    let onPlayAll: () -> Void
+    let onAddAllToPlaylist: () -> Void
+    let onRefresh: () -> Void
+
+    var body: some ToolbarContent {
+        ToolbarItemGroup {
+            Button(action: onPlayAll) {
+                Image(systemName: "play")
+            }
+            .help("Play All")
+
+            Button(action: onAddAllToPlaylist) {
+                Image(systemName: "plus")
+            }
+            .help("Add All to Playlist")
+
+            DownloadAllButton(songs: songs)
+
+            if case .netease = playlistMetadata {
+                Button(action: onRefresh) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .help("Refresh Playlist")
+            }
+        }
+    }
+}
+
 struct DownloadAllButton: View {
     @State private var presentDownloadAllSongDialog = false
     @State private var canceledDownloadAllSong = false
@@ -294,7 +554,7 @@ struct DownloadAllButton: View {
 
                 for (idx, song) in songs.enumerated() {
                     text = "Downloading \(idx + 1) / \(totalCnt)"
-                    if let _ = getCachedMusicFile(id: song.id) {
+                    if getCachedMusicFile(id: song.id) != nil {
                     } else {
                         if let songData = await CloudMusicApi().song_url_v1(id: [song.id]) {
                             let songData = songData[0]
@@ -354,216 +614,70 @@ struct PlayListView: View {
 
     var playlistMetadata: PlaylistMetadata?
 
-    let currencyStyle = Decimal.FormatStyle.Currency(code: "USD")
-
-    func uploadCloud(songId: UInt64, url: URL) async {
-        isLoading = true
-        defer { isLoading = false }
-        if let metadata = await loadMetadata(url: url) {
-            do {
-                if let privateSongId = try await CloudMusicApi().cloud(
-                    filePath: url,
-                    songName: metadata.title,
-                    artist: metadata.artist,
-                    album: metadata.album
-                ) {
-                    try await CloudMusicApi().cloud_match(
-                        userId: userInfo.profile?.userId ?? 0,
-                        songId: privateSongId,
-                        adjustSongId: songId
-                    )
-                    updatePlaylist(force: true)
-                    return
-                } else {
-                    AlertModal.showAlert("Failed to upload music")
-                }
-            } catch let error as RequestError {
-                AlertModal.showAlert(error.localizedDescription)
-            } catch {
-                AlertModal.showAlert(error.localizedDescription)
-            }
-        } else {
-            AlertModal.showAlert("Failed to load metadata for \(url)")
-        }
-    }
-
-    func selectFile() async -> URL? {
-        let openPanel = NSOpenPanel()
-        openPanel.prompt = "Select Audio File"
-        openPanel.allowsMultipleSelection = false
-        openPanel.canChooseDirectories = false
-        openPanel.canChooseFiles = true
-        openPanel.allowedContentTypes = [UTType.mp3, UTType.audio]
-
-        let result = await openPanel.begin()
-
-        if result == .OK, let url = openPanel.url {
-            return url
-        }
-        return nil
-    }
-
     var body: some View {
         ZStack {
-            Table(
-                of: CloudMusicApi.Song.self,
-                selection: $selectedItem,
-                sortOrder: $sortOrder
-            ) {
-                TableColumn("") { song in
-                    let favored = (userInfo.likelist.contains(song.id))
-
-                    Button(action: {
-                        Task {
-                            var likelist = userInfo.likelist
-                            await likeSong(
-                                likelist: &likelist,
-                                songId: song.id,
-                                favored: favored
-                            )
-                            userInfo.likelist = likelist
-                        }
-                    }) {
-                        Image(systemName: favored ? "heart.fill" : "heart")
-                            .resizable()
-                            .frame(width: 16, height: 14)
-                            .help(favored ? "Unfavor" : "Favor")
-                            .padding(.trailing, 4)
+            SongTableView(
+                songs: model.songs,
+                selectedItem: $selectedItem,
+                sortOrder: $sortOrder,
+                userInfo: userInfo,
+                playlistMetadata: playlistMetadata,
+                onSortChange: handleSortChange,
+                onContextMenuPlay: { song in
+                    Task {
+                        let newItem = loadItem(song: song)
+                        let _ = await playlistStatus.addItemAndSeekTo(
+                            newItem, shouldPlay: true)
                     }
-                }
-                .width(16)
-
-                TableColumn("Title", value: \.name) { song in
-                    HStack {
-                        Text(song.name)
-
-                        if let alia = song.tns?.first ?? song.alia.first {
-                            Text("( \(alia) )")
-                                .foregroundColor(.secondary)
-                        }
-
-                        if let _ = song.pc {
-                            Spacer()
-                            Image(systemName: "cloud")
-                                .resizable()
-                                .frame(width: 18, height: 12)
-                                .help("Cloud")
-                        } else {
-                            if song.fee == .vip
-                                || song.fee == .album
-                            {
-                                Spacer()
-                                Image(systemName: "dollarsign.circle")
-                                    .resizable()
-                                    .frame(width: 16, height: 16)
-                                    .help("Need buy")
-                                    .padding(.horizontal, 1)
-                                    .frame(width: 18, height: 16)
-                            } else if song.fee == .trial {
-                                Spacer()
-                                Image(systemName: "gift")
-                                    .resizable()
-                                    .frame(width: 16, height: 16)
-                                    .help("Trial")
-                                    .padding(.horizontal, 1)
-                                    .frame(width: 18, height: 16)
+                },
+                onContextMenuAddToNowPlaying: { song in
+                    let newItem = loadItem(song: song)
+                    let _ = playlistStatus.addItemToPlaylist(newItem)
+                },
+                onContextMenuAddToPlaylist: { song in
+                    selectedSongToAdd = song
+                },
+                onContextMenuDeleteFromPlaylist: { song in
+                    Task {
+                        if case .netease(let songId, _) = playlistMetadata {
+                            do {
+                                try await CloudMusicApi().playlist_tracks(
+                                    op: .del, playlistId: songId,
+                                    trackIds: [song.id])
+                                updatePlaylist()
+                            } catch let error as RequestError {
+                                AlertModal.showAlert(error.localizedDescription)
+                            } catch {
+                                AlertModal.showAlert(error.localizedDescription)
                             }
                         }
                     }
-                }
-                .width(min: 500)
-
-                TableColumn("Artist", value: \.ar[0].name) { song in
-                    Text(song.ar.map(\.name).joined(separator: ", "))
-                }
-
-                TableColumn("Ablum", value: \.al.name)
-
-                TableColumn("Duration", value: \.dt) { song in
-                    let ret = song.parseDuration()
-                    Text(String(format: "%02d:%02d", ret.minute, ret.second))
-                }
-                .width(max: 60)
-            } rows: {
-                if let songs = model.songs {
-                    ForEach(songs) { song in
-                        TableRow(song)
-                            .contextMenu {
-                                Button("Play") {
-                                    Task {
-                                        let newItem = loadItem(song: song)
-                                        let _ = await playlistStatus.addItemAndSeekTo(
-                                            newItem, shouldPlay: true)
-                                    }
-                                }
-
-                                Button("Add to Now Playing") {
-                                    let newItem = loadItem(song: song)
-                                    let _ = playlistStatus.addItemToPlaylist(newItem)
-                                }
-
-                                Button("Add to Playlist") {
-                                    selectedSongToAdd = song
-                                }
-
-                                if case .netease(let songId, _) = playlistMetadata {
-                                    Button("Delete from Playlist") {
-                                        Task {
-                                            do {
-                                                try await CloudMusicApi().playlist_tracks(
-                                                    op: .del, playlistId: songId,
-                                                    trackIds: [song.id])
-                                                updatePlaylist()
-                                            } catch let error as RequestError {
-                                                AlertModal.showAlert(error.localizedDescription)
-                                            } catch {
-                                                AlertModal.showAlert(error.localizedDescription)
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Button("Upload to Cloud") {
-                                    Task {
-                                        if let url = await selectFile() {
-                                            await uploadCloud(songId: song.id, url: url)
-                                        }
-                                    }
-                                }
-
-                                Button("Copy Title") {
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(song.name, forType: .string)
-                                }
-
-                                Button("Copy Link") {
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString("https://music.163.com/#/song?id=\(song.id)", forType: .string)
-                                }
+                },
+                onContextMenuUploadToCloud: { song in
+                    Task {
+                        if let url = await selectAudioFile() {
+                            isLoading = true
+                            let success = await uploadCloudFile(
+                                songId: song.id, url: url, userInfo: userInfo)
+                            if success {
+                                updatePlaylist(force: true)
                             }
-                            .dropDestination(for: URL.self) { urls in
-                                if let url = urls.first {
-                                    Task {
-                                        await uploadCloud(songId: song.id, url: url)
-                                    }
-                                }
-                            }
+                            isLoading = false
+                        }
+                    }
+                },
+                onDropUpload: { song, url in
+                    Task {
+                        isLoading = true
+                        let success = await uploadCloudFile(
+                            songId: song.id, url: url, userInfo: userInfo)
+                        if success {
+                            updatePlaylist(force: true)
+                        }
+                        isLoading = false
                     }
                 }
-            }
-            .onTapGesture(count: 2) { location in
-                print("location: \(location)")
-            }
-            .onChange(of: sortOrder) { prevSortOrder, sortOrder in
-                if prevSortOrder.count >= 1, self.sortOrder.count >= 1,
-                    prevSortOrder[0].keyPath == self.sortOrder[0].keyPath,
-                    self.sortOrder[0].order == .forward
-                {
-                    self.sortOrder.removeAll()
-                }
-
-                handleSortChange(sortOrder: self.sortOrder)
-            }
+            )
             .onChange(of: searchText) { prevSearchText, searchText in
                 model.applySearch(by: searchText)
                 model.update()
@@ -593,48 +707,33 @@ struct PlayListView: View {
             .navigationTitle((playlistMetadata?.name) ?? "Playlist")
             .searchable(text: $searchText, prompt: "Search in Playlist")
             .toolbar {
-                ToolbarItemGroup {
-                    let songs = model.songs ?? []
-
-                    Button(action: {
+                PlaylistToolbar(
+                    songs: model.songs ?? [],
+                    playlistMetadata: playlistMetadata,
+                    onPlayAll: {
                         Task {
-                            let newItems = songs.map { song in
+                            let newItems = (model.songs ?? []).map { song in
                                 loadItem(song: song)
                             }
                             let _ = await playlistStatus.replacePlaylist(
                                 newItems, continuePlaying: true, shouldSaveState: true)
                         }
-                    }) {
-                        Image(systemName: "play")
-                    }
-                    .help("Play All")
-
-                    Button(action: {
+                    },
+                    onAddAllToPlaylist: {
                         Task {
-                            let newItems = songs.map { song in
+                            let newItems = (model.songs ?? []).map { song in
                                 loadItem(song: song)
                             }
                             let _ = await playlistStatus.addItemsToPlaylist(
                                 newItems, continuePlaying: false, shouldSaveState: true)
                         }
-                    }) {
-                        Image(systemName: "plus")
-                    }
-                    .help("Add All to Playlist")
-
-                    DownloadAllButton(songs: model.songs ?? [])
-
-                    if case .netease = playlistMetadata {
-                        Button(action: {
-                            Task {
-                                updatePlaylist(force: true)
-                            }
-                        }) {
-                            Image(systemName: "arrow.clockwise")
+                    },
+                    onRefresh: {
+                        Task {
+                            updatePlaylist(force: true)
                         }
-                        .help("Refresh Playlist")
                     }
-                }
+                )
             }
             .onChange(of: playlistMetadata?.id) {
                 updatePlaylist()
@@ -664,14 +763,14 @@ struct PlayListView: View {
 
             model.curId = playlistMetadata.id
             loadingTask?.cancel()
-            
+
             // Generate a new task ID for this loading operation
             let taskId = UUID()
             currentLoadingTaskId = taskId
-            
+
             loadingTask = Task {
                 await model.updatePlaylistDetail(metadata: playlistMetadata, force: force)
-                
+
                 // Only update loading state if this is still the current task
                 if taskId == currentLoadingTaskId {
                     isLoading = false
