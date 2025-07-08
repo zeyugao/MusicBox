@@ -516,18 +516,33 @@ struct SongTableView: View {
 struct PlaylistToolbar: ToolbarContent {
     let songs: [CloudMusicApi.Song]
     let playlistMetadata: PlaylistMetadata?
-    let onPlayAll: () -> Void
-    let onAddAllToPlaylist: () -> Void
+    let playlistStatus: PlaylistStatus
     let onRefresh: () -> Void
 
     var body: some ToolbarContent {
         ToolbarItemGroup {
-            Button(action: onPlayAll) {
+            Button(action: {
+                Task {
+                    let newItems = songs.map { song in
+                        loadItem(song: song)
+                    }
+                    let _ = await playlistStatus.replacePlaylist(
+                        newItems, continuePlaying: true, shouldSaveState: true)
+                }
+            }) {
                 Image(systemName: "play")
             }
             .help("Play All")
 
-            Button(action: onAddAllToPlaylist) {
+            Button(action: {
+                Task {
+                    let newItems = songs.map { song in
+                        loadItem(song: song)
+                    }
+                    let _ = await playlistStatus.addItemsToPlaylist(
+                        newItems, continuePlaying: false, shouldSaveState: true)
+                }
+            }) {
                 Image(systemName: "plus")
             }
             .help("Add All to Playlist")
@@ -703,24 +718,7 @@ struct PlayListView: View {
                 PlaylistToolbar(
                     songs: model.songs ?? [],
                     playlistMetadata: playlistMetadata,
-                    onPlayAll: {
-                        Task {
-                            let newItems = (model.songs ?? []).map { song in
-                                loadItem(song: song)
-                            }
-                            let _ = await playlistStatus.replacePlaylist(
-                                newItems, continuePlaying: true, shouldSaveState: true)
-                        }
-                    },
-                    onAddAllToPlaylist: {
-                        Task {
-                            let newItems = (model.songs ?? []).map { song in
-                                loadItem(song: song)
-                            }
-                            let _ = await playlistStatus.addItemsToPlaylist(
-                                newItems, continuePlaying: false, shouldSaveState: true)
-                        }
-                    },
+                    playlistStatus: playlistStatus,
                     onRefresh: {
                         Task {
                             updatePlaylist(force: true)
