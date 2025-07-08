@@ -12,6 +12,104 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct UploadItem: Identifiable {
+    let id = UUID()
+    let songId: UInt64
+    let songName: String
+    let url: URL
+    var isCompleted: Bool = false
+    var errorMessage: String? = nil
+    var isUploading: Bool = true
+}
+
+class UploadManager: ObservableObject {
+    @Published var uploadItems: [UploadItem] = []
+    @Published var isUploading: Bool = false
+    @Published var presentUploadDialog: Bool = false
+
+    private var uploadTasks: [UUID: Task<Void, Never>] = [:]
+
+    var totalCount: Int {
+        uploadItems.filter { $0.isUploading }.count
+    }
+
+    var completedCount: Int {
+        uploadItems.filter { $0.isCompleted && $0.isUploading }.count
+    }
+
+    var uploadProgress: Double {
+        guard totalCount > 0 else { return 0.0 }
+        return Double(completedCount) / Double(totalCount)
+    }
+
+    func addUpload(
+        songId: UInt64, songName: String, url: URL,
+        uploadAction: @escaping (UInt64, URL) async throws -> Void
+    ) {
+        let uploadItem = UploadItem(songId: songId, songName: songName, url: url)
+        // Insert at the beginning of the array to show newest uploads at the top
+        uploadItems.insert(uploadItem, at: 0)
+        isUploading = true
+        presentUploadDialog = true
+
+        let itemId = uploadItem.id
+        let task = Task {
+            do {
+                try await uploadAction(songId, url)
+                await MainActor.run {
+                    if let index = self.uploadItems.firstIndex(where: { $0.id == itemId }) {
+                        self.uploadItems[index].isCompleted = true
+                        self.uploadItems[index].isUploading = false
+                    }
+                    self.uploadTasks.removeValue(forKey: itemId)
+                    self.checkUploadCompletion()
+                }
+            } catch {
+                await MainActor.run {
+                    if let index = self.uploadItems.firstIndex(where: { $0.id == itemId }) {
+                        self.uploadItems[index].errorMessage = error.localizedDescription
+                        self.uploadItems[index].isUploading = false
+                    }
+                    self.uploadTasks.removeValue(forKey: itemId)
+                    self.checkUploadCompletion()
+                }
+            }
+        }
+
+        uploadTasks[itemId] = task
+    }
+
+    private func checkUploadCompletion() {
+        // Check if all currently uploading items are done (either completed or failed)
+        let uploadingItems = uploadItems.filter { $0.isUploading }
+        if uploadingItems.isEmpty {
+            isUploading = false
+        }
+    }
+
+    func cancelAllUploads() {
+        for task in uploadTasks.values {
+            task.cancel()
+        }
+        // Only cancel currently uploading items
+        for index in uploadItems.indices {
+            if uploadItems[index].isUploading {
+                uploadItems[index].isUploading = false
+                uploadItems[index].errorMessage = "Cancelled"
+            }
+        }
+        uploadTasks.removeAll()
+        isUploading = false
+    }
+
+    func clearAllItems() {
+        uploadItems.removeAll()
+        uploadTasks.removeAll()
+        isUploading = false
+        presentUploadDialog = false
+    }
+}
+
 enum PlaylistMetadata: Hashable, Equatable {
     static func == (lhs: PlaylistMetadata, rhs: PlaylistMetadata) -> Bool {
         lhs.id == rhs.id
@@ -269,6 +367,91 @@ struct DownloadProgressDialog: View {
     }
 }
 
+struct UploadProgressDialog: View {
+    @ObservedObject var uploadManager: UploadManager
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text("Upload to Cloud")
+                    .font(.headline)
+                Spacer()
+            }
+
+            ScrollView {
+                VStack(spacing: 8) {
+                    ForEach(uploadManager.uploadItems) { item in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.songName)
+                                    .font(.caption)
+                                    .lineLimit(1)
+
+                                if let errorMessage = item.errorMessage {
+                                    Text(errorMessage)
+                                        .font(.caption2)
+                                        .foregroundColor(.red)
+                                        .lineLimit(2)
+                                } else if item.isCompleted {
+                                    Text("Completed")
+                                        .font(.caption2)
+                                        .foregroundColor(.green)
+                                } else if item.isUploading {
+                                    ProgressView()
+                                        .progressViewStyle(LinearProgressViewStyle())
+                                        .scaleEffect(0.8)
+                                }
+                            }
+
+                            Spacer()
+
+                            if item.errorMessage != nil {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.red)
+                            } else if item.isCompleted {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(6)
+                    }
+                }
+            }
+            .frame(maxHeight: 300)
+
+            HStack {
+                if uploadManager.isUploading {
+                    Text("\(uploadManager.completedCount)/\(uploadManager.totalCount) completed")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("All uploads finished")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if uploadManager.isUploading {
+                    Button("Cancel All") {
+                        uploadManager.cancelAllUploads()
+                    }
+                } else {
+                    Button("Clear All") {
+                        uploadManager.clearAllItems()
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .frame(minHeight: 150)
+        .frame(width: 350)
+    }
+}
+
 struct DownloadAllButton: View {
     @State private var presentDownloadAllSongDialog = false
     @State private var canceledDownloadAllSong = false
@@ -294,7 +477,7 @@ struct DownloadAllButton: View {
 
                 for (idx, song) in songs.enumerated() {
                     text = "Downloading \(idx + 1) / \(totalCnt)"
-                    if let _ = getCachedMusicFile(id: song.id) {
+                    if getCachedMusicFile(id: song.id) != nil {
                     } else {
                         if let songData = await CloudMusicApi().song_url_v1(id: [song.id]) {
                             let songData = songData[0]
@@ -337,8 +520,37 @@ struct DownloadAllButton: View {
     }
 }
 
+struct UploadToCloudButton: View {
+    @ObservedObject var uploadManager: UploadManager
+
+    var body: some View {
+        Button(action: {
+            uploadManager.presentUploadDialog.toggle()
+        }) {
+            if uploadManager.isUploading {
+                ProgressView(value: uploadManager.uploadProgress)
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .controlSize(.small)
+            } else {
+                Image(systemName: "icloud.and.arrow.up")
+            }
+        }
+        .help(
+            uploadManager.isUploading
+                ? "Uploading \(uploadManager.completedCount)/\(uploadManager.totalCount)"
+                : "Upload to Cloud"
+        )
+        .popover(
+            isPresented: $uploadManager.presentUploadDialog
+        ) {
+            UploadProgressDialog(uploadManager: uploadManager)
+        }
+    }
+}
+
 struct PlayListView: View {
     @StateObject var model = PlaylistDetailModel()
+    @StateObject var uploadManager = UploadManager()
 
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject var playlistStatus: PlaylistStatus
@@ -356,9 +568,7 @@ struct PlayListView: View {
 
     let currencyStyle = Decimal.FormatStyle.Currency(code: "USD")
 
-    func uploadCloud(songId: UInt64, url: URL) async {
-        isLoading = true
-        defer { isLoading = false }
+    func uploadCloud(songId: UInt64, url: URL) async throws {
         if let metadata = await loadMetadata(url: url) {
             do {
                 if let privateSongId = try await CloudMusicApi().cloud(
@@ -372,18 +582,25 @@ struct PlayListView: View {
                         songId: privateSongId,
                         adjustSongId: songId
                     )
-                    updatePlaylist(force: true)
+                    await MainActor.run {
+                        updatePlaylist(force: true)
+                    }
                     return
                 } else {
-                    AlertModal.showAlert("Failed to upload music")
+                    throw NSError(
+                        domain: "UploadError", code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Failed to upload music"])
                 }
-            } catch let error as RequestError {
-                AlertModal.showAlert(error.localizedDescription)
             } catch {
-                AlertModal.showAlert(error.localizedDescription)
+                throw error
             }
         } else {
-            AlertModal.showAlert("Failed to load metadata for \(url)")
+            throw NSError(
+                domain: "UploadError", code: 2,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "Failed to load metadata for \(url.lastPathComponent)"
+                ])
         }
     }
 
@@ -442,7 +659,7 @@ struct PlayListView: View {
                                 .foregroundColor(.secondary)
                         }
 
-                        if let _ = song.pc {
+                        if song.pc != nil {
                             Spacer()
                             Image(systemName: "cloud")
                                 .resizable()
@@ -526,7 +743,13 @@ struct PlayListView: View {
                                 Button("Upload to Cloud") {
                                     Task {
                                         if let url = await selectFile() {
-                                            await uploadCloud(songId: song.id, url: url)
+                                            uploadManager.addUpload(
+                                                songId: song.id,
+                                                songName: song.name,
+                                                url: url
+                                            ) { songId, url in
+                                                try await uploadCloud(songId: songId, url: url)
+                                            }
                                         }
                                     }
                                 }
@@ -538,15 +761,22 @@ struct PlayListView: View {
 
                                 Button("Copy Link") {
                                     NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString("https://music.163.com/#/song?id=\(song.id)", forType: .string)
+                                    NSPasteboard.general.setString(
+                                        "https://music.163.com/#/song?id=\(song.id)",
+                                        forType: .string)
                                 }
                             }
                             .dropDestination(for: URL.self) { urls in
                                 if let url = urls.first {
-                                    Task {
-                                        await uploadCloud(songId: song.id, url: url)
+                                    uploadManager.addUpload(
+                                        songId: song.id,
+                                        songName: song.name,
+                                        url: url
+                                    ) { songId, url in
+                                        try await uploadCloud(songId: songId, url: url)
                                     }
                                 }
+                                return true
                             }
                     }
                 }
@@ -624,6 +854,8 @@ struct PlayListView: View {
 
                     DownloadAllButton(songs: model.songs ?? [])
 
+                    UploadToCloudButton(uploadManager: uploadManager)
+
                     if case .netease = playlistMetadata {
                         Button(action: {
                             Task {
@@ -664,14 +896,14 @@ struct PlayListView: View {
 
             model.curId = playlistMetadata.id
             loadingTask?.cancel()
-            
+
             // Generate a new task ID for this loading operation
             let taskId = UUID()
             currentLoadingTaskId = taskId
-            
+
             loadingTask = Task {
                 await model.updatePlaylistDetail(metadata: playlistMetadata, force: force)
-                
+
                 // Only update loading state if this is still the current task
                 if taskId == currentLoadingTaskId {
                     isLoading = false
