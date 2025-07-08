@@ -363,22 +363,27 @@ struct SongContextMenu: View {
 struct SongTitleCell: View {
     let song: CloudMusicApi.Song
 
-    private var aliasText: String? {
-        song.tns?.first ?? song.alia.first
-    }
+    // 缓存计算结果，避免重复计算
+    private let aliasText: String?
+    private let statusIcon:
+        (systemName: String, help: String, width: CGFloat, height: CGFloat, padding: CGFloat)?
 
-    private var statusIcon: (systemName: String, help: String)? {
+    init(song: CloudMusicApi.Song) {
+        self.song = song
+        self.aliasText = song.tns?.first ?? song.alia.first
+
+        // 预计算状态图标信息
         if song.pc != nil {
-            return ("cloud", "Cloud")
-        }
-
-        switch song.fee {
-        case .vip, .album:
-            return ("dollarsign.circle", "Need buy")
-        case .trial:
-            return ("gift", "Trial")
-        default:
-            return nil
+            self.statusIcon = ("cloud", "Cloud", 18, 12, 0)
+        } else {
+            switch song.fee {
+            case .vip, .album:
+                self.statusIcon = ("dollarsign.circle", "Need buy", 16, 16, 1)
+            case .trial:
+                self.statusIcon = ("gift", "Trial", 16, 16, 1)
+            default:
+                self.statusIcon = nil
+            }
         }
     }
 
@@ -398,12 +403,9 @@ struct SongTitleCell: View {
                 Spacer()
                 Image(systemName: icon.systemName)
                     .resizable()
-                    .frame(
-                        width: icon.systemName == "cloud" ? 18 : 16,
-                        height: icon.systemName == "cloud" ? 12 : 16
-                    )
+                    .frame(width: icon.width, height: icon.height)
                     .help(icon.help)
-                    .padding(.horizontal, icon.systemName == "cloud" ? 0 : 1)
+                    .padding(.horizontal, icon.padding)
                     .frame(width: 18, height: 16)
             }
         }
@@ -414,46 +416,48 @@ struct SongFavoriteButton: View {
     let song: CloudMusicApi.Song
     let userInfo: UserInfo
 
+    // 缓存 songId，避免重复访问
+    private let songId: UInt64
+
+    init(song: CloudMusicApi.Song, userInfo: UserInfo) {
+        self.song = song
+        self.userInfo = userInfo
+        self.songId = song.id
+    }
+
     private var isFavorite: Bool {
-        userInfo.likelist.contains(song.id)
-    }
-
-    private var iconName: String {
-        isFavorite ? "heart.fill" : "heart"
-    }
-
-    private var helpText: String {
-        isFavorite ? "Unfavor" : "Favor"
+        userInfo.likelist.contains(songId)
     }
 
     private func toggleFavorite() {
+        let currentFavoriteState = isFavorite
+
         Task {
             var likelist = userInfo.likelist
             await likeSong(
                 likelist: &likelist,
-                songId: song.id,
-                favored: isFavorite
+                songId: songId,
+                favored: currentFavoriteState
             )
             await MainActor.run {
-                updateUserLikelist()
+                // 使用捕获的状态，避免重复计算
+                if currentFavoriteState {
+                    userInfo.likelist.remove(songId)
+                } else {
+                    userInfo.likelist.insert(songId)
+                }
             }
         }
     }
 
-    private func updateUserLikelist() {
-        if isFavorite {
-            userInfo.likelist.remove(song.id)
-        } else {
-            userInfo.likelist.insert(song.id)
-        }
-    }
-
     var body: some View {
+        let favorite = isFavorite
+
         Button(action: toggleFavorite) {
-            Image(systemName: iconName)
+            Image(systemName: favorite ? "heart.fill" : "heart")
                 .resizable()
                 .frame(width: 16, height: 14)
-                .help(helpText)
+                .help(favorite ? "Unfavor" : "Favor")
                 .padding(.trailing, 4)
         }
     }
@@ -462,8 +466,12 @@ struct SongFavoriteButton: View {
 struct SongArtistCell: View {
     let song: CloudMusicApi.Song
 
-    private var artistNames: String {
-        song.ar.map(\.name).joined(separator: ", ")
+    // 缓存艺术家名称，避免重复计算
+    private let artistNames: String
+
+    init(song: CloudMusicApi.Song) {
+        self.song = song
+        self.artistNames = song.ar.map(\.name).joined(separator: ", ")
     }
 
     var body: some View {
@@ -474,13 +482,98 @@ struct SongArtistCell: View {
 struct SongDurationCell: View {
     let song: CloudMusicApi.Song
 
-    private var formattedDuration: String {
+    // 缓存格式化的时长，避免重复计算
+    private let formattedDuration: String
+
+    init(song: CloudMusicApi.Song) {
+        self.song = song
         let duration = song.parseDuration()
-        return String(format: "%02d:%02d", duration.minute, duration.second)
+        self.formattedDuration = String(format: "%02d:%02d", duration.minute, duration.second)
     }
 
     var body: some View {
         Text(formattedDuration)
+    }
+}
+
+struct SongTableRow: View {
+    let song: CloudMusicApi.Song
+    let playlistMetadata: PlaylistMetadata?
+    let playlistStatus: PlaylistStatus
+    @Binding var selectedSongToAdd: CloudMusicApi.Song?
+    let onDeleteFromPlaylist: (CloudMusicApi.Song) -> Void
+    let onUploadToCloud: (CloudMusicApi.Song, URL) -> Void
+
+    // 缓存常用的闭包，避免重复创建
+    private let playAction: () -> Void
+    private let addToNowPlayingAction: () -> Void
+    private let addToPlaylistAction: () -> Void
+    private let deleteFromPlaylistAction: () -> Void
+    private let uploadToCloudAction: () -> Void
+
+    init(
+        song: CloudMusicApi.Song,
+        playlistMetadata: PlaylistMetadata?,
+        playlistStatus: PlaylistStatus,
+        selectedSongToAdd: Binding<CloudMusicApi.Song?>,
+        onDeleteFromPlaylist: @escaping (CloudMusicApi.Song) -> Void,
+        onUploadToCloud: @escaping (CloudMusicApi.Song, URL) -> Void
+    ) {
+        self.song = song
+        self.playlistMetadata = playlistMetadata
+        self.playlistStatus = playlistStatus
+        self._selectedSongToAdd = selectedSongToAdd
+        self.onDeleteFromPlaylist = onDeleteFromPlaylist
+        self.onUploadToCloud = onUploadToCloud
+
+        // 预计算闭包，避免在每次渲染时重新创建
+        self.playAction = {
+            Task {
+                let newItem = loadItem(song: song)
+                let _ = await playlistStatus.addItemAndSeekTo(newItem, shouldPlay: true)
+            }
+        }
+
+        self.addToNowPlayingAction = {
+            let newItem = loadItem(song: song)
+            let _ = playlistStatus.addItemToPlaylist(newItem)
+        }
+
+        self.addToPlaylistAction = {
+            selectedSongToAdd.wrappedValue = song
+        }
+
+        self.deleteFromPlaylistAction = {
+            onDeleteFromPlaylist(song)
+        }
+
+        self.uploadToCloudAction = {
+            Task {
+                if let url = await selectAudioFile() {
+                    onUploadToCloud(song, url)
+                }
+            }
+        }
+    }
+
+    var body: some View {
+        TableRow(song)
+            .contextMenu {
+                SongContextMenu(
+                    song: song,
+                    playlistMetadata: playlistMetadata,
+                    onPlay: playAction,
+                    onAddToNowPlaying: addToNowPlayingAction,
+                    onAddToPlaylist: addToPlaylistAction,
+                    onDeleteFromPlaylist: deleteFromPlaylistAction,
+                    onUploadToCloud: uploadToCloudAction
+                )
+            }
+            .dropDestination(for: URL.self) { urls in
+                if let url = urls.first {
+                    onUploadToCloud(song, url)
+                }
+            }
     }
 }
 
@@ -525,40 +618,14 @@ struct SongTableView: View {
         } rows: {
             if let songs = songs {
                 ForEach(songs) { song in
-                    TableRow(song)
-                        .contextMenu {
-                            SongContextMenu(
-                                song: song,
-                                playlistMetadata: playlistMetadata,
-                                onPlay: {
-                                    Task {
-                                        let newItem = loadItem(song: song)
-                                        let _ = await playlistStatus.addItemAndSeekTo(
-                                            newItem, shouldPlay: true)
-                                    }
-                                },
-                                onAddToNowPlaying: {
-                                    let newItem = loadItem(song: song)
-                                    let _ = playlistStatus.addItemToPlaylist(newItem)
-                                },
-                                onAddToPlaylist: {
-                                    selectedSongToAdd = song
-                                },
-                                onDeleteFromPlaylist: { onDeleteFromPlaylist(song) },
-                                onUploadToCloud: {
-                                    Task {
-                                        if let url = await selectAudioFile() {
-                                            onUploadToCloud(song, url)
-                                        }
-                                    }
-                                }
-                            )
-                        }
-                        .dropDestination(for: URL.self) { urls in
-                            if let url = urls.first {
-                                onUploadToCloud(song, url)
-                            }
-                        }
+                    SongTableRow(
+                        song: song,
+                        playlistMetadata: playlistMetadata,
+                        playlistStatus: playlistStatus,
+                        selectedSongToAdd: $selectedSongToAdd,
+                        onDeleteFromPlaylist: onDeleteFromPlaylist,
+                        onUploadToCloud: onUploadToCloud
+                    )
                 }
             }
         }
