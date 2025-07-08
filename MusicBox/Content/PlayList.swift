@@ -360,6 +360,97 @@ struct SongContextMenu: View {
     }
 }
 
+struct SongTitleCell: View {
+    let song: CloudMusicApi.Song
+
+    var body: some View {
+        HStack {
+            Text(song.name)
+
+            if let alia = song.tns?.first ?? song.alia.first {
+                Text("( \(alia) )")
+                    .foregroundColor(.secondary)
+            }
+
+            if song.pc != nil {
+                Spacer()
+                Image(systemName: "cloud")
+                    .resizable()
+                    .frame(width: 18, height: 12)
+                    .help("Cloud")
+            } else {
+                if song.fee == .vip || song.fee == .album {
+                    Spacer()
+                    Image(systemName: "dollarsign.circle")
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                        .help("Need buy")
+                        .padding(.horizontal, 1)
+                        .frame(width: 18, height: 16)
+                } else if song.fee == .trial {
+                    Spacer()
+                    Image(systemName: "gift")
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                        .help("Trial")
+                        .padding(.horizontal, 1)
+                        .frame(width: 18, height: 16)
+                }
+            }
+        }
+    }
+}
+
+struct SongFavoriteButton: View {
+    let song: CloudMusicApi.Song
+    let userInfo: UserInfo
+
+    var body: some View {
+        let favored = (userInfo.likelist.contains(song.id))
+
+        Button(action: {
+            Task {
+                var likelist = userInfo.likelist
+                await likeSong(
+                    likelist: &likelist,
+                    songId: song.id,
+                    favored: favored
+                )
+                await MainActor.run {
+                    if favored {
+                        userInfo.likelist.remove(song.id)
+                    } else {
+                        userInfo.likelist.insert(song.id)
+                    }
+                }
+            }
+        }) {
+            Image(systemName: favored ? "heart.fill" : "heart")
+                .resizable()
+                .frame(width: 16, height: 14)
+                .help(favored ? "Unfavor" : "Favor")
+                .padding(.trailing, 4)
+        }
+    }
+}
+
+struct SongArtistCell: View {
+    let song: CloudMusicApi.Song
+
+    var body: some View {
+        Text(song.ar.map(\.name).joined(separator: ", "))
+    }
+}
+
+struct SongDurationCell: View {
+    let song: CloudMusicApi.Song
+
+    var body: some View {
+        let ret = song.parseDuration()
+        Text(String(format: "%02d:%02d", ret.minute, ret.second))
+    }
+}
+
 struct SongTableView: View {
     let songs: [CloudMusicApi.Song]?
     @Binding var selectedItem: CloudMusicApi.Song.ID?
@@ -379,82 +470,23 @@ struct SongTableView: View {
             sortOrder: $sortOrder
         ) {
             TableColumn("") { song in
-                let favored = (userInfo.likelist.contains(song.id))
-
-                Button(action: {
-                    Task {
-                        var likelist = userInfo.likelist
-                        await likeSong(
-                            likelist: &likelist,
-                            songId: song.id,
-                            favored: favored
-                        )
-                        await MainActor.run {
-                            // Update the userInfo in a way that won't cause issues
-                            if favored {
-                                userInfo.likelist.remove(song.id)
-                            } else {
-                                userInfo.likelist.insert(song.id)
-                            }
-                        }
-                    }
-                }) {
-                    Image(systemName: favored ? "heart.fill" : "heart")
-                        .resizable()
-                        .frame(width: 16, height: 14)
-                        .help(favored ? "Unfavor" : "Favor")
-                        .padding(.trailing, 4)
-                }
+                SongFavoriteButton(song: song, userInfo: userInfo)
             }
             .width(16)
 
             TableColumn("Title", value: \.name) { song in
-                HStack {
-                    Text(song.name)
-
-                    if let alia = song.tns?.first ?? song.alia.first {
-                        Text("( \(alia) )")
-                            .foregroundColor(.secondary)
-                    }
-
-                    if song.pc != nil {
-                        Spacer()
-                        Image(systemName: "cloud")
-                            .resizable()
-                            .frame(width: 18, height: 12)
-                            .help("Cloud")
-                    } else {
-                        if song.fee == .vip || song.fee == .album {
-                            Spacer()
-                            Image(systemName: "dollarsign.circle")
-                                .resizable()
-                                .frame(width: 16, height: 16)
-                                .help("Need buy")
-                                .padding(.horizontal, 1)
-                                .frame(width: 18, height: 16)
-                        } else if song.fee == .trial {
-                            Spacer()
-                            Image(systemName: "gift")
-                                .resizable()
-                                .frame(width: 16, height: 16)
-                                .help("Trial")
-                                .padding(.horizontal, 1)
-                                .frame(width: 18, height: 16)
-                        }
-                    }
-                }
+                SongTitleCell(song: song)
             }
             .width(min: 500)
 
             TableColumn("Artist", value: \.ar[0].name) { song in
-                Text(song.ar.map(\.name).joined(separator: ", "))
+                SongArtistCell(song: song)
             }
 
-            TableColumn("Ablum", value: \.al.name)
+            TableColumn("Album", value: \.al.name)
 
             TableColumn("Duration", value: \.dt) { song in
-                let ret = song.parseDuration()
-                Text(String(format: "%02d:%02d", ret.minute, ret.second))
+                SongDurationCell(song: song)
             }
             .width(max: 60)
         } rows: {
