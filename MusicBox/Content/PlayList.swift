@@ -363,39 +363,48 @@ struct SongContextMenu: View {
 struct SongTitleCell: View {
     let song: CloudMusicApi.Song
 
+    private var aliasText: String? {
+        song.tns?.first ?? song.alia.first
+    }
+
+    private var statusIcon: (systemName: String, help: String)? {
+        if song.pc != nil {
+            return ("cloud", "Cloud")
+        }
+
+        switch song.fee {
+        case .vip, .album:
+            return ("dollarsign.circle", "Need buy")
+        case .trial:
+            return ("gift", "Trial")
+        default:
+            return nil
+        }
+    }
+
     var body: some View {
         HStack {
+            // Main title
             Text(song.name)
 
-            if let alia = song.tns?.first ?? song.alia.first {
-                Text("( \(alia) )")
+            // Alias text
+            if let alias = aliasText {
+                Text("( \(alias) )")
                     .foregroundColor(.secondary)
             }
 
-            if song.pc != nil {
+            // Status icon
+            if let icon = statusIcon {
                 Spacer()
-                Image(systemName: "cloud")
+                Image(systemName: icon.systemName)
                     .resizable()
-                    .frame(width: 18, height: 12)
-                    .help("Cloud")
-            } else {
-                if song.fee == .vip || song.fee == .album {
-                    Spacer()
-                    Image(systemName: "dollarsign.circle")
-                        .resizable()
-                        .frame(width: 16, height: 16)
-                        .help("Need buy")
-                        .padding(.horizontal, 1)
-                        .frame(width: 18, height: 16)
-                } else if song.fee == .trial {
-                    Spacer()
-                    Image(systemName: "gift")
-                        .resizable()
-                        .frame(width: 16, height: 16)
-                        .help("Trial")
-                        .padding(.horizontal, 1)
-                        .frame(width: 18, height: 16)
-                }
+                    .frame(
+                        width: icon.systemName == "cloud" ? 18 : 16,
+                        height: icon.systemName == "cloud" ? 12 : 16
+                    )
+                    .help(icon.help)
+                    .padding(.horizontal, icon.systemName == "cloud" ? 0 : 1)
+                    .frame(width: 18, height: 16)
             }
         }
     }
@@ -405,30 +414,46 @@ struct SongFavoriteButton: View {
     let song: CloudMusicApi.Song
     let userInfo: UserInfo
 
-    var body: some View {
-        let favored = (userInfo.likelist.contains(song.id))
+    private var isFavorite: Bool {
+        userInfo.likelist.contains(song.id)
+    }
 
-        Button(action: {
-            Task {
-                var likelist = userInfo.likelist
-                await likeSong(
-                    likelist: &likelist,
-                    songId: song.id,
-                    favored: favored
-                )
-                await MainActor.run {
-                    if favored {
-                        userInfo.likelist.remove(song.id)
-                    } else {
-                        userInfo.likelist.insert(song.id)
-                    }
-                }
+    private var iconName: String {
+        isFavorite ? "heart.fill" : "heart"
+    }
+
+    private var helpText: String {
+        isFavorite ? "Unfavor" : "Favor"
+    }
+
+    private func toggleFavorite() {
+        Task {
+            var likelist = userInfo.likelist
+            await likeSong(
+                likelist: &likelist,
+                songId: song.id,
+                favored: isFavorite
+            )
+            await MainActor.run {
+                updateUserLikelist()
             }
-        }) {
-            Image(systemName: favored ? "heart.fill" : "heart")
+        }
+    }
+
+    private func updateUserLikelist() {
+        if isFavorite {
+            userInfo.likelist.remove(song.id)
+        } else {
+            userInfo.likelist.insert(song.id)
+        }
+    }
+
+    var body: some View {
+        Button(action: toggleFavorite) {
+            Image(systemName: iconName)
                 .resizable()
                 .frame(width: 16, height: 14)
-                .help(favored ? "Unfavor" : "Favor")
+                .help(helpText)
                 .padding(.trailing, 4)
         }
     }
@@ -437,17 +462,25 @@ struct SongFavoriteButton: View {
 struct SongArtistCell: View {
     let song: CloudMusicApi.Song
 
+    private var artistNames: String {
+        song.ar.map(\.name).joined(separator: ", ")
+    }
+
     var body: some View {
-        Text(song.ar.map(\.name).joined(separator: ", "))
+        Text(artistNames)
     }
 }
 
 struct SongDurationCell: View {
     let song: CloudMusicApi.Song
 
+    private var formattedDuration: String {
+        let duration = song.parseDuration()
+        return String(format: "%02d:%02d", duration.minute, duration.second)
+    }
+
     var body: some View {
-        let ret = song.parseDuration()
-        Text(String(format: "%02d:%02d", ret.minute, ret.second))
+        Text(formattedDuration)
     }
 }
 
