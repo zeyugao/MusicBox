@@ -371,8 +371,7 @@ struct SongTableView: View {
     let onContextMenuAddToNowPlaying: (CloudMusicApi.Song) -> Void
     let onContextMenuAddToPlaylist: (CloudMusicApi.Song) -> Void
     let onContextMenuDeleteFromPlaylist: (CloudMusicApi.Song) -> Void
-    let onContextMenuUploadToCloud: (CloudMusicApi.Song) -> Void
-    let onDropUpload: (CloudMusicApi.Song, URL) -> Void
+    let onUploadToCloud: (CloudMusicApi.Song, URL) -> Void
 
     var body: some View {
         Table(
@@ -471,12 +470,18 @@ struct SongTableView: View {
                                 onAddToNowPlaying: { onContextMenuAddToNowPlaying(song) },
                                 onAddToPlaylist: { onContextMenuAddToPlaylist(song) },
                                 onDeleteFromPlaylist: { onContextMenuDeleteFromPlaylist(song) },
-                                onUploadToCloud: { onContextMenuUploadToCloud(song) }
+                                onUploadToCloud: {
+                                    Task {
+                                        if let url = await selectAudioFile() {
+                                            onUploadToCloud(song, url)
+                                        }
+                                    }
+                                }
                             )
                         }
                         .dropDestination(for: URL.self) { urls in
                             if let url = urls.first {
-                                onDropUpload(song, url)
+                                onUploadToCloud(song, url)
                             }
                         }
                 }
@@ -614,6 +619,15 @@ struct PlayListView: View {
 
     var playlistMetadata: PlaylistMetadata?
 
+    private func handleUploadToCloud(song: CloudMusicApi.Song, url: URL) async {
+        isLoading = true
+        let success = await uploadCloudFile(songId: song.id, url: url, userInfo: userInfo)
+        if success {
+            updatePlaylist(force: true)
+        }
+        isLoading = false
+    }
+
     var body: some View {
         ZStack {
             SongTableView(
@@ -653,28 +667,9 @@ struct PlayListView: View {
                         }
                     }
                 },
-                onContextMenuUploadToCloud: { song in
+                onUploadToCloud: { song, url in
                     Task {
-                        if let url = await selectAudioFile() {
-                            isLoading = true
-                            let success = await uploadCloudFile(
-                                songId: song.id, url: url, userInfo: userInfo)
-                            if success {
-                                updatePlaylist(force: true)
-                            }
-                            isLoading = false
-                        }
-                    }
-                },
-                onDropUpload: { song, url in
-                    Task {
-                        isLoading = true
-                        let success = await uploadCloudFile(
-                            songId: song.id, url: url, userInfo: userInfo)
-                        if success {
-                            updatePlaylist(force: true)
-                        }
-                        isLoading = false
+                        await handleUploadToCloud(song: song, url: url)
                     }
                 }
             )
