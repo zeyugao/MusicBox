@@ -827,12 +827,20 @@ class CloudMusicApi {
             let songId: UInt64
         }
 
+        struct Result3: Decodable {
+            let code: Int
+            let privateCloud: PrivateCloud?
+        }
+
         struct Result: Decodable {
-            let privateCloud: PrivateCloud
+            let res3: Result3
         }
 
         if let parsed = res.asType(Result.self, silent: true) {
-            return parsed.privateCloud.songId
+            if let songId = parsed.res3.privateCloud?.songId {
+                return songId
+            }
+            throw RequestError.errorCode((parsed.res3.code, "/api/cloud/pub/v2 Failed"))
         }
 
         struct ErrorResult: Decodable {
@@ -843,8 +851,6 @@ class CloudMusicApi {
         if let parsed = res.asType(ErrorResult.self, silent: true) {
             throw RequestError.errorCode((parsed.code, parsed.msg))
         }
-
-        print(res.asAny() ?? "Unknown error")
 
         throw RequestError.Request("\(res.asAny() ?? "Unknown error")")
     }
