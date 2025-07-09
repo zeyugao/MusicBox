@@ -12,6 +12,11 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
+extension Notification.Name {
+    static let uploadToCloud = Notification.Name("uploadToCloud")
+    static let refreshPlaylist = Notification.Name("refreshPlaylist")
+}
+
 enum PlaylistMetadata: Hashable, Equatable {
     static func == (lhs: PlaylistMetadata, rhs: PlaylistMetadata) -> Bool {
         lhs.id == rhs.id
@@ -183,33 +188,27 @@ func likeSong(
     }
 }
 
-func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo) async -> Bool {
+func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo) async throws -> Bool {
     if let metadata = await loadMetadata(url: url) {
-        do {
-            if let privateSongId = try await CloudMusicApi().cloud(
-                filePath: url,
-                songName: metadata.title,
-                artist: metadata.artist,
-                album: metadata.album
-            ) {
-                try await CloudMusicApi().cloud_match(
-                    userId: userInfo.profile?.userId ?? 0,
-                    songId: privateSongId,
-                    adjustSongId: songId
-                )
-                return true
-            } else {
-                AlertModal.showAlert("Failed to upload music")
-            }
-        } catch let error as RequestError {
-            AlertModal.showAlert(error.localizedDescription)
-        } catch {
-            AlertModal.showAlert(error.localizedDescription)
+        if let privateSongId = try await CloudMusicApi().cloud(
+            filePath: url,
+            songName: metadata.title,
+            artist: metadata.artist,
+            album: metadata.album
+        ) {
+            try await CloudMusicApi().cloud_match(
+                userId: userInfo.profile?.userId ?? 0,
+                songId: privateSongId,
+                adjustSongId: songId
+            )
+            return true
+        } else {
+            throw RequestError.Request("Failed to upload file to cloud")
         }
+
     } else {
-        AlertModal.showAlert("Failed to load metadata for \(url)")
+        throw RequestError.Request("Failed to load metadata from file")
     }
-    return false
 }
 
 @MainActor
@@ -496,87 +495,6 @@ struct SongDurationCell: View {
     }
 }
 
-struct SongTableRow: View {
-    let song: CloudMusicApi.Song
-    let playlistMetadata: PlaylistMetadata?
-    let playlistStatus: PlaylistStatus
-    @Binding var selectedSongToAdd: CloudMusicApi.Song?
-    let onDeleteFromPlaylist: (CloudMusicApi.Song) -> Void
-    let onUploadToCloud: (CloudMusicApi.Song, URL) -> Void
-
-    // 缓存常用的闭包，避免重复创建
-    private let playAction: () -> Void
-    private let addToNowPlayingAction: () -> Void
-    private let addToPlaylistAction: () -> Void
-    private let deleteFromPlaylistAction: () -> Void
-    private let uploadToCloudAction: () -> Void
-
-    init(
-        song: CloudMusicApi.Song,
-        playlistMetadata: PlaylistMetadata?,
-        playlistStatus: PlaylistStatus,
-        selectedSongToAdd: Binding<CloudMusicApi.Song?>,
-        onDeleteFromPlaylist: @escaping (CloudMusicApi.Song) -> Void,
-        onUploadToCloud: @escaping (CloudMusicApi.Song, URL) -> Void
-    ) {
-        self.song = song
-        self.playlistMetadata = playlistMetadata
-        self.playlistStatus = playlistStatus
-        self._selectedSongToAdd = selectedSongToAdd
-        self.onDeleteFromPlaylist = onDeleteFromPlaylist
-        self.onUploadToCloud = onUploadToCloud
-
-        // 预计算闭包，避免在每次渲染时重新创建
-        self.playAction = {
-            Task {
-                let newItem = loadItem(song: song)
-                let _ = await playlistStatus.addItemAndSeekTo(newItem, shouldPlay: true)
-            }
-        }
-
-        self.addToNowPlayingAction = {
-            let newItem = loadItem(song: song)
-            let _ = playlistStatus.addItemToPlaylist(newItem)
-        }
-
-        self.addToPlaylistAction = {
-            selectedSongToAdd.wrappedValue = song
-        }
-
-        self.deleteFromPlaylistAction = {
-            onDeleteFromPlaylist(song)
-        }
-
-        self.uploadToCloudAction = {
-            Task {
-                if let url = await selectAudioFile() {
-                    onUploadToCloud(song, url)
-                }
-            }
-        }
-    }
-
-    var body: some View {
-        TableRow(song)
-            .contextMenu {
-                SongContextMenu(
-                    song: song,
-                    playlistMetadata: playlistMetadata,
-                    onPlay: playAction,
-                    onAddToNowPlaying: addToNowPlayingAction,
-                    onAddToPlaylist: addToPlaylistAction,
-                    onDeleteFromPlaylist: deleteFromPlaylistAction,
-                    onUploadToCloud: uploadToCloudAction
-                )
-            }
-            .dropDestination(for: URL.self) { urls in
-                if let url = urls.first {
-                    onUploadToCloud(song, url)
-                }
-            }
-    }
-}
-
 struct SongTableView: View {
     let songs: [CloudMusicApi.Song]?
     @Binding var selectedItem: CloudMusicApi.Song.ID?
@@ -618,14 +536,40 @@ struct SongTableView: View {
         } rows: {
             if let songs = songs {
                 ForEach(songs) { song in
-                    SongTableRow(
-                        song: song,
-                        playlistMetadata: playlistMetadata,
-                        playlistStatus: playlistStatus,
-                        selectedSongToAdd: $selectedSongToAdd,
-                        onDeleteFromPlaylist: onDeleteFromPlaylist,
-                        onUploadToCloud: onUploadToCloud
-                    )
+                    TableRow(song)
+                        .contextMenu {
+                            SongContextMenu(
+                                song: song,
+                                playlistMetadata: playlistMetadata,
+                                onPlay: {
+                                    Task {
+                                        let newItem = loadItem(song: song)
+                                        let _ = await playlistStatus.addItemAndSeekTo(
+                                            newItem, shouldPlay: true)
+                                    }
+                                },
+                                onAddToNowPlaying: {
+                                    let newItem = loadItem(song: song)
+                                    let _ = playlistStatus.addItemToPlaylist(newItem)
+                                },
+                                onAddToPlaylist: {
+                                    selectedSongToAdd = song
+                                },
+                                onDeleteFromPlaylist: { onDeleteFromPlaylist(song) },
+                                onUploadToCloud: {
+                                    Task {
+                                        if let url = await selectAudioFile() {
+                                            onUploadToCloud(song, url)
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                        .dropDestination(for: URL.self) { urls in
+                            if let url = urls.first {
+                                onUploadToCloud(song, url)
+                            }
+                        }
                 }
             }
         }
@@ -649,6 +593,7 @@ struct PlaylistToolbar: ToolbarContent {
     let songs: [CloudMusicApi.Song]
     let playlistMetadata: PlaylistMetadata?
     let playlistStatus: PlaylistStatus
+    let userInfo: UserInfo
     let onRefresh: () -> Void
 
     var body: some ToolbarContent {
@@ -681,12 +626,275 @@ struct PlaylistToolbar: ToolbarContent {
 
             DownloadAllButton(songs: songs)
 
+            UploadButton(userInfo: userInfo, onRefresh: onRefresh)
+
             if case .netease = playlistMetadata {
                 Button(action: onRefresh) {
                     Image(systemName: "arrow.clockwise")
                 }
                 .help("Refresh Playlist")
             }
+        }
+    }
+}
+
+struct UploadQueueItem: Identifiable {
+    let id = UUID()
+    let songId: UInt64
+    let songName: String
+    let url: URL
+    var isCompleted: Bool = false
+    var isFailed: Bool = false
+    var errorMessage: String?
+}
+
+struct UploadProgressRow: View {
+    let item: UploadQueueItem
+
+    var body: some View {
+        HStack {
+            Text(item.songName)
+                .lineLimit(1)
+
+            Spacer()
+
+            if item.isCompleted {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+            } else if item.isFailed {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.red)
+                    .help(item.errorMessage ?? "Upload failed")
+            } else {
+                ProgressView()
+                    .progressViewStyle(LinearProgressViewStyle())
+                    .frame(width: 100)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+    }
+}
+
+struct UploadProgressDialog: View {
+    @Binding var uploadQueue: [UploadQueueItem]
+    @Binding var isPresented: Bool
+    @Binding var canceled: Bool
+
+    var completedCount: Int {
+        uploadQueue.filter { $0.isCompleted }.count
+    }
+
+    var failedCount: Int {
+        uploadQueue.filter { $0.isFailed }.count
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text("Uploading to Cloud")
+                    .font(.headline)
+                Spacer()
+            }
+
+            ScrollView {
+                VStack(spacing: 4) {
+                    ForEach(uploadQueue) { item in
+                        UploadProgressRow(item: item)
+                    }
+                }
+            }
+            .frame(maxHeight: 200)
+
+            HStack {
+                Text("Completed: \(completedCount), Failed: \(failedCount)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Button(canceled ? "Canceling" : "Cancel") {
+                    canceled = true
+                }
+                .disabled(canceled)
+            }
+        }
+        .padding(20)
+        .frame(width: 400)
+        .frame(minHeight: 150)
+    }
+}
+
+@MainActor
+class UploadManager: ObservableObject {
+    @Published var uploadQueue: [UploadQueueItem] = []
+    @Published var isUploading: Bool = false
+    @Published var canceled: Bool = false
+
+    private let userInfo: UserInfo
+    private let onRefresh: (() -> Void)?
+
+    init(userInfo: UserInfo, onRefresh: (() -> Void)? = nil) {
+        self.userInfo = userInfo
+        self.onRefresh = onRefresh
+    }
+
+    var completedCount: Int {
+        uploadQueue.filter { $0.isCompleted }.count
+    }
+
+    var totalCount: Int {
+        uploadQueue.count
+    }
+
+    var progress: Double {
+        guard totalCount > 0 else { return 0 }
+        return Double(completedCount) / Double(totalCount)
+    }
+
+    func addUploadTask(songId: UInt64, songName: String, url: URL) {
+        let item = UploadQueueItem(songId: songId, songName: songName, url: url)
+        uploadQueue.append(item)
+
+        if !isUploading {
+            startUploading()
+        }
+    }
+
+    private func startUploading() {
+        isUploading = true
+        canceled = false
+
+        Task {
+            await processUploadQueue()
+        }
+    }
+
+    private func processUploadQueue() async {
+        var hasAnySuccess = false
+
+        for i in 0..<uploadQueue.count {
+            if canceled {
+                break
+            }
+
+            let item = uploadQueue[i]
+            if item.isCompleted || item.isFailed {
+                continue
+            }
+
+            do {
+                let success = try await uploadCloudFile(
+                    songId: item.songId, url: item.url, userInfo: userInfo)
+
+                await MainActor.run {
+                    uploadQueue[i].isCompleted = success
+                    if !success {
+                        uploadQueue[i].isFailed = true
+                        uploadQueue[i].errorMessage = "Upload failed"
+                    } else {
+                        hasAnySuccess = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    uploadQueue[i].isFailed = true
+                    uploadQueue[i].errorMessage = error.localizedDescription
+                }
+            }
+        }
+
+        await MainActor.run {
+            isUploading = false
+            canceled = false
+
+            // 如果有任何成功上传，发送刷新通知
+            if hasAnySuccess {
+                NotificationCenter.default.post(name: .refreshPlaylist, object: nil)
+            }
+        }
+    }
+
+    func clearCompleted() {
+        uploadQueue.removeAll { $0.isCompleted }
+    }
+
+    func clearAll() {
+        uploadQueue.removeAll()
+        isUploading = false
+        canceled = false
+    }
+}
+
+struct UploadButton: View {
+    let userInfo: UserInfo
+    let onRefresh: (() -> Void)?
+
+    @StateObject private var uploadManager: UploadManager
+    @State private var showUploadDialog = false
+
+    init(userInfo: UserInfo, onRefresh: (() -> Void)? = nil) {
+        self.userInfo = userInfo
+        self.onRefresh = onRefresh
+        self._uploadManager = StateObject(
+            wrappedValue: UploadManager(userInfo: userInfo, onRefresh: onRefresh))
+    }
+
+    var body: some View {
+        Button(action: {
+            showUploadDialog.toggle()
+        }) {
+            ZStack {
+                if uploadManager.isUploading && uploadManager.totalCount > 0 {
+                    // 显示进度
+                    ZStack {
+                        Circle()
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 2)
+                            .frame(width: 20, height: 20)
+
+                        Circle()
+                            .trim(from: 0, to: uploadManager.progress)
+                            .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                            .frame(width: 20, height: 20)
+                            .rotationEffect(.degrees(-90))
+
+                        Text("\(uploadManager.completedCount)")
+                            .font(.system(size: 8, weight: .bold))
+                    }
+                } else if uploadManager.totalCount > 0 {
+                    // 显示完成状态
+                    Image(systemName: "checkmark.circle")
+                        .foregroundColor(.green)
+                } else {
+                    // 默认状态
+                    Image(systemName: "icloud.and.arrow.up")
+                }
+            }
+        }
+        .help(
+            uploadManager.isUploading
+                ? "Uploading \(uploadManager.completedCount)/\(uploadManager.totalCount)"
+                : "Upload to Cloud"
+        )
+        .popover(isPresented: $showUploadDialog) {
+            UploadProgressDialog(
+                uploadQueue: $uploadManager.uploadQueue,
+                isPresented: $showUploadDialog,
+                canceled: $uploadManager.canceled
+            )
+        }
+        .environmentObject(uploadManager)
+        .onReceive(NotificationCenter.default.publisher(for: .uploadToCloud)) { notification in
+            if let userInfo = notification.userInfo,
+                let songId = userInfo["songId"] as? UInt64,
+                let songName = userInfo["songName"] as? String,
+                let url = userInfo["url"] as? URL
+            {
+                uploadManager.addUploadTask(songId: songId, songName: songName, url: url)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .refreshPlaylist)) { _ in
+            onRefresh?()
         }
     }
 }
@@ -777,12 +985,16 @@ struct PlayListView: View {
     var playlistMetadata: PlaylistMetadata?
 
     private func handleUploadToCloud(song: CloudMusicApi.Song, url: URL) async {
-        isLoading = true
-        let success = await uploadCloudFile(songId: song.id, url: url, userInfo: userInfo)
-        if success {
-            updatePlaylist(force: true)
-        }
-        isLoading = false
+        // 发送通知给 UploadButton 来处理上传队列
+        NotificationCenter.default.post(
+            name: .uploadToCloud,
+            object: nil,
+            userInfo: [
+                "songId": song.id,
+                "songName": song.name,
+                "url": url,
+            ]
+        )
     }
 
     var body: some View {
@@ -813,6 +1025,7 @@ struct PlayListView: View {
                     }
                 },
                 onUploadToCloud: { song, url in
+                    // 暂时保持原来的上传方法
                     Task {
                         await handleUploadToCloud(song: song, url: url)
                     }
@@ -851,6 +1064,7 @@ struct PlayListView: View {
                     songs: model.songs ?? [],
                     playlistMetadata: playlistMetadata,
                     playlistStatus: playlistStatus,
+                    userInfo: userInfo,
                     onRefresh: {
                         Task {
                             updatePlaylist(force: true)
@@ -866,6 +1080,11 @@ struct PlayListView: View {
             }
             .onDisappear {
                 loadingTask?.cancel()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .refreshPlaylist)) { _ in
+                Task {
+                    updatePlaylist(force: true)
+                }
             }
 
             if isLoading {
