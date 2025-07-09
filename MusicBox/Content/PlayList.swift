@@ -1133,6 +1133,7 @@ struct PlayListView: View {
                 )
             }
             .onChange(of: playlistMetadata?.id) {
+                clearExistingData()
                 updatePlaylist()
             }
             .task {
@@ -1151,6 +1152,15 @@ struct PlayListView: View {
                 LoadingIndicatorView()
             }
         }
+    }
+
+    private func clearExistingData() {
+        model.songs = nil
+        model.originalSongs = nil
+        model.curId = nil
+
+        searchText = ""
+        sortOrder = []
     }
 
     private func updatePlaylist(force: Bool = false) {
