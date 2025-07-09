@@ -831,12 +831,14 @@ class CloudMusicApi {
 
         struct Result: Decodable {
             let code: Int
+            let message: String?
         }
 
         if let parsed = res.asType(Result.self, silent: true) {
             if parsed.code == 200 {
                 return
             }
+            throw RequestError.errorCode((parsed.code, parsed.message ?? "Unknown error"))
         }
 
         throw RequestError.Request(
