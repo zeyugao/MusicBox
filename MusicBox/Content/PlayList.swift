@@ -743,6 +743,10 @@ class UploadManager: ObservableObject {
         uploadQueue.filter { $0.isCompleted }.count
     }
 
+    var failedCount: Int {
+        uploadQueue.filter { $0.isFailed }.count
+    }
+
     var totalCount: Int {
         uploadQueue.count
     }
@@ -844,37 +848,33 @@ struct UploadButton: View {
         Button(action: {
             showUploadDialog.toggle()
         }) {
-            ZStack {
-                if uploadManager.isUploading && uploadManager.totalCount > 0 {
-                    // 显示进度
-                    ZStack {
-                        Circle()
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 2)
-                            .frame(width: 20, height: 20)
-
-                        Circle()
-                            .trim(from: 0, to: uploadManager.progress)
-                            .stroke(Color.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                            .frame(width: 20, height: 20)
-                            .rotationEffect(.degrees(-90))
-
-                        Text("\(uploadManager.completedCount)")
-                            .font(.system(size: 8, weight: .bold))
-                    }
-                } else if uploadManager.totalCount > 0 {
-                    // 显示完成状态
+            if uploadManager.isUploading && uploadManager.totalCount > 0 {
+                // 显示上传中图标
+                Image(systemName: "arrow.up.circle.fill")
+                    .foregroundColor(.blue)
+                    .symbolEffect(.pulse, options: .repeating)
+            } else if uploadManager.totalCount > 0 {
+                // 根据是否有失败显示不同的完成状态
+                if uploadManager.failedCount > 0 {
+                    Image(systemName: "xmark.circle")
+                        .foregroundColor(.red)
+                } else {
                     Image(systemName: "checkmark.circle")
                         .foregroundColor(.green)
-                } else {
-                    // 默认状态
-                    Image(systemName: "icloud.and.arrow.up")
                 }
+            } else {
+                // 默认状态
+                Image(systemName: "icloud.and.arrow.up")
             }
         }
         .help(
             uploadManager.isUploading
                 ? "Uploading \(uploadManager.completedCount)/\(uploadManager.totalCount)"
-                : "Upload to Cloud"
+                : uploadManager.totalCount > 0
+                    ? (uploadManager.failedCount > 0
+                        ? "Upload completed with \(uploadManager.failedCount) failed"
+                        : "Upload completed successfully")
+                    : "Upload to Cloud"
         )
         .popover(isPresented: $showUploadDialog) {
             UploadProgressDialog(
@@ -1097,11 +1097,8 @@ struct PlayListView: View {
         if let playlistMetadata = playlistMetadata {
             isLoading = true
 
-            searchText = ""
-            sortOrder = []
-
-            model.songs = nil
-            model.originalSongs = nil
+            // model.songs = nil
+            // model.originalSongs = nil
 
             model.curId = playlistMetadata.id
             loadingTask?.cancel()
@@ -1117,6 +1114,9 @@ struct PlayListView: View {
                 if taskId == currentLoadingTaskId {
                     isLoading = false
                 }
+
+                searchText = ""
+                sortOrder = []
             }
         }
     }
