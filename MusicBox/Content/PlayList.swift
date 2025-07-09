@@ -798,13 +798,15 @@ class UploadManager: ObservableObject {
     private func processUploadQueue() async {
         var hasAnySuccess = false
 
-        for i in 0..<uploadQueue.count {
+        var i = 0
+        while i < uploadQueue.count {
             if canceled {
                 break
             }
 
             let item = uploadQueue[i]
             if item.isCompleted || item.isFailed {
+                i += 1
                 continue
             }
 
@@ -832,6 +834,8 @@ class UploadManager: ObservableObject {
                     uploadQueue[i].errorMessage = error.localizedDescription
                 }
             }
+
+            i += 1
         }
 
         await MainActor.run {
