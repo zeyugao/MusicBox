@@ -800,6 +800,11 @@ class UploadManager: ObservableObject {
                         hasAnySuccess = true
                     }
                 }
+            } catch let error as RequestError {
+                await MainActor.run {
+                    uploadQueue[i].isFailed = true
+                    uploadQueue[i].errorMessage = error.localizedDescription
+                }
             } catch {
                 await MainActor.run {
                     uploadQueue[i].isFailed = true
