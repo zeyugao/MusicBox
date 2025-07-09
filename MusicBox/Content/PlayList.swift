@@ -196,6 +196,7 @@ func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo) async throws 
             artist: metadata.artist,
             album: metadata.album
         ) {
+            print("Private song ID: \(privateSongId)")
             try await CloudMusicApi().cloud_match(
                 userId: userInfo.profile?.userId ?? 0,
                 songId: privateSongId,

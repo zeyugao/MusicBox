@@ -813,6 +813,8 @@ class CloudMusicApi {
             throw RequestError.errorCode((parsed.code, parsed.msg))
         }
 
+        print(res.asAny() ?? "Unknown error")
+
         throw RequestError.Request("\(res.asAny() ?? "Unknown error")")
     }
 
