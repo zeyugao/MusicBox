@@ -12,14 +12,33 @@ import Foundation
 import SwiftUI
 
 struct LoadingIndicatorView: View {
+    @State private var isVisible = false
+
     var body: some View {
-        ProgressView()
-            .colorInvert()
-            .progressViewStyle(CircularProgressViewStyle())
-            .controlSize(.small)
-            .frame(width: 48, height: 48)
-            .background(Color(nsColor: NSColor.textColor).opacity(0.75))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+        Group {
+            if isVisible {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
+                        .controlSize(.small)
+                        .frame(width: 16, height: 16)
+
+                    Text("Loading...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding(12)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isVisible = true
+            }
+        }
+        .onDisappear {
+            isVisible = false
+        }
     }
 }
 
