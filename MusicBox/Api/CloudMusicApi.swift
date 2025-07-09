@@ -37,6 +37,37 @@ struct ServerError: Decodable, Error {
     let message: String?
 }
 
+enum IntOrString: Decodable {
+    case int(Int)
+    case string(String)
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let intValue = try? container.decode(Int.self) {
+            self = .int(intValue)
+            return
+        }
+        if let stringValue = try? container.decode(String.self) {
+            self = .string(stringValue)
+            return
+        }
+        throw DecodingError.typeMismatch(
+            IntOrString.self,
+            DecodingError.Context(
+                codingPath: decoder.codingPath,
+                debugDescription: "Expected a String or an Int but found neither"))
+    }
+
+    var stringValue: String {
+        switch self {
+        case .int(let value):
+            return String(value)
+        case .string(let value):
+            return value
+        }
+    }
+}
+
 class SharedCacheManager {
     class CacheItem {
         let value: Any
@@ -833,14 +864,16 @@ class CloudMusicApi {
 
         struct Result: Decodable {
             let code: Int
-            let message: String?
+            let message: IntOrString?
         }
 
         if let parsed = res.asType(Result.self, silent: true) {
             if parsed.code == 200 {
                 return
             }
-            throw RequestError.errorCode((parsed.code, parsed.message ?? "Unknown error"))
+
+            throw RequestError.errorCode(
+                (parsed.code, parsed.message?.stringValue ?? "Unknown error"))
         }
 
         throw RequestError.Request(
