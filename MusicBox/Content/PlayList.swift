@@ -651,6 +651,11 @@ struct UploadQueueItem: Identifiable {
 struct UploadProgressRow: View {
     let item: UploadQueueItem
 
+    private var truncatedErrorMessage: String {
+        guard let errorMessage = item.errorMessage else { return "Upload failed" }
+        return errorMessage.count > 30 ? String(errorMessage.prefix(30)) + "..." : errorMessage
+    }
+
     var body: some View {
         HStack {
             Text(item.songName)
@@ -662,13 +667,22 @@ struct UploadProgressRow: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
             } else if item.isFailed {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.red)
-                    .help(item.errorMessage ?? "Upload failed")
+                HStack {
+                    Text(truncatedErrorMessage)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .frame(maxWidth: 300, alignment: .trailing)
+                        .help(item.errorMessage ?? "Upload failed")
+
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                        .help(item.errorMessage ?? "Upload failed")
+                }
             } else {
                 ProgressView()
                     .progressViewStyle(LinearProgressViewStyle())
-                    .frame(width: 100)
+                    .frame(width: 300)
             }
         }
         .padding(.horizontal, 8)
@@ -689,10 +703,14 @@ struct UploadProgressDialog: View {
         uploadQueue.filter { $0.isFailed }.count
     }
 
+    var isUploading: Bool {
+        uploadQueue.contains { !$0.isCompleted && !$0.isFailed }
+    }
+
     var body: some View {
         VStack(spacing: 10) {
             HStack {
-                Text("Uploading to Cloud")
+                Text("Upload to Cloud")
                     .font(.headline)
                 Spacer()
             }
@@ -713,14 +731,16 @@ struct UploadProgressDialog: View {
 
                 Spacer()
 
-                Button(canceled ? "Canceling" : "Cancel") {
-                    canceled = true
+                if isUploading {
+                    Button(canceled ? "Canceling" : "Cancel") {
+                        canceled = true
+                    }
+                    .disabled(canceled)
                 }
-                .disabled(canceled)
             }
         }
         .padding(20)
-        .frame(width: 400)
+        .frame(width: 500)
         .frame(minHeight: 150)
     }
 }
