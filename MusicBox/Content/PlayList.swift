@@ -905,6 +905,7 @@ struct DownloadAllButton: View {
     @State private var downloadProgress: Double = 0.0
 
     @State private var downloading = false
+    @State private var showConfirmationPopover = false
 
     @State private var text: String = "Downloading"
 
@@ -916,35 +917,7 @@ struct DownloadAllButton: View {
                 presentDownloadAllSongDialog.toggle()
                 return
             }
-            presentDownloadAllSongDialog = true
-            downloading = true
-
-            Task {
-                let totalCnt = songs.count
-
-                for (idx, song) in songs.enumerated() {
-                    text = "Downloading \(idx + 1) / \(totalCnt)"
-                    if getCachedMusicFile(id: song.id) != nil {
-                    } else {
-                        if let songData = await CloudMusicApi().song_url_v1(id: [song.id]) {
-                            let songData = songData[0]
-                            let ext = songData.type
-                            if let url = URL(string: songData.url.https) {
-                                let _ = await downloadMusicFile(url: url, id: song.id, ext: ext)
-                            }
-                        }
-                    }
-
-                    downloadProgress = Double(idx + 1) / Double(totalCnt)
-
-                    if canceledDownloadAllSong {
-                        break
-                    }
-                }
-                canceledDownloadAllSong = false
-                presentDownloadAllSongDialog = false
-                downloading = false
-            }
+            showConfirmationPopover = true
         }) {
             if downloading {
                 ProgressView(value: downloadProgress)
@@ -955,6 +928,63 @@ struct DownloadAllButton: View {
             }
         }
         .help(downloading ? "Downloading" : "Download All")
+        .popover(
+            isPresented: $showConfirmationPopover
+        ) {
+            VStack(spacing: 15) {
+                Text("Download All Songs")
+                    .font(.headline)
+
+                Text("Are you sure you want to download all \(songs.count) songs?")
+                    .multilineTextAlignment(.center)
+
+                HStack(spacing: 10) {
+                    Button("Cancel") {
+                        showConfirmationPopover = false
+                    }
+                    .buttonStyle(.borderless)
+
+                    Button("Download") {
+                        showConfirmationPopover = false
+                        presentDownloadAllSongDialog = true
+                        downloading = true
+
+                        Task {
+                            let totalCnt = songs.count
+
+                            for (idx, song) in songs.enumerated() {
+                                text = "Downloading \(idx + 1) / \(totalCnt)"
+                                if getCachedMusicFile(id: song.id) != nil {
+                                } else {
+                                    if let songData = await CloudMusicApi().song_url_v1(id: [
+                                        song.id
+                                    ]) {
+                                        let songData = songData[0]
+                                        let ext = songData.type
+                                        if let url = URL(string: songData.url.https) {
+                                            let _ = await downloadMusicFile(
+                                                url: url, id: song.id, ext: ext)
+                                        }
+                                    }
+                                }
+
+                                downloadProgress = Double(idx + 1) / Double(totalCnt)
+
+                                if canceledDownloadAllSong {
+                                    break
+                                }
+                            }
+                            canceledDownloadAllSong = false
+                            presentDownloadAllSongDialog = false
+                            downloading = false
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(20)
+            .frame(width: 300)
+        }
         .popover(
             isPresented: $presentDownloadAllSongDialog
         ) {
