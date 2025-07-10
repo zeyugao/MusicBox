@@ -884,11 +884,17 @@ struct UploadButton: View {
                     .foregroundColor(.blue)
                     .symbolEffect(.pulse, options: .repeating)
             } else if uploadManager.totalCount > 0 {
-                // 根据是否有失败显示不同的完成状态
-                if uploadManager.failedCount > 0 {
+                // 根据成功和失败的数量显示不同的完成状态
+                if uploadManager.failedCount > 0 && uploadManager.completedCount > 0 {
+                    // 部分成功：有成功也有失败
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundColor(.orange)
+                } else if uploadManager.failedCount > 0 {
+                    // 全部失败
                     Image(systemName: "xmark.circle")
                         .foregroundColor(.red)
                 } else {
+                    // 全部成功
                     Image(systemName: "checkmark.circle")
                         .foregroundColor(.green)
                 }
@@ -901,9 +907,11 @@ struct UploadButton: View {
             uploadManager.isUploading
                 ? "Uploading \(uploadManager.completedCount)/\(uploadManager.totalCount)"
                 : uploadManager.totalCount > 0
-                    ? (uploadManager.failedCount > 0
-                        ? "Upload completed with \(uploadManager.failedCount) failed"
-                        : "Upload completed successfully")
+                    ? (uploadManager.failedCount > 0 && uploadManager.completedCount > 0
+                        ? "Upload partially completed: \(uploadManager.completedCount) succeeded, \(uploadManager.failedCount) failed"
+                        : uploadManager.failedCount > 0
+                            ? "Upload completed with \(uploadManager.failedCount) failed"
+                            : "Upload completed successfully")
                     : "Upload to Cloud"
         )
         .popover(isPresented: $showUploadDialog) {
