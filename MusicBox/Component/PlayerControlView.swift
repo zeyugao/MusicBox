@@ -326,7 +326,6 @@ struct PlayerControlView: View {
                 }
                 .buttonStyle(PlayControlButtonStyle())
                 .foregroundColor(.primary)
-                .padding(.trailing, 16)
 
                 HStack(spacing: 32) {
                     HStack {
