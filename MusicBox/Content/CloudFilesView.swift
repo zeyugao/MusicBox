@@ -344,10 +344,16 @@ struct MatchWithModalView: View {
                 onMatchSuccess()
                 dismiss()
             }
+
+        } catch let error as RequestError {
+            DispatchQueue.main.async {
+                dismiss()
+                AlertModal.showAlert(error.localizedDescription)
+            }
         } catch {
             DispatchQueue.main.async {
                 dismiss()
-                AlertModal.showAlert("Match failed. Please try again.")
+                AlertModal.showAlert(error.localizedDescription)
             }
         }
     }
