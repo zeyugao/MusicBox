@@ -87,12 +87,14 @@ struct ExploreView: View {
     @State private var isLoading = false
 
     @Binding private var navigationPath: NavigationPath
+    private let isInitialized: Bool
 
     @EnvironmentObject var playController: PlaylistStatus
     @EnvironmentObject private var userInfo: UserInfo
 
-    init(navigationPath: Binding<NavigationPath>) {
+    init(navigationPath: Binding<NavigationPath>, isInitialized: Bool) {
         _navigationPath = navigationPath
+        self.isInitialized = isInitialized
     }
 
     private func gotoPlaylist(id: UInt64, name: String) {
@@ -116,7 +118,9 @@ struct ExploreView: View {
                     }
                 }
             }
-            .task {
+            .task(id: isInitialized) {
+                guard isInitialized else { return }
+
                 let currentDate = Date()
                 let calendar = Calendar.current
                 let day = calendar.component(.day, from: currentDate)

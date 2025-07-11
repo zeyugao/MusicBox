@@ -237,6 +237,7 @@ struct ContentView: View {
     @StateObject private var alertModel = AlertModal()
 
     @State private var navigationPath = NavigationPath()
+    @State private var isInitialized = false
 
     var body: some View {
         ZStack(
@@ -312,14 +313,16 @@ struct ContentView: View {
                                         .environmentObject(playStatus)
                                 }
                         case .explore:
-                            ExploreView(navigationPath: $navigationPath)
-                                .environmentObject(userInfo)
-                                .environmentObject(playlistStatus)
-                                .navigationTitle("Explore")
-                                .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                    PlayingDetailView()
-                                        .environmentObject(playStatus)
-                                }
+                            ExploreView(
+                                navigationPath: $navigationPath, isInitialized: isInitialized
+                            )
+                            .environmentObject(userInfo)
+                            .environmentObject(playlistStatus)
+                            .navigationTitle("Explore")
+                            .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                PlayingDetailView()
+                                    .environmentObject(playStatus)
+                            }
                         case let .playlist(playlist):
                             let metadata = PlaylistMetadata.netease(
                                 playlist.id, playlist.name)
@@ -358,6 +361,8 @@ struct ContentView: View {
 
             await initUserDataTask
             await loadStateTask
+
+            isInitialized = true
         }
         .alert(
             isPresented: Binding<Bool>(
