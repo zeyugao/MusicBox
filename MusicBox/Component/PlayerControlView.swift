@@ -5,6 +5,10 @@
 //  Created by Elsa on 2024/4/17.
 //
 
+import AVFoundation
+import AVKit
+import AudioToolbox
+import CoreAudio
 import Foundation
 import SwiftUI
 
@@ -30,6 +34,54 @@ struct PlayControlButton: View {
                 .frame(width: 16, height: 16)
         }
         .buttonStyle(PlayControlButtonStyle())
+    }
+}
+
+struct AudioOutputDeviceButton: View {
+    var body: some View {
+        AVRoutePickerViewWrapper()
+            .frame(width: 16, height: 16)
+            .help("Select Audio Output Device")
+    }
+}
+
+struct AVRoutePickerViewWrapper: NSViewRepresentable {
+    func makeNSView(context: Context) -> AVRoutePickerView {
+        let routePickerView = AVRoutePickerView()
+
+        // Set the delegate to handle route picker events
+        routePickerView.delegate = context.coordinator
+
+        // Make sure the button is properly sized
+        routePickerView.translatesAutoresizingMaskIntoConstraints = false
+
+        routePickerView.isRoutePickerButtonBordered = false
+
+        // Set button color to match PlayControlButtonStyle
+        if #available(macOS 10.15, *) {
+            routePickerView.setRoutePickerButtonColor(NSColor.labelColor, for: .normal)
+            routePickerView.setRoutePickerButtonColor(
+                NSColor.secondaryLabelColor, for: .normalHighlighted)
+        }
+
+        return routePickerView
+    }
+
+    func updateNSView(_ nsView: AVRoutePickerView, context: Context) {
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject, AVRoutePickerViewDelegate {
+        func routePickerViewWillBeginPresentingRoutes(_ routePickerView: AVRoutePickerView) {
+            print("Route picker will begin presenting routes")
+        }
+
+        func routePickerViewDidEndPresentingRoutes(_ routePickerView: AVRoutePickerView) {
+            print("Route picker did end presenting routes")
+        }
     }
 }
 
@@ -297,6 +349,9 @@ struct PlayerControlView: View {
                         .tint(.primary)
                         .frame(width: 100)
                         .controlSize(.mini)
+
+                        AudioOutputDeviceButton()
+                            .padding(.leading, 8)
                     }
                 }
                 .padding(.trailing, 32)
