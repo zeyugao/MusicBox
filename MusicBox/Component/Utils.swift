@@ -13,6 +13,7 @@ import SwiftUI
 
 struct LoadingIndicatorView: View {
     @State private var isVisible = false
+    @State private var delayTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -32,11 +33,16 @@ struct LoadingIndicatorView: View {
             }
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                isVisible = true
+            delayTask = Task {
+                try? await Task.sleep(nanoseconds: 500_000_000)  // 0.5 seconds
+                await MainActor.run {
+                    isVisible = true
+                }
             }
         }
         .onDisappear {
+            delayTask?.cancel()
+            delayTask = nil
             isVisible = false
         }
     }
@@ -79,9 +85,23 @@ class ImageLoader: ObservableObject {
     private let url: URL?
     private var cancellable: AnyCancellable?
     private let fileManager = FileManager.default
+    private static let urlSession = URLSession.shared
+    private static let imageCache = NSCache<NSString, NSImage>()
 
     init(url: URL?) {
         self.url = url
+        checkForCachedImage()
+    }
+
+    private func checkForCachedImage() {
+        guard let url = url else { return }
+
+        let cacheKey = NSString(string: url.absoluteString)
+        if let cachedImage = Self.imageCache.object(forKey: cacheKey) {
+            image = cachedImage
+            return
+        }
+
         checkForSavedImage()
     }
 
@@ -105,12 +125,18 @@ class ImageLoader: ObservableObject {
     }
 
     private func checkForSavedImage() {
-        let file = getImagePath()
+        guard let file = getImagePath(),
+            fileManager.fileExists(atPath: file.path),
+            let data = try? Data(contentsOf: file),
+            let img = NSImage(data: data)
+        else { return }
 
-        guard let file = file, fileManager.fileExists(atPath: file.path) else { return }
+        image = img
 
-        if let data = try? Data(contentsOf: file), let img = NSImage(data: data) {
-            image = img
+        // Cache in memory for faster access
+        if let url = url {
+            let cacheKey = NSString(string: url.absoluteString)
+            Self.imageCache.setObject(img, forKey: cacheKey)
         }
     }
 
@@ -121,15 +147,21 @@ class ImageLoader: ObservableObject {
     func load() {
         guard image == nil, cancellable == nil, let url = url else { return }
 
-        cancellable = URLSession.shared.dataTaskPublisher(for: url)
+        cancellable = Self.urlSession.dataTaskPublisher(for: url)
             .map { $0.data }
             .replaceError(with: nil)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] data in
-                if let data = data {
-                    self?.image = NSImage(data: data)
-                    self?.saveImage(data: data)
+                guard let self = self, let data = data, let img = NSImage(data: data) else {
+                    return
                 }
+
+                self.image = img
+                self.saveImage(data: data)
+
+                // Cache in memory for faster access
+                let cacheKey = NSString(string: url.absoluteString)
+                Self.imageCache.setObject(img, forKey: cacheKey)
             }
     }
 
@@ -155,27 +187,72 @@ class ImageLoader: ObservableObject {
     }
 }
 
+// MARK: - Metadata Loading
+class MetadataLoader {
+    private static let metadataCache = NSCache<NSString, MetadataResult>()
+
+    class MetadataResult {
+        let title: String
+        let artist: String
+        let duration: CMTime
+        let album: String
+
+        init(title: String, artist: String, duration: CMTime, album: String) {
+            self.title = title
+            self.artist = artist
+            self.duration = duration
+            self.album = album
+        }
+    }
+
+    static func loadMetadata(url: URL) async -> MetadataResult? {
+        let cacheKey = NSString(string: url.absoluteString)
+
+        // Check cache first
+        if let cached = metadataCache.object(forKey: cacheKey) {
+            return cached
+        }
+
+        let asset = AVAsset(url: url)
+        do {
+            // Load all needed properties in parallel
+            async let metadataItems = asset.load(.commonMetadata)
+            async let duration = asset.load(.duration)
+
+            let metadata = try await metadataItems
+            let assetDuration = try await duration
+
+            let titleItem = metadata.first(where: { $0.commonKey?.rawValue == "title" })
+            let artistItem = metadata.first(where: { $0.commonKey?.rawValue == "artist" })
+            let albumItem = metadata.first(where: { $0.commonKey?.rawValue == "albumTitle" })
+
+            // Load metadata values in parallel
+            async let title = titleItem?.load(.value) as? String ?? "Unknown"
+            async let artist = artistItem?.load(.value) as? String ?? "Unknown"
+            async let album = albumItem?.load(.value) as? String ?? "Unknown"
+
+            let result = MetadataResult(
+                title: try await title,
+                artist: try await artist,
+                duration: assetDuration,
+                album: try await album
+            )
+
+            // Cache the result
+            metadataCache.setObject(result, forKey: cacheKey)
+
+            return result
+        } catch {
+            print("Error loading asset properties: \(error)")
+        }
+        return nil
+    }
+}
+
+// MARK: - Legacy Function Support
 func loadMetadata(url: URL) async -> (
     title: String, artist: String, duration: CMTime, album: String
 )? {
-    let asset = AVAsset(url: url)
-    do {
-        // Asynchronously load the needed properties
-        let metadataItems = try await asset.load(.commonMetadata)
-        let titleItem = metadataItems.first(where: { $0.commonKey?.rawValue == "title" })
-        let artistItem = metadataItems.first(where: { $0.commonKey?.rawValue == "artist" })
-        let albumItem = metadataItems.first(where: { $0.commonKey?.rawValue == "albumTitle" })
-
-        // Fetching values using load method
-        let title = try await titleItem?.load(.value) as? String ?? "Unknown"
-        let artist = try await artistItem?.load(.value) as? String ?? "Unknown"
-        let album = try await albumItem?.load(.value) as? String ?? "Unknown"
-
-        let duration = try await asset.load(.duration)
-
-        return (title, artist, duration, album)
-    } catch {
-        print("Error loading asset properties: \(error)")
-    }
-    return nil
+    guard let result = await MetadataLoader.loadMetadata(url: url) else { return nil }
+    return (result.title, result.artist, result.duration, result.album)
 }

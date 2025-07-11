@@ -6,83 +6,72 @@
 //
 
 import Cocoa
+import Foundation
 
+// MARK: - String Extensions
 extension String {
     func subString(from startString: String, to endString: String) -> String {
-        var str = self
-        if let startIndex = self.range(of: startString)?.upperBound {
-            str.removeSubrange(str.startIndex..<startIndex)
-            if let endIndex = str.range(of: endString)?.lowerBound {
-                str.removeSubrange(endIndex..<str.endIndex)
-                return str
-            }
+        guard let startIndex = self.range(of: startString)?.upperBound else { return "" }
+        let remainingString = String(self[startIndex...])
+        guard let endIndex = remainingString.range(of: endString)?.lowerBound else {
+            return remainingString
         }
-        return ""
+        return String(remainingString[..<endIndex])
     }
 
     func subString(from startString: String) -> String {
-        var str = self
-        if let startIndex = self.range(of: startString)?.upperBound {
-            str.removeSubrange(self.startIndex..<startIndex)
-            return str
-        }
-        return ""
+        guard let startIndex = self.range(of: startString)?.upperBound else { return "" }
+        return String(self[startIndex...])
     }
 
     func subString(to endString: String) -> String {
-        var str = self
-        if let endIndex = self.range(of: endString)?.lowerBound {
-            str.removeSubrange(endIndex..<str.endIndex)
-            return str
-        }
-        return ""
+        guard let endIndex = self.range(of: endString)?.lowerBound else { return "" }
+        return String(self[..<endIndex])
     }
 
     var https: String {
-        if starts(with: "http://") {
-            return replacingOccurrences(of: "http://", with: "https://")
-        } else {
-            return self
-        }
+        starts(with: "http://") ? replacingOccurrences(of: "http://", with: "https://") : self
     }
 }
 
+// MARK: - URL Extensions
 extension URL {
     var https: URL? {
-        return URL(string: absoluteString.https)
+        URL(string: absoluteString.https)
     }
 }
 
+// MARK: - Data Extensions
 extension Data {
+    private static let jsonDecoder = JSONDecoder()
+
     func asType<T: Decodable>(_ type: T.Type, silent: Bool = false) -> T? {
         do {
-            return try JSONDecoder().decode(type, from: self)
+            return try Self.jsonDecoder.decode(type, from: self)
         } catch {
             if !silent {
-                let callStack = Thread.callStackSymbols.joined(separator: "\n")
-                let errorMessage =
-                    "Error: \(error.localizedDescription)\n\n\(callStack)"
-                AlertModal.showAlert("Error", errorMessage)
+                let userFriendlyError = "Failed to decode data: \(error.localizedDescription)"
+                AlertModal.showAlert("Decoding Error", userFriendlyError)
             }
             return nil
         }
     }
 
     func asAny() -> Any? {
-        return try? JSONSerialization.jsonObject(with: self, options: [])
+        try? JSONSerialization.jsonObject(with: self, options: [])
     }
 
     func asJSONString() -> String {
-        if let jsonObject = asAny() {
-            do {
-                let jsonData = try JSONSerialization.data(
-                    withJSONObject: jsonObject, options: .prettyPrinted)
-                return String(data: jsonData, encoding: .utf8) ?? "Failed to convert to string"
-            } catch {
-                return "Failed to serialize JSON: \(error.localizedDescription)"
-            }
-        } else {
+        guard let jsonObject = asAny() else {
             return String(data: self, encoding: .utf8) ?? "Failed to decode as UTF-8"
+        }
+
+        do {
+            let jsonData = try JSONSerialization.data(
+                withJSONObject: jsonObject, options: .prettyPrinted)
+            return String(data: jsonData, encoding: .utf8) ?? "Failed to convert to string"
+        } catch {
+            return "Failed to serialize JSON: \(error.localizedDescription)"
         }
     }
 }

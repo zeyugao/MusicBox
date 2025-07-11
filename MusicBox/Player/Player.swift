@@ -90,6 +90,7 @@ class PlayStatus: ObservableObject {
 
     private var inSeeking: Bool = false
     private var switchingItem: Bool = false
+    private var seekingTask: Task<Void, Never>?
 
     func seekToOffset(offset newTime: CMTime) async {
         guard loadingProgress == nil else {
@@ -97,28 +98,32 @@ class PlayStatus: ObservableObject {
             return
         }
 
-        await MainActor.run {
-            playedSecond = newTime.seconds
-        }
+        seekingTask?.cancel()
+        seekingTask = Task {
+            await MainActor.run {
+                playedSecond = newTime.seconds
+            }
 
-        if let item = self.currentItem, player.currentItem is CachingPlayerItem {
-            if inSeeking {
+            if let item = self.currentItem, player.currentItem is CachingPlayerItem {
+                if inSeeking {
+                    return
+                }
+                inSeeking = true
+                defer { inSeeking = false }
+
+                await seekToItem(item: item, playedSecond: newTime.seconds)
+                print("Seek a caching item to \(newTime.seconds)")
+                await startPlay()
                 return
             }
-            inSeeking = true
-            defer { inSeeking = false }
 
-            await seekToItem(item: item, playedSecond: newTime.seconds)
-            print("Seek a caching item to \(newTime.seconds)")
-            await startPlay()
-            return
+            await player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
+            await MainActor.run {
+                self.currentLyricIndex = nil
+            }
+            updateCurrentPlaybackInfo()
         }
-
-        await player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
-        await MainActor.run {
-            self.currentLyricIndex = nil
-        }
-        updateCurrentPlaybackInfo()
+        await seekingTask?.value
     }
 
     private let timeScale = CMTimeScale(NSEC_PER_SEC)
@@ -128,10 +133,9 @@ class PlayStatus: ObservableObject {
         await seekToOffset(offset: newTime)
     }
 
+    @MainActor
     func updateDuration(duration: Double) {
-        Task { @MainActor [weak self] in
-            self?.duration = duration
-        }
+        self.duration = duration
     }
 
     func seekByOffset(offset: Double) async {
@@ -142,12 +146,12 @@ class PlayStatus: ObservableObject {
 
     func replaceCurrentItem(item: AVPlayerItem?) {
         deinitPlayerObservers()
-        
+
         // Clear delegate of previous caching player item to break retain cycles
         if let currentItem = player.currentItem as? CachingPlayerItem {
             currentItem.delegate = nil
         }
-        
+
         player = AVPlayer(playerItem: item)
         player.automaticallyWaitsToMinimizeStalling = false
         initPlayerObservers()
@@ -162,7 +166,7 @@ class PlayStatus: ObservableObject {
 
         self.currentItem = item
 
-        updateDuration(duration: item.duration.seconds)
+        await updateDuration(duration: item.duration.seconds)
 
         let playerItem: AVPlayerItem
         if let url = item.getLocalUrl() {
@@ -201,10 +205,13 @@ class PlayStatus: ObservableObject {
 
     private var scrobbled: Bool = false
 
+    private var scrobbleTask: Task<Void, Never>?
+
     private func doScrobble() {
         if !scrobbled && readyToPlay {
             if playedSecond > 30 {
-                Task { [weak self] in
+                scrobbleTask?.cancel()
+                scrobbleTask = Task { [weak self] in
                     guard let self = self else { return }
                     print("do scrobble")
                     if let item = self.currentItem, let song = item.nsSong {
@@ -213,7 +220,9 @@ class PlayStatus: ObservableObject {
                             playedTime: Int(self.playedSecond)
                         )
                     }
-                    self.scrobbled = true
+                    await MainActor.run {
+                        self.scrobbled = true
+                    }
                 }
             }
         }
@@ -440,12 +449,16 @@ class PlayStatus: ObservableObject {
     deinit {
         deinitPlayerObservers()
         deinitNotificationObservers()
-        
+
+        // Cancel any pending tasks to prevent memory leaks
+        seekingTask?.cancel()
+        scrobbleTask?.cancel()
+
         // Clear delegate of current caching player item to break retain cycles
         if let currentItem = player.currentItem as? CachingPlayerItem {
             currentItem.delegate = nil
         }
-        
+
         // Ensure player is stopped and cleaned up
         player.pause()
         player.replaceCurrentItem(with: nil)
@@ -477,7 +490,7 @@ extension PlayStatus: CachingPlayerItemDelegate {
         _ playerItem: CachingPlayerItem, didDownloadBytesSoFar bytesDownloaded: Int,
         outOf bytesExpected: Int
     ) {
-        if let _ = loadingProgress {
+        if loadingProgress != nil {
             setLoadingProgress(Double(bytesDownloaded) / Double(bytesExpected))
         }
     }
@@ -489,13 +502,13 @@ extension PlayStatus: CachingPlayerItemDelegate {
 
     func playerItem(_ playerItem: CachingPlayerItem, downloadingFailedWith error: Error) {
         setLoadingProgress(nil)
-        let message = "Caching player item file download failed with error: \(error.localizedDescription)."
+        let message =
+            "Caching player item file download failed with error: \(error.localizedDescription)."
         print(message)
         AlertModal.showAlert(message)
         nextTrack()
     }
 }
-
 
 class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     private let savedCurrentPlaylistKey = "CurrentPlaylist"
@@ -829,7 +842,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main
         ) { [weak self] _ in
             guard let self = self else { return }
-            
+
             Task { [weak self] in
                 print("didPlayToEndTimeNotification")
                 await self?.nextTrack()
@@ -849,7 +862,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         if let ob = playerShouldNextObserver {
             NotificationCenter.default.removeObserver(ob)
         }
-        
+
         deinitNotificationObservers()
 
         saveState()

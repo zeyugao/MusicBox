@@ -14,37 +14,49 @@ enum DisplayContentType {
     case playlist
 }
 
-func encodeObjToJSON<T: Encodable>(_ value: T) -> String {
-    let encoder = JSONEncoder()
-    if let data = try? encoder.encode(value) {
+// MARK: - JSON Utilities
+struct JSONUtils {
+    private static let encoder = JSONEncoder()
+    private static let decoder = JSONDecoder()
+
+    static func encodeToJSON<T: Encodable>(_ value: T) -> String {
+        guard let data = try? encoder.encode(value) else { return "{}" }
         return String(data: data, encoding: .utf8) ?? "{}"
     }
-    return "{}"
+
+    static func decodeFromJSON<T: Decodable>(_ type: T.Type, _ json: String) -> T? {
+        guard let data = json.data(using: .utf8) else { return nil }
+        return try? decoder.decode(type, from: data)
+    }
+
+    static func loadDecodableState<T: Decodable>(forKey: String, type: T.Type) -> T? {
+        guard let savedData = UserDefaults.standard.object(forKey: forKey) as? Data else {
+            return nil
+        }
+        return try? decoder.decode(type, from: savedData)
+    }
+
+    static func saveEncodableState<T: Encodable>(forKey: String, data: T) {
+        guard let encoded = try? encoder.encode(data) else { return }
+        UserDefaults.standard.set(encoded, forKey: forKey)
+    }
+}
+
+// MARK: - Legacy Function Support
+func encodeObjToJSON<T: Encodable>(_ value: T) -> String {
+    JSONUtils.encodeToJSON(value)
 }
 
 func decodeJSONToObj<T: Decodable>(_ type: T.Type, _ json: String) -> T? {
-    if let data = json.data(using: .utf8) {
-        let decoder = JSONDecoder()
-        return try? decoder.decode(type, from: data)
-    }
-    return nil
+    JSONUtils.decodeFromJSON(type, json)
 }
 
 func loadDecodableState<T: Decodable>(forKey: String, type: T.Type) -> T? {
-    if let savedData = UserDefaults.standard.object(forKey: forKey)
-        as? Data
-    {
-        let decoder = JSONDecoder()
-        return try? decoder.decode(type, from: savedData)
-    }
-    return nil
+    JSONUtils.loadDecodableState(forKey: forKey, type: type)
 }
 
 func saveEncodableState<T: Encodable>(forKey: String, data: T) {
-    let encoder = JSONEncoder()
-    if let encoded = try? encoder.encode(data) {
-        UserDefaults.standard.set(encoded, forKey: forKey)
-    }
+    JSONUtils.saveEncodableState(forKey: forKey, data: data)
 }
 
 class UserInfo: ObservableObject {
@@ -65,18 +77,19 @@ enum NavigationScreen: Hashable, Equatable, Encodable {
     }
 
     func encode(to encoder: Encoder) throws {
-        let _ = encoder.container(keyedBy: CodingKeys.self)
-        //        var container = encoder.container(keyedBy: CodingKeys.self)
-        //        switch self {
-        //        case .account:
-        //            try container.encode(0, forKey: .account)
-        //        case .nowPlaying:
-        //            try container.encode(0, forKey: .nowPlaying)
-        //        case .explore:
-        //            try container.encode(0, forKey: .explore)
-        //        case .playlist:
-        //            try container.encode(0, forKey: .playlist)
-        //        }
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .account:
+            try container.encode("account", forKey: .account)
+        case .nowPlaying:
+            try container.encode("nowPlaying", forKey: .nowPlaying)
+        case .explore:
+            try container.encode("explore", forKey: .explore)
+        case .playlist:
+            try container.encode("playlist", forKey: .playlist)
+        case .cloudFiles:
+            break  // Handle if needed
+        }
     }
 }
 
@@ -88,12 +101,11 @@ enum PlayingDetailPath: Hashable, Codable {
     }
 
     func encode(to encoder: Encoder) throws {
-        let _ = encoder.container(keyedBy: CodingKeys.self)
-        //        var container = encoder.container(keyedBy: CodingKeys.self)
-        //        switch self {
-        //        case .playing:
-        //            try container.encode(0, forKey: .playing)
-        //        }
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .playing:
+            try container.encode("playing", forKey: .playing)
+        }
     }
 }
 
@@ -143,24 +155,20 @@ struct TextWithImage: View {
 class PlayingDetailModel: ObservableObject {
     @Published var isPresented = false
 
-    static let targetName = String(reflecting: PlayingDetailPath.self)
+    private static let targetName = String(reflecting: PlayingDetailPath.self)
+    private static let encoder = JSONEncoder()
 
     @MainActor
     func checkIsDetailFront(navigationPath: NavigationPath) {
-        if let data = try? navigationPath.codable.map(JSONEncoder().encode),
+        guard let data = try? navigationPath.codable.map(Self.encoder.encode),
             let items = data.asType([String].self)
-        {
-            let newIsPresented: Bool
-            if items.first == Self.targetName {
-                newIsPresented = true
-            } else {
-                newIsPresented = false
-            }
+        else { return }
 
-            // Only update if the value actually changed to prevent multiple updates per frame
-            if self.isPresented != newIsPresented {
-                self.isPresented = newIsPresented
-            }
+        let newIsPresented = items.first == Self.targetName
+
+        // Only update if the value actually changed to prevent multiple updates per frame
+        if self.isPresented != newIsPresented {
+            self.isPresented = newIsPresented
         }
     }
 
@@ -353,14 +361,20 @@ struct ContentView: View {
             }
         )
         .task {
-            async let initUserDataTask: () = initUserData(userInfo: userInfo)
-            async let loadStateTask: () = {
-                await playlistStatus.loadState()
-                await playStatus.loadState()
-            }()
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    await initUserData(userInfo: userInfo)
+                }
+                group.addTask {
+                    await playlistStatus.loadState()
+                }
+                group.addTask {
+                    await playStatus.loadState()
+                }
 
-            await initUserDataTask
-            await loadStateTask
+                // Wait for all tasks to complete
+                await group.waitForAll()
+            }
 
             isInitialized = true
         }
