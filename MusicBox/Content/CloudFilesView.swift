@@ -93,7 +93,7 @@ struct CloudFilesView: View {
                         HStack {
                             Spacer()
                             ProgressView()
-                                .scaleEffect(0.8)
+                                .scaleEffect(0.5)
                             Text("Loading more...")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
