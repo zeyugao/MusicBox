@@ -64,9 +64,10 @@ struct CloudFilesView: View {
 
                                 if let simpleSong = file.simpleSong,
                                     let artistName = simpleSong.ar.first?.name,
-                                    let albumName = simpleSong.al.name
+                                    let albumName = simpleSong.al.name,
+                                    let name = simpleSong.name
                                 {
-                                    Text("\(artistName) - \(albumName)")
+                                    Text("\(name) - \(artistName) - \(albumName)")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                         .lineLimit(1)
