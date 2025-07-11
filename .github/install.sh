@@ -3,6 +3,8 @@
 # MusicBox Installation Script
 # This script installs MusicBox from GitHub Actions artifacts
 
+cd "$(dirname "$0")" || exit 1  # Change to the script's directory
+
 set -e  # Exit on any error
 
 APP_NAME="MusicBox.app"
