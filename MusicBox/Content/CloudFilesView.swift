@@ -22,7 +22,7 @@ struct CloudFilesView: View {
             if isLoading {
                 VStack {
                     ProgressView()
-                        .scaleEffect(1.5)
+                        .scaleEffect(0.8)
                     Text("Loading cloud files...")
                         .foregroundColor(.secondary)
                         .padding(.top)
