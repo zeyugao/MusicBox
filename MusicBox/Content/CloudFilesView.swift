@@ -40,7 +40,7 @@ struct CloudFilesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(cloudFiles) { file in
+                    ForEach(cloudFiles, id: \.id) { file in
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
