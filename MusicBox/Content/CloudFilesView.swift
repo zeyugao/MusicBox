@@ -112,7 +112,11 @@ struct CloudFilesView: View {
             await loadCloudFiles()
         }
         .sheet(item: $selectedFileForMatch) { file in
-            MatchWithModalView(cloudFile: file, userInfo: userInfo)
+            MatchWithModalView(cloudFile: file, userInfo: userInfo) {
+                Task {
+                    await loadCloudFiles(reset: true)
+                }
+            }
         }
     }
 
@@ -164,10 +168,12 @@ struct CloudFilesView: View {
 struct MatchWithModalView: View {
     let cloudFile: CloudMusicApi.CloudFile
     let userInfo: UserInfo
+    let onMatchSuccess: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var selectedPlaylist: CloudMusicApi.PlayListItem?
     @State private var playlistSongs: [CloudMusicApi.Song] = []
     @State private var isLoadingPlaylist = false
+    @State private var selectedSongForMatch: CloudMusicApi.Song?
 
     var body: some View {
         NavigationSplitView {
@@ -256,13 +262,17 @@ struct MatchWithModalView: View {
                             Text(String(format: "%02d:%02d", duration.minute, duration.second))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 2)
-                        .onTapGesture {
-                            Task {
-                                await matchCloudFile(targetSong: song)
+                        }.contentShape(Rectangle())
+                            .padding(.vertical, 2)
+                            .padding(.horizontal, 8)
+                            .background(
+                                selectedSongForMatch?.id == song.id
+                                    ? Color.blue.opacity(0.2) : Color.clear
+                            )
+                            .cornerRadius(8)
+                            .onTapGesture {
+                                selectedSongForMatch = song
                             }
-                        }
                     }
                     .listStyle(PlainListStyle())
                     .navigationTitle(selectedPlaylist.name)
@@ -289,6 +299,17 @@ struct MatchWithModalView: View {
                 Button("Cancel") {
                     dismiss()
                 }
+            }
+
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Confirm Match") {
+                    if let selectedSong = selectedSongForMatch {
+                        Task {
+                            await matchCloudFile(targetSong: selectedSong)
+                        }
+                    }
+                }
+                .disabled(selectedSongForMatch == nil)
             }
         }
     }
@@ -320,10 +341,14 @@ struct MatchWithModalView: View {
             )
 
             DispatchQueue.main.async {
+                onMatchSuccess()
                 dismiss()
             }
         } catch {
-            print("Cloud match failed: \(error)")
+            DispatchQueue.main.async {
+                dismiss()
+                AlertModal.showAlert("Match failed. Please try again.")
+            }
         }
     }
 }
