@@ -507,7 +507,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         let loopMode: LoopMode
     }
 
-    var loopMode: LoopMode = .sequence
+    @Published var loopMode: LoopMode = .sequence
     private var switchingItem: Bool = false
 
     var playlist: [PlaylistItem] = []
@@ -756,7 +756,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 let storage = try JSONDecoder().decode(Storage.self, from: data)
                 playlist = storage.playlist
                 currentItemIndex = storage.currentItemIndex
-                loopMode = storage.loopMode
+
+                await MainActor.run {
+                    loopMode = storage.loopMode
+                }
 
                 await seekToItem(offset: currentItemIndex)
             } catch {
