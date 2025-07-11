@@ -80,7 +80,21 @@ enum ExploreNavigationPath: Hashable, Codable {
 }
 
 struct ExploreView: View {
-    @State var recommendResource: [CloudMusicApi.RecommandPlaylistItem] = []
+    @State var recommendResource: [CloudMusicApi.RecommandPlaylistItem] = {
+        let currentDate = Date()
+        let calendar = Calendar.current
+        let day = calendar.component(.day, from: currentDate)
+        let dialyRecommend = CloudMusicApi.RecommandPlaylistItem(
+            creator: nil,
+            picUrl: "\(day).square",
+            userId: 0,
+            id: CloudMusicApi.RecommandSongPlaylistId,
+            name: "每日歌曲推荐",
+            playcount: 0,
+            trackCount: 0
+        )
+        return [dialyRecommend]
+    }()
     @State private var searchText = ""
     @State private var searchSuggestions = [CloudMusicApi.Song]()
     @State private var task: Task<Void, Never>?
@@ -121,26 +135,12 @@ struct ExploreView: View {
             .task(id: isInitialized) {
                 guard isInitialized else { return }
 
-                let currentDate = Date()
-                let calendar = Calendar.current
-                let day = calendar.component(.day, from: currentDate)
-                let dialyRecommend = CloudMusicApi.RecommandPlaylistItem(
-                    creator: nil,
-                    picUrl: "\(day).square",
-                    userId: 0,
-                    id: CloudMusicApi.RecommandSongPlaylistId,
-                    name: "每日歌曲推荐",
-                    playcount: 0,
-                    trackCount: 0
-                )
-                var newRes = [dialyRecommend]
                 // Only attempt to get recommendations if the user is logged in
                 if userInfo.profile != nil {
                     if let res = await CloudMusicApi(cacheTtl: 5 * 60).recommend_resource() {
-                        newRes.append(contentsOf: res)
+                        recommendResource.append(contentsOf: res)
                     }
                 }
-                recommendResource = newRes
             }
             .searchable(
                 text: $searchText,
