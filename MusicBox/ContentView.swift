@@ -305,6 +305,7 @@ struct ContentView: View {
                                 }
                         case .cloudFiles:
                             CloudFilesView()
+                                .environmentObject(userInfo)
                                 .navigationTitle("My Cloud Files")
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
