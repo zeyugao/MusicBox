@@ -233,6 +233,60 @@ class CloudMusicApi {
         let uid: UInt64
     }
 
+    struct CloudFile: Codable, Identifiable, Hashable, Equatable {
+        static func == (lhs: CloudMusicApi.CloudFile, rhs: CloudMusicApi.CloudFile) -> Bool {
+            return lhs.pcId == rhs.pcId
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(pcId)
+        }
+
+        let fileName: String
+        let fileSize: Int64
+        let matchType: String
+        let pcId: UInt64
+        let privateCloud: PrivateCloud
+        let simpleSong: SimpleSong?
+
+        var id: UInt64 { pcId }
+
+        struct PrivateCloud: Codable {
+            let songId: UInt64
+        }
+
+        struct SimpleSong: Codable {
+            let al: SimpleAlbum
+            let ar: [SimpleArtist]
+
+            struct SimpleAlbum: Codable {
+                let name: String?
+            }
+
+            struct SimpleArtist: Codable {
+                let name: String?
+            }
+        }
+
+        func parseFileSize() -> String {
+            let bytes = Double(fileSize)
+            let formatter = ByteCountFormatter()
+            formatter.allowedUnits = [.useMB, .useGB]
+            formatter.countStyle = .file
+            return formatter.string(fromByteCount: Int64(bytes))
+        }
+
+        var isMatched: Bool {
+            return matchType == "matched"
+        }
+    }
+
+    struct CloudFilesResponse: Codable {
+        let code: Int
+        let count: Int
+        let data: [CloudFile]
+    }
+
     enum Fee: Int, Codable {
         case free = 0  // 免费或无版权
         case vip = 1  // VIP 歌曲
@@ -572,12 +626,23 @@ class CloudMusicApi {
         print(ret)
     }
 
-    func user_cloud() async {
-        guard let ret: Data = try? await doRequest(memberName: "user_cloud", data: [:]) else {
-            return
+    func user_cloud(limit: Int = 30, offset: Int = 0) async -> [CloudFile]? {
+        guard
+            let res = try? await doRequest(
+                memberName: "user_cloud",
+                data: [
+                    "limit": limit,
+                    "offset": offset
+                ])
+        else {
+            print("user_cloud failed")
+            return nil
         }
 
-        print(ret)
+        if let parsed = res.asType(CloudFilesResponse.self) {
+            return parsed.data
+        }
+        return nil
     }
 
     func playlist_detail(id: UInt64) async -> (tracks: [Song], trackIds: [UInt64])? {

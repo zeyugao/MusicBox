@@ -57,6 +57,7 @@ enum NavigationScreen: Hashable, Equatable, Encodable {
     case account
     case nowPlaying
     case explore
+    case cloudFiles
     case playlist(playlist: PlaylistMetadata)
 
     enum CodingKeys: String, CodingKey {
@@ -253,6 +254,8 @@ struct ContentView: View {
                             if userInfo.profile != nil {
                                 TextWithImage("Now Playing", image: "dot.radiowaves.left.and.right")
                                     .tag(NavigationScreen.nowPlaying)
+                                TextWithImage("My Cloud Files", image: "icloud.and.arrow.up")
+                                    .tag(NavigationScreen.cloudFiles)
                             }
                         }
 
@@ -296,6 +299,13 @@ struct ContentView: View {
                             NowPlayingView()
                                 .environmentObject(playlistStatus)
                                 .navigationTitle("Now Playing")
+                                .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                    PlayingDetailView()
+                                        .environmentObject(playStatus)
+                                }
+                        case .cloudFiles:
+                            CloudFilesView()
+                                .navigationTitle("My Cloud Files")
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
                                         .environmentObject(playStatus)
