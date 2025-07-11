@@ -633,7 +633,7 @@ class CloudMusicApi {
                 memberName: "user_cloud",
                 data: [
                     "limit": limit,
-                    "offset": offset
+                    "offset": offset,
                 ])
         else {
             print("user_cloud failed")
@@ -1123,17 +1123,17 @@ class CloudMusicApi {
         }
 
         struct SuggestResult: Decodable {
-            let songs: [SearchResult.Song]
+            let songs: [SearchResult.Song]?
         }
 
         struct Result: Decodable {
             let code: Int
-            let result: SuggestResult
+            let result: SuggestResult?
         }
         if let parsed = res.asType(Result.self) {
-            return parsed.result.songs
+            return parsed.result?.songs ?? []
         }
-        print("search_suggest failed")
+        print("search_suggest failed to parse response: \(res.asJSONString())")
         return nil
     }
 
