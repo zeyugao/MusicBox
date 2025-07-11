@@ -1021,7 +1021,7 @@ struct DownloadAllButton: View {
                 }
             }
             .padding(20)
-            .frame(width: 300)
+            .frame(width: 400)
         }
         .popover(
             isPresented: $presentDownloadAllSongDialog
