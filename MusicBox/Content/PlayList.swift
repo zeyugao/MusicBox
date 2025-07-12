@@ -238,19 +238,20 @@ struct ListPlaylistDialogView: View {
     var body: some View {
         VStack {
             ScrollView {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 16) {
                     ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
                         Button(action: {
                             onSelect?(playlist)
                             dismiss()
                         }) {
                             HStack {
-                                let height = 64.0
+                                let height = 48.0
                                 AsyncImageWithCache(url: URL(string: playlist.coverImgUrl.https)) {
                                     image in
                                     image.resizable()
                                         .scaledToFit()
                                         .frame(width: height, height: height)
+                                        .cornerRadius(5)
                                 } placeholder: {
                                     Image(systemName: "music.note")
                                         .resizable()
@@ -260,8 +261,9 @@ struct ListPlaylistDialogView: View {
                                         .frame(width: height, height: height)
                                         .background(Color.gray.opacity(0.2))
                                 }
+                                .padding(.trailing, 8)
                                 Text(playlist.name)
-                                    .font(.title2)
+                                    // .font(.title2)
                                 Spacer()
                             }
                         }
@@ -275,15 +277,18 @@ struct ListPlaylistDialogView: View {
                                 NSCursor.pop()
                             }
                         }
+                        .padding(.leading, 16)
                     }
                 }
             }
             .frame(maxWidth: 400, maxHeight: 600)
+            .padding(.top, 16)
 
             Button("Cancel") {
                 dismiss()
             }
-        }.padding()
+            .padding(.bottom, 8)
+        }
     }
 }
 
