@@ -350,14 +350,19 @@ struct ContentView: View {
                 }
                 .padding(.bottom, 80)
 
-                PlayerControlView(navigationPath: $navigationPath)
-                    .environmentObject(playlistStatus)
-                    .environmentObject(playStatus)
-                    .environmentObject(userInfo)
-                    .environmentObject(playingDetailModel)
-                    .frame(height: 80)
-                    .background(Color(nsColor: NSColor.textBackgroundColor))
-                    .frame(minWidth: 800)
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(Color(nsColor: NSColor.separatorColor).opacity(0.5))
+                        .frame(height: 1)
+                    PlayerControlView(navigationPath: $navigationPath)
+                        .environmentObject(playlistStatus)
+                        .environmentObject(playStatus)
+                        .environmentObject(userInfo)
+                        .environmentObject(playingDetailModel)
+                        .frame(height: 80)
+                        .background(Color(nsColor: NSColor.textBackgroundColor))
+                        .frame(minWidth: 800)
+                }
             }
         )
         .task {
