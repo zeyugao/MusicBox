@@ -16,12 +16,16 @@ enum LoopMode: Decodable, Encodable {
     case sequence
 }
 
+class PlaybackProgress: ObservableObject {
+    @Published var playedSecond: Double = 0.0
+    @Published var duration: Double = 0.0
+}
+
 class PlayStatus: ObservableObject {
     private var player = AVPlayer()
 
-    @Published var playedSecond: Double = 0.0
-    @Published var duration: Double = 0.0
-
+    var playbackProgress = PlaybackProgress()
+    
     @Published var isLoading: Bool = false
     @Published var loadingProgress: Double? = nil
     @Published var readyToPlay: Bool = true
@@ -101,7 +105,7 @@ class PlayStatus: ObservableObject {
         seekingTask?.cancel()
         seekingTask = Task {
             await MainActor.run {
-                playedSecond = newTime.seconds
+                playbackProgress.playedSecond = newTime.seconds
             }
 
             if let item = self.currentItem, player.currentItem is CachingPlayerItem {
@@ -135,7 +139,7 @@ class PlayStatus: ObservableObject {
 
     @MainActor
     func updateDuration(duration: Double) {
-        self.duration = duration
+        self.playbackProgress.duration = duration
     }
 
     func seekByOffset(offset: Double) async {
@@ -209,7 +213,7 @@ class PlayStatus: ObservableObject {
 
     private func doScrobble() {
         if !scrobbled && readyToPlay {
-            if playedSecond > 30 {
+            if playbackProgress.playedSecond > 30 {
                 scrobbleTask?.cancel()
                 scrobbleTask = Task { [weak self] in
                     guard let self = self else { return }
@@ -217,7 +221,7 @@ class PlayStatus: ObservableObject {
                     if let item = self.currentItem, let song = item.nsSong {
                         await CloudMusicApi().scrobble(
                             song: song,
-                            playedTime: Int(self.playedSecond)
+                            playedTime: Int(self.playbackProgress.playedSecond)
                         )
                     }
                     await MainActor.run {
@@ -238,7 +242,7 @@ class PlayStatus: ObservableObject {
     func monotonouslyUpdateLyric(lyricIndex: Int, newTime: Double? = nil) -> Int? {
         var lyricIndex = lyricIndex
 
-        let roundedPlayedSecond = Int((newTime ?? playedSecond) * 10)
+        let roundedPlayedSecond = Int((newTime ?? playbackProgress.playedSecond) * 10)
         while lyricIndex < self.lyricTimeline.count
             && roundedPlayedSecond >= self.lyricTimeline[lyricIndex]
         {
@@ -263,8 +267,8 @@ class PlayStatus: ObservableObject {
     func updateCurrentPlaybackInfo() {
         NowPlayingCenter.handlePlaybackChange(
             playing: player.timeControlStatus == .playing, rate: player.rate,
-            position: self.playedSecond,
-            duration: duration)
+            position: self.playbackProgress.playedSecond,
+            duration: playbackProgress.duration)
     }
 
     func nowPlayingInit() {
@@ -300,9 +304,9 @@ class PlayStatus: ObservableObject {
             guard let self = self else { return }
             if !self.switchingItem && self.readyToPlay {
                 let newTime = self.player.currentTime().seconds
-                if Int(self.playedSecond) != Int(newTime) {
+                if Int(self.playbackProgress.playedSecond) != Int(newTime) {
                     Task { @MainActor in
-                        self.playedSecond = newTime
+                        self.playbackProgress.playedSecond = newTime
                     }
                     self.updateCurrentPlaybackInfo()
                 }
@@ -325,7 +329,7 @@ class PlayStatus: ObservableObject {
             player.removeTimeObserver(timeObserverToken)
             periodicTimeObserverToken = nil
             Task { @MainActor [weak self] in
-                self?.playedSecond = 0
+                self?.playbackProgress.playedSecond = 0
             }
         }
         playerStateObserver?.invalidate()
@@ -389,8 +393,8 @@ class PlayStatus: ObservableObject {
                         } else {
                             Task { @MainActor [weak self] in
                                 self?.currentItem = nil
-                                self?.duration = 0.0
-                                self?.playedSecond = 0.0
+                                self?.playbackProgress.duration = 0.0
+                                self?.playbackProgress.playedSecond = 0.0
                                 self?.playerState = .stopped
                             }
                         }
@@ -427,7 +431,7 @@ class PlayStatus: ObservableObject {
 
     func saveState() {
         do {
-            let storage = Storage(playedSecond: playedSecond, volume: volume)
+            let storage = Storage(playedSecond: playbackProgress.playedSecond, volume: volume)
             let data = try JSONEncoder().encode(storage)
             UserDefaults.standard.set(data, forKey: "PlayStatus")
         } catch {

@@ -87,6 +87,7 @@ struct AVRoutePickerViewWrapper: NSViewRepresentable {
 
 struct PlaySliderView: View {
     @EnvironmentObject var playStatus: PlayStatus
+    @ObservedObject var playbackProgress: PlaybackProgress
     @State private var isEditing: Bool = false
     @State private var targetValue: Double = 0.0
 
@@ -95,13 +96,13 @@ struct PlaySliderView: View {
             value: Binding(
                 get: {
                     guard !self.playStatus.isLoading else {
-                        return self.playStatus.playedSecond
+                        return self.playbackProgress.playedSecond
                     }
 
                     if self.isEditing {
                         return targetValue
                     } else {
-                        return self.playStatus.playedSecond
+                        return self.playbackProgress.playedSecond
                     }
                 },
                 set: {
@@ -117,7 +118,7 @@ struct PlaySliderView: View {
                     }
                 }
             ),
-            in: 0...self.playStatus.duration
+            in: 0...self.playbackProgress.duration
         ) {
             editing in
             guard !self.playStatus.isLoading else { return }
@@ -270,16 +271,16 @@ struct PlayerControlView: View {
                         .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
                         .padding(.bottom, -2)
                     HStack {
-                        Text(secondsToMinutesAndSeconds(seconds: playStatus.playedSecond))
+                        Text(secondsToMinutesAndSeconds(seconds: playStatus.playbackProgress.playedSecond))
                             .font(.system(size: 12))
                             .lineLimit(1)
                             .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
                             .frame(width: 40)
 
-                        PlaySliderView()
+                        PlaySliderView(playbackProgress: playStatus.playbackProgress)
                             .environmentObject(playStatus)
 
-                        Text(secondsToMinutesAndSeconds(seconds: playStatus.duration))
+                        Text(secondsToMinutesAndSeconds(seconds: playStatus.playbackProgress.duration))
                             .font(.system(size: 12))
                             .lineLimit(1)
                             .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
