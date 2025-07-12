@@ -136,6 +136,35 @@ struct PlaySliderView: View {
     }
 }
 
+struct PlaybackProgressView: View {
+    @ObservedObject var playbackProgress: PlaybackProgress
+
+    func secondsToMinutesAndSeconds(seconds: Double) -> String {
+        let seconds_int = Int(seconds)
+        let minutes = (seconds_int % 3600) / 60
+        let seconds = (seconds_int % 3600) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    var body: some View {
+        HStack {
+            Text(secondsToMinutesAndSeconds(seconds: playbackProgress.playedSecond))
+                .font(.system(size: 12))
+                .lineLimit(1)
+                .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
+                .frame(width: 40)
+
+            PlaySliderView(playbackProgress: playbackProgress)
+
+            Text(secondsToMinutesAndSeconds(seconds: playbackProgress.duration))
+                .font(.system(size: 12))
+                .lineLimit(1)
+                .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
+                .frame(width: 40)
+        }
+    }
+}
+
 struct PlayerControlView: View {
     @EnvironmentObject var playStatus: PlayStatus
     @EnvironmentObject var playlistStatus: PlaylistStatus
@@ -270,22 +299,8 @@ struct PlayerControlView: View {
                         .lineLimit(1)
                         .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
                         .padding(.bottom, -2)
-                    HStack {
-                        Text(secondsToMinutesAndSeconds(seconds: playStatus.playbackProgress.playedSecond))
-                            .font(.system(size: 12))
-                            .lineLimit(1)
-                            .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
-                            .frame(width: 40)
-
-                        PlaySliderView(playbackProgress: playStatus.playbackProgress)
-                            .environmentObject(playStatus)
-
-                        Text(secondsToMinutesAndSeconds(seconds: playStatus.playbackProgress.duration))
-                            .font(.system(size: 12))
-                            .lineLimit(1)
-                            .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
-                            .frame(width: 40)
-                    }
+                    PlaybackProgressView(playbackProgress: playStatus.playbackProgress)
+                        .environmentObject(playStatus)
                 }
                 .layoutPriority(1)
                 .frame(minWidth: 300)
