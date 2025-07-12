@@ -789,9 +789,6 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 await MainActor.run {
                     playlist = storage.playlist
                     currentItemIndex = storage.currentItemIndex
-                }
-
-                await MainActor.run {
                     loopMode = storage.loopMode
                 }
 
