@@ -359,9 +359,7 @@ struct ContentView: View {
                         .environmentObject(playStatus)
                         .environmentObject(userInfo)
                         .environmentObject(playingDetailModel)
-                        .frame(height: 80)
                         .background(Color(nsColor: NSColor.textBackgroundColor))
-                        .frame(minWidth: 800)
                 }
             }
         )
