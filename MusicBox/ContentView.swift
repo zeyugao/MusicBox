@@ -366,9 +366,8 @@ struct ContentView: View {
                     await initUserData(userInfo: userInfo)
                 }
                 group.addTask {
+                    // Load playlist first, then load play status
                     await playlistStatus.loadState()
-                }
-                group.addTask {
                     await playStatus.loadState()
                 }
 
