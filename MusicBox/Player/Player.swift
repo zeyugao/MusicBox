@@ -21,11 +21,54 @@ class PlaybackProgress: ObservableObject {
     @Published var duration: Double = 0.0
 }
 
+class LyricStatus: ObservableObject {
+    @Published var lyricTimeline: [Int] = []  // We align to 0.1s, 12.32 -> 123
+    @Published var currentLyricIndex: Int? = nil
+
+    func resetLyricIndex(currentTime: Double) {
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            self.currentLyricIndex = self.monotonouslyUpdateLyric(
+                lyricIndex: 0, newTime: currentTime)
+        }
+    }
+
+    func monotonouslyUpdateLyric(lyricIndex: Int, newTime: Double? = nil, currentTime: Double = 0)
+        -> Int?
+    {
+        var lyricIndex = lyricIndex
+
+        let roundedPlayedSecond = Int((newTime ?? currentTime) * 10)
+        while lyricIndex < self.lyricTimeline.count
+            && roundedPlayedSecond >= self.lyricTimeline[lyricIndex]
+        {
+            lyricIndex += 1
+        }
+        if lyricIndex > 0 {
+            return lyricIndex - 1
+        }
+        return nil
+    }
+
+    func updateLyricIndex(currentTime: Double) {
+        let initIdx = self.currentLyricIndex
+        let newIdx = self.monotonouslyUpdateLyric(
+            lyricIndex: initIdx ?? 0, currentTime: currentTime)
+
+        if newIdx != initIdx {
+            Task { @MainActor [weak self] in
+                self?.currentLyricIndex = newIdx
+            }
+        }
+    }
+}
+
 class PlayStatus: ObservableObject {
     private var player = AVPlayer()
 
     var playbackProgress = PlaybackProgress()
-    
+    var lyricStatus = LyricStatus()
+
     @Published var isLoading: Bool = false
     @Published var loadingProgress: Double? = nil
     @Published var readyToPlay: Bool = true
@@ -41,8 +84,6 @@ class PlayStatus: ObservableObject {
     }
 
     @Published var playerState: PlayerState = .stopped
-    @Published var lyricTimeline: [Int] = []  // We align to 0.1s, 12.32 -> 123
-    @Published var currentLyricIndex: Int? = nil
 
     struct Storage: Codable {
         let playedSecond: Double
@@ -123,7 +164,8 @@ class PlayStatus: ObservableObject {
 
             await player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
             await MainActor.run {
-                self.currentLyricIndex = self.monotonouslyUpdateLyric(lyricIndex: 0, newTime: newTime.seconds)
+                self.lyricStatus.currentLyricIndex = self.lyricStatus.monotonouslyUpdateLyric(
+                    lyricIndex: 0, newTime: newTime.seconds)
             }
             updateCurrentPlaybackInfo()
         }
@@ -232,28 +274,6 @@ class PlayStatus: ObservableObject {
         }
     }
 
-    func resetLyricIndex() {
-        Task { @MainActor [weak self] in
-            guard let self = self else { return }
-            self.currentLyricIndex = self.monotonouslyUpdateLyric(lyricIndex: 0, newTime: self.playbackProgress.playedSecond)
-        }
-    }
-
-    func monotonouslyUpdateLyric(lyricIndex: Int, newTime: Double? = nil) -> Int? {
-        var lyricIndex = lyricIndex
-
-        let roundedPlayedSecond = Int((newTime ?? playbackProgress.playedSecond) * 10)
-        while lyricIndex < self.lyricTimeline.count
-            && roundedPlayedSecond >= self.lyricTimeline[lyricIndex]
-        {
-            lyricIndex += 1
-        }
-        if lyricIndex > 0 {
-            return lyricIndex - 1
-        }
-        return nil
-    }
-
     private func setLoadingProgress(_ progress: Double?) {
         Task { @MainActor [weak self] in
             guard let self = self else { return }
@@ -311,15 +331,7 @@ class PlayStatus: ObservableObject {
                     self.updateCurrentPlaybackInfo()
                 }
 
-                let initIdx = self.currentLyricIndex
-                let newIdx = self.monotonouslyUpdateLyric(
-                    lyricIndex: initIdx ?? 0, newTime: newTime)
-
-                if newIdx != initIdx {
-                    // withAnimation {
-                    self.currentLyricIndex = newIdx
-                    // }
-                }
+                self.lyricStatus.updateLyricIndex(currentTime: newTime)
             }
         }
     }
@@ -651,7 +663,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     func seekToItem(offset: Int?, playedSecond: Double? = 0.0, shouldPlay: Bool = false) async {
         if let offset = offset {
             guard offset < playlist.count else { return }
-            
+
             await MainActor.run {
                 currentItemIndex = offset
             }

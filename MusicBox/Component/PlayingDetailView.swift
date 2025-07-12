@@ -11,6 +11,7 @@ import SwiftUI
 struct LyricView: View {
     var lyric: [CloudMusicApi.LyricLine]
     @EnvironmentObject var playStatus: PlayStatus
+    @ObservedObject var lyricStatus: LyricStatus
     @Binding var hasRoma: Bool
 
     @AppStorage("showRoma") var showRoma: Bool = false
@@ -29,7 +30,7 @@ struct LyricView: View {
                         lyric.indices, id: \.self
                     ) { index in
                         let line = lyric[index]
-                        let currentPlaying = playStatus.currentLyricIndex == index
+                        let currentPlaying = lyricStatus.currentLyricIndex == index
 
                         VStack(alignment: .leading) {
                             if showTimestamp {
@@ -72,7 +73,7 @@ struct LyricView: View {
                     }
                 }
                 .padding(.vertical)
-                .onChange(of: playStatus.currentLyricIndex) { _, newIndex in
+                .onChange(of: lyricStatus.currentLyricIndex) { _, newIndex in
                     scrollToIdx(newIndex ?? 0)
                 }
             }
@@ -82,14 +83,14 @@ struct LyricView: View {
                         Image(systemName: "clock")
                     }
                     .onChange(of: showTimestamp) {
-                        scrollToIdx(playStatus.currentLyricIndex ?? 0)
+                        scrollToIdx(lyricStatus.currentLyricIndex ?? 0)
                     }
                     if hasRoma {
                         Toggle(isOn: $showRoma) {
                             Image(systemName: "quote.bubble")
                         }
                         .onChange(of: showRoma) {
-                            scrollToIdx(playStatus.currentLyricIndex ?? 0)
+                            scrollToIdx(lyricStatus.currentLyricIndex ?? 0)
                         }
                     }
                 }
@@ -110,8 +111,9 @@ struct PlayingDetailView: View {
             self.hasRoma = !lyric.romalrc.lyric.isEmpty
             let lyric = lyric.merge()
             self.lyric = lyric
-            self.playStatus.lyricTimeline = lyric.map { Int($0.time * 10) }
-            self.playStatus.resetLyricIndex()
+            self.playStatus.lyricStatus.lyricTimeline = lyric.map { Int($0.time * 10) }
+            self.playStatus.lyricStatus.resetLyricIndex(
+                currentTime: self.playStatus.playbackProgress.playedSecond)
         }
     }
 
@@ -146,6 +148,7 @@ struct PlayingDetailView: View {
                             if let lyric = lyric {
                                 LyricView(
                                     lyric: lyric,
+                                    lyricStatus: playStatus.lyricStatus,
                                     hasRoma: $hasRoma
                                 )
                             } else {
