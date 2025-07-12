@@ -123,7 +123,7 @@ class PlayStatus: ObservableObject {
 
             await player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
             await MainActor.run {
-                self.currentLyricIndex = nil
+                self.currentLyricIndex = self.monotonouslyUpdateLyric(lyricIndex: 0, newTime: newTime.seconds)
             }
             updateCurrentPlaybackInfo()
         }
@@ -235,7 +235,7 @@ class PlayStatus: ObservableObject {
     func resetLyricIndex() {
         Task { @MainActor [weak self] in
             guard let self = self else { return }
-            self.currentLyricIndex = self.monotonouslyUpdateLyric(lyricIndex: 0)
+            self.currentLyricIndex = self.monotonouslyUpdateLyric(lyricIndex: 0, newTime: self.playbackProgress.playedSecond)
         }
     }
 
