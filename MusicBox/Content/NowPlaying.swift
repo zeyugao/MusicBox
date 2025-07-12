@@ -24,11 +24,10 @@ func formatCMTime(_ time: CMTime) -> String {
 
 struct NowPlayingView: View {
     @EnvironmentObject var playController: PlaylistStatus
-    @State private var playlist: [PlaylistItem] = []
 
     var body: some View {
         ScrollViewReader { proxy in
-            List(playlist) { item in
+            List(playController.playlist) { item in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
@@ -47,9 +46,9 @@ struct NowPlayingView: View {
                             }
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     Text(formatCMTime(item.duration))
                         .foregroundColor(.secondary)
                         .font(.caption)
@@ -67,30 +66,40 @@ struct NowPlayingView: View {
                     Button("Delete") {
                         Task {
                             await playController.deleteBySongId(id: item.id)
-                            playlist = playController.playlist
                         }
                     }
                 }
             }
             .listStyle(PlainListStyle())
             .task {
-                playlist = playController.playlist
                 // 自动滚动到当前播放的歌曲
-                if let currentItem = playController.currentItem {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            proxy.scrollTo(currentItem.id, anchor: .center)
-                        }
-                    }
-                }
+                scrollToCurrentItem(proxy: proxy)
             }
-            .onChange(of: playController.currentItem) { _, newItem in
+            .onChange(of: playController.playlist) { _, _ in
+                // 当播放列表改变时，重新滚动到当前歌曲
+                scrollToCurrentItem(proxy: proxy)
+            }
+            .onChange(of: playController.currentItem) { _, _ in
                 // 当播放的歌曲改变时，也自动滚动到新的歌曲
-                if let currentItem = newItem {
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        proxy.scrollTo(currentItem.id, anchor: .center)
-                    }
-                }
+                scrollToCurrentItem(proxy: proxy)
+            }
+        }
+    }
+
+    private func scrollToCurrentItem(proxy: ScrollViewProxy) {
+        guard let currentItem = playController.currentItem else { return }
+
+        // 验证当前项是否在播放列表中
+        guard playController.playlist.contains(where: { $0.id == currentItem.id }) else {
+            print("Warning: Current item not found in playlist")
+            return
+        }
+
+        // 使用多重延迟确保布局完成后再滚动，提高滚动准确性
+        DispatchQueue.main.async {
+            // 第三次尝试：进一步延迟，处理布局变化的情况
+            DispatchQueue.main.async {
+                proxy.scrollTo(currentItem.id, anchor: .center)
             }
         }
     }

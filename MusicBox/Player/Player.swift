@@ -523,8 +523,8 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     @Published var loopMode: LoopMode = .sequence
     private var switchingItem: Bool = false
 
-    var playlist: [PlaylistItem] = []
-    private var currentItemIndex: Int? = nil
+    @Published var playlist: [PlaylistItem] = []
+    @Published private var currentItemIndex: Int? = nil
     var currentItem: PlaylistItem? {
         if let currentItemIndex = currentItemIndex {
             return playlist[currentItemIndex]
@@ -647,7 +647,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     func seekToItem(offset: Int?, playedSecond: Double? = 0.0, shouldPlay: Bool = false) async {
         if let offset = offset {
             guard offset < playlist.count else { return }
-            currentItemIndex = offset
+            
+            await MainActor.run {
+                currentItemIndex = offset
+            }
 
             await NowPlayingCenter.handleItemChange(
                 item: currentItem,
@@ -767,8 +770,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         if let data = UserDefaults.standard.data(forKey: "PlaylistStatus") {
             do {
                 let storage = try JSONDecoder().decode(Storage.self, from: data)
-                playlist = storage.playlist
-                currentItemIndex = storage.currentItemIndex
+                await MainActor.run {
+                    playlist = storage.playlist
+                    currentItemIndex = storage.currentItemIndex
+                }
 
                 await MainActor.run {
                     loopMode = storage.loopMode
