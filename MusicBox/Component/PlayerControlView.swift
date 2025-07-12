@@ -8,6 +8,7 @@
 import AVFoundation
 import AVKit
 import AudioToolbox
+import Combine
 import CoreAudio
 import Foundation
 import SwiftUI
@@ -273,6 +274,12 @@ struct PlayerControlView: View {
                         .keyboardShortcut(.space, modifiers: [])
                         .buttonStyle(PlayControlButtonStyle())
                         .frame(width: 20, height: 20)
+                        .onReceive(NotificationCenter.default.publisher(for: .spaceKeyPressed)) {
+                            _ in
+                            Task {
+                                await playStatus.togglePlayPause()
+                            }
+                        }
                     }
 
                     Button(action: {

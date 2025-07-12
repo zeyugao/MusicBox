@@ -9,6 +9,10 @@ import AppKit
 import Sparkle
 import SwiftUI
 
+extension Notification.Name {
+    static let spaceKeyPressed = Notification.Name("spaceKeyPressed")
+}
+
 // This view model class publishes when new updates can be checked by the user
 final class CheckForUpdatesViewModel: ObservableObject {
     @Published var canCheckForUpdates = false
@@ -42,10 +46,48 @@ struct CheckForUpdatesView: View {
 // Application delegate to handle app lifecycle
 class AppDelegate: NSObject, NSApplicationDelegate {
     static var mainWindow: NSWindow?
+    private var keyDownMonitor: Any?
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         // Prevent the app from terminating when the last window is closed
         return false
+    }
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        setupGlobalKeyMonitor()
+    }
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        if let monitor = keyDownMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+    }
+    
+    private func setupGlobalKeyMonitor() {
+        // Use local monitor for events within the app
+        keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Only handle space key (keyCode 49) when no modifiers are pressed
+            if event.keyCode == 49 && event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty {
+                // Check if there's a text field or search field in focus
+                if let window = NSApplication.shared.keyWindow,
+                   let firstResponder = window.firstResponder {
+                    // Don't handle space if a text input is active
+                    if firstResponder is NSTextView || 
+                       firstResponder is NSTextField ||
+                       firstResponder.className.contains("TextField") ||
+                       firstResponder.className.contains("SearchField") {
+                        return event // Let the text field handle the space
+                    }
+                }
+                
+                // Post notification for space key press
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .spaceKeyPressed, object: nil)
+                }
+                return nil // Consume the event to prevent default handling
+            }
+            return event
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool)
