@@ -362,14 +362,16 @@ struct SongContextMenu: View {
 
 struct SongTitleCell: View {
     let song: CloudMusicApi.Song
+    @ObservedObject var playlistStatus: PlaylistStatus
 
     // 缓存计算结果，避免重复计算
     private let aliasText: String?
     private let statusIcon:
         (systemName: String, help: String, width: CGFloat, height: CGFloat, padding: CGFloat)?
 
-    init(song: CloudMusicApi.Song) {
+    init(song: CloudMusicApi.Song, playlistStatus: PlaylistStatus) {
         self.song = song
+        self.playlistStatus = playlistStatus
         self.aliasText = song.tns?.first ?? song.alia.first
 
         // 预计算状态图标信息
@@ -398,9 +400,16 @@ struct SongTitleCell: View {
                     .foregroundColor(.secondary)
             }
 
+            Spacer()
+
+            // Currently playing speaker icon
+            if song.id == playlistStatus.currentItem?.id {
+                Image(systemName: "speaker.3.fill")
+                    .foregroundColor(.accentColor)
+            }
+
             // Status icon
             if let icon = statusIcon {
-                Spacer()
                 Image(systemName: icon.systemName)
                     .resizable()
                     .frame(width: icon.width, height: icon.height)
@@ -520,7 +529,7 @@ struct SongTableView: View {
             .width(16)
 
             TableColumn("Title", value: \.name) { song in
-                SongTitleCell(song: song)
+                SongTitleCell(song: song, playlistStatus: playlistStatus)
             }
             .width(min: 500)
 
