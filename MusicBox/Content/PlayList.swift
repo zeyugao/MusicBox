@@ -588,9 +588,6 @@ struct SongTableView: View {
                 }
             }
         }
-        .onTapGesture(count: 2) { location in
-            print("location: \(location)")
-        }
         .onChange(of: sortOrder) { prevSortOrder, newSortOrder in
             if prevSortOrder.count >= 1, newSortOrder.count >= 1,
                 prevSortOrder[0].keyPath == newSortOrder[0].keyPath,
