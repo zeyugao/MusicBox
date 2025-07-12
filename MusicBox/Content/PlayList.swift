@@ -612,6 +612,8 @@ class SongTableViewController: NSViewController {
         tableView.allowsColumnReordering = false
         tableView.usesAlternatingRowBackgroundColors = true
         tableView.rowSizeStyle = .default
+        tableView.doubleAction = #selector(handleDoubleClick(_:))
+        tableView.target = self
         
         view.addSubview(scrollView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -708,6 +710,19 @@ class SongTableViewController: NSViewController {
         }
         
         tableView.sortDescriptors = descriptors
+    }
+    
+    @objc private func handleDoubleClick(_ sender: NSTableView) {
+        let clickedRow = sender.clickedRow
+        guard clickedRow >= 0, let songs = songs, clickedRow < songs.count else { return }
+        
+        let song = songs[clickedRow]
+        
+        // 播放选中的歌曲
+        Task {
+            let newItem = loadItem(song: song)
+            let _ = await playlistStatus?.addItemAndSeekTo(newItem, shouldPlay: true)
+        }
     }
 }
 
