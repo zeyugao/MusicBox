@@ -301,6 +301,7 @@ struct PlayerControlView: View {
                     .padding(.bottom, -2)
                 PlaybackProgressView(playbackProgress: playStatus.playbackProgress)
                     .environmentObject(playStatus)
+                    .frame(maxWidth: 600)
             }
             .layoutPriority(1)
             .frame(minWidth: 300)
