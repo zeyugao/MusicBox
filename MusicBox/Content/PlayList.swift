@@ -320,197 +320,654 @@ struct DownloadProgressDialog: View {
     }
 }
 
-struct SongContextMenu: View {
-    let song: CloudMusicApi.Song
-    let playlistMetadata: PlaylistMetadata?
-    let onPlay: () -> Void
-    let onAddToNowPlaying: () -> Void
-    let onAddToPlaylist: () -> Void
-    let onDeleteFromPlaylist: () -> Void
-    let onUploadToCloud: () -> Void
 
-    var body: some View {
-        Button("Play") {
-            onPlay()
-        }
+// MARK: - UIKit Table Cell Views
 
-        Button("Add to Now Playing") {
-            onAddToNowPlaying()
-        }
-
-        Button("Add to Playlist") {
-            onAddToPlaylist()
-        }
-
-        if case .netease = playlistMetadata {
-            Button("Delete from Playlist") {
-                onDeleteFromPlaylist()
+class SongFavoriteTableCellView: NSTableCellView {
+    private let favoriteButton = NSButton()
+    private var song: CloudMusicApi.Song?
+    private weak var userInfo: UserInfo?
+    
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupView()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupView()
+    }
+    
+    private func setupView() {
+        favoriteButton.isBordered = false
+        favoriteButton.target = self
+        favoriteButton.action = #selector(toggleFavorite)
+        addSubview(favoriteButton)
+        
+        favoriteButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            favoriteButton.centerXAnchor.constraint(equalTo: centerXAnchor),
+            favoriteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            favoriteButton.widthAnchor.constraint(equalToConstant: 16),
+            favoriteButton.heightAnchor.constraint(equalToConstant: 14)
+        ])
+    }
+    
+    func configure(with song: CloudMusicApi.Song, userInfo: UserInfo) {
+        self.song = song
+        self.userInfo = userInfo
+        updateButton()
+    }
+    
+    private func updateButton() {
+        guard let song = song, let userInfo = userInfo else { return }
+        let isFavorite = userInfo.likelist.contains(song.id)
+        favoriteButton.image = NSImage(systemSymbolName: isFavorite ? "heart.fill" : "heart", accessibilityDescription: nil)
+        favoriteButton.toolTip = isFavorite ? "Unfavor" : "Favor"
+    }
+    
+    @objc private func toggleFavorite() {
+        guard let song = song, let userInfo = userInfo else { return }
+        let isFavorite = userInfo.likelist.contains(song.id)
+        
+        Task {
+            var likelist = userInfo.likelist
+            await likeSong(likelist: &likelist, songId: song.id, favored: isFavorite)
+            await MainActor.run {
+                if isFavorite {
+                    userInfo.likelist.remove(song.id)
+                } else {
+                    userInfo.likelist.insert(song.id)
+                }
+                updateButton()
             }
-        }
-
-        Button("Upload to Cloud") {
-            onUploadToCloud()
-        }
-
-        Button("Copy Title") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(song.name, forType: .string)
-        }
-
-        Button("Copy Link") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(
-                "https://music.163.com/#/song?id=\(song.id)", forType: .string)
         }
     }
 }
 
-struct SongTitleCell: View {
-    let song: CloudMusicApi.Song
-    @ObservedObject var playlistStatus: PlaylistStatus
-
-    // 缓存计算结果，避免重复计算
-    private let aliasText: String?
-    private let statusIcon:
-        (systemName: String, help: String, width: CGFloat, height: CGFloat, padding: CGFloat)?
-
-    init(song: CloudMusicApi.Song, playlistStatus: PlaylistStatus) {
-        self.song = song
-        self.playlistStatus = playlistStatus
-        self.aliasText = song.tns?.first ?? song.alia.first
-
-        // 预计算状态图标信息
+class SongTitleTableCellView: NSTableCellView {
+    private let titleLabel = NSTextField()
+    private let aliasLabel = NSTextField()
+    private let speakerIcon = NSImageView()
+    private let statusIcon = NSImageView()
+    private let stackView = NSStackView()
+    
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupView()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupView()
+    }
+    
+    private func setupView() {
+        titleLabel.isBezeled = false
+        titleLabel.drawsBackground = false
+        titleLabel.isEditable = false
+        titleLabel.isSelectable = false
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.maximumNumberOfLines = 1
+        
+        aliasLabel.isBezeled = false
+        aliasLabel.drawsBackground = false
+        aliasLabel.isEditable = false
+        aliasLabel.isSelectable = false
+        aliasLabel.textColor = .secondaryLabelColor
+        aliasLabel.lineBreakMode = .byTruncatingTail
+        aliasLabel.maximumNumberOfLines = 1
+        
+        stackView.orientation = .horizontal
+        stackView.alignment = .centerY
+        stackView.spacing = 4
+        
+        stackView.addArrangedSubview(titleLabel)
+        stackView.addArrangedSubview(aliasLabel)
+        
+        let spacer = NSView()
+        stackView.addArrangedSubview(spacer)
+        stackView.addArrangedSubview(speakerIcon)
+        stackView.addArrangedSubview(statusIcon)
+        
+        addSubview(stackView)
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            speakerIcon.widthAnchor.constraint(equalToConstant: 16),
+            speakerIcon.heightAnchor.constraint(equalToConstant: 16),
+            statusIcon.widthAnchor.constraint(equalToConstant: 18),
+            statusIcon.heightAnchor.constraint(equalToConstant: 16)
+        ])
+    }
+    
+    func configure(with song: CloudMusicApi.Song, playlistStatus: PlaylistStatus) {
+        titleLabel.stringValue = song.name
+        
+        if let alias = song.tns?.first ?? song.alia.first {
+            aliasLabel.stringValue = "( \(alias) )"
+            aliasLabel.isHidden = false
+        } else {
+            aliasLabel.isHidden = true
+        }
+        
+        // Speaker icon for currently playing
+        if song.id == playlistStatus.currentItem?.id {
+            speakerIcon.image = NSImage(systemSymbolName: "speaker.3.fill", accessibilityDescription: nil)
+            speakerIcon.contentTintColor = .controlAccentColor
+            speakerIcon.isHidden = false
+        } else {
+            speakerIcon.isHidden = true
+        }
+        
+        // Status icon
         if song.pc != nil {
-            self.statusIcon = ("cloud", "Cloud", 18, 12, 0)
+            statusIcon.image = NSImage(systemSymbolName: "cloud", accessibilityDescription: nil)
+            statusIcon.toolTip = "Cloud"
+            statusIcon.isHidden = false
         } else {
             switch song.fee {
             case .vip, .album:
-                self.statusIcon = ("dollarsign.circle", "Need buy", 16, 16, 1)
+                statusIcon.image = NSImage(systemSymbolName: "dollarsign.circle", accessibilityDescription: nil)
+                statusIcon.toolTip = "Need buy"
+                statusIcon.isHidden = false
             case .trial:
-                self.statusIcon = ("gift", "Trial", 16, 16, 1)
+                statusIcon.image = NSImage(systemSymbolName: "gift", accessibilityDescription: nil)
+                statusIcon.toolTip = "Trial"
+                statusIcon.isHidden = false
             default:
-                self.statusIcon = nil
-            }
-        }
-    }
-
-    var body: some View {
-        HStack {
-            // Main title
-            Text(song.name)
-
-            // Alias text
-            if let alias = aliasText {
-                Text("( \(alias) )")
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            // Currently playing speaker icon
-            if song.id == playlistStatus.currentItem?.id {
-                Image(systemName: "speaker.3.fill")
-                    .foregroundColor(.accentColor)
-            }
-
-            // Status icon
-            if let icon = statusIcon {
-                Image(systemName: icon.systemName)
-                    .resizable()
-                    .frame(width: icon.width, height: icon.height)
-                    .help(icon.help)
-                    .padding(.horizontal, icon.padding)
-                    .frame(width: 18, height: 16)
+                statusIcon.isHidden = true
             }
         }
     }
 }
 
-struct SongFavoriteButton: View {
-    let song: CloudMusicApi.Song
-    let userInfo: UserInfo
-
-    // 缓存 songId，避免重复访问
-    private let songId: UInt64
-
-    init(song: CloudMusicApi.Song, userInfo: UserInfo) {
-        self.song = song
-        self.userInfo = userInfo
-        self.songId = song.id
+class SongArtistTableCellView: NSTableCellView {
+    private let artistLabel = NSTextField()
+    
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupView()
     }
-
-    private var isFavorite: Bool {
-        userInfo.likelist.contains(songId)
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupView()
     }
+    
+    private func setupView() {
+        artistLabel.isBezeled = false
+        artistLabel.drawsBackground = false
+        artistLabel.isEditable = false
+        artistLabel.isSelectable = false
+        artistLabel.lineBreakMode = .byTruncatingTail
+        artistLabel.maximumNumberOfLines = 1
+        
+        addSubview(artistLabel)
+        artistLabel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            artistLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
+            artistLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
+            artistLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+    
+    func configure(with song: CloudMusicApi.Song) {
+        artistLabel.stringValue = song.ar.map(\.name).joined(separator: ", ")
+    }
+}
 
-    private func toggleFavorite() {
-        let currentFavoriteState = isFavorite
+class SongDurationTableCellView: NSTableCellView {
+    private let durationLabel = NSTextField()
+    
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupView()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupView()
+    }
+    
+    private func setupView() {
+        durationLabel.isBezeled = false
+        durationLabel.drawsBackground = false
+        durationLabel.isEditable = false
+        durationLabel.isSelectable = false
+        durationLabel.alignment = .right
+        durationLabel.lineBreakMode = .byTruncatingTail
+        durationLabel.maximumNumberOfLines = 1
+        
+        addSubview(durationLabel)
+        durationLabel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            durationLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
+            durationLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
+            durationLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+    
+    func configure(with song: CloudMusicApi.Song) {
+        let duration = song.parseDuration()
+        durationLabel.stringValue = String(format: "%02d:%02d", duration.minute, duration.second)
+    }
+}
 
-        Task {
-            var likelist = userInfo.likelist
-            await likeSong(
-                likelist: &likelist,
-                songId: songId,
-                favored: currentFavoriteState
-            )
-            await MainActor.run {
-                // 使用捕获的状态，避免重复计算
-                if currentFavoriteState {
-                    userInfo.likelist.remove(songId)
-                } else {
-                    userInfo.likelist.insert(songId)
+// MARK: - UIKit Table View Controller
+
+class SongTableViewController: NSViewController {
+    private let tableView = NSTableView()
+    private let scrollView = NSScrollView()
+    
+    var songs: [CloudMusicApi.Song]? {
+        didSet {
+            tableView.reloadData()
+        }
+    }
+    
+    var selectedItem: CloudMusicApi.Song.ID? {
+        didSet {
+            updateSelection()
+        }
+    }
+    
+    var sortOrder: [KeyPathComparator<CloudMusicApi.Song>] = [] {
+        didSet {
+            updateSortDescriptors()
+        }
+    }
+    
+    weak var userInfo: UserInfo?
+    weak var playlistStatus: PlaylistStatus?
+    var playlistMetadata: PlaylistMetadata?
+    var onSortChange: (([KeyPathComparator<CloudMusicApi.Song>]) -> Void)?
+    var selectedSongToAdd: ((CloudMusicApi.Song) -> Void)?
+    var onDeleteFromPlaylist: ((CloudMusicApi.Song) -> Void)?
+    var onUploadToCloud: ((CloudMusicApi.Song, URL) -> Void)?
+    
+    override func loadView() {
+        view = NSView()
+        setupTableView()
+    }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupColumns()
+    }
+    
+    private func setupTableView() {
+        scrollView.documentView = tableView
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.autohidesScrollers = true
+        
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.allowsColumnSelection = false
+        tableView.allowsMultipleSelection = false
+        tableView.allowsColumnReordering = false
+        tableView.usesAlternatingRowBackgroundColors = true
+        tableView.rowSizeStyle = .default
+        
+        view.addSubview(scrollView)
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        // Enable drag and drop
+        tableView.registerForDraggedTypes([.fileURL])
+        tableView.setDraggingSourceOperationMask(.copy, forLocal: false)
+    }
+    
+    private func setupColumns() {
+        // Favorite column
+        let favoriteColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("favorite"))
+        favoriteColumn.title = ""
+        favoriteColumn.width = 16
+        favoriteColumn.minWidth = 16
+        favoriteColumn.maxWidth = 16
+        favoriteColumn.resizingMask = []
+        tableView.addTableColumn(favoriteColumn)
+        
+        // Title column
+        let titleColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("title"))
+        titleColumn.title = "Title"
+        titleColumn.width = 400
+        titleColumn.minWidth = 200
+        titleColumn.sortDescriptorPrototype = NSSortDescriptor(key: "name", ascending: true)
+        tableView.addTableColumn(titleColumn)
+        
+        // Artist column
+        let artistColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("artist"))
+        artistColumn.title = "Artist"
+        artistColumn.width = 100
+        artistColumn.minWidth = 50
+        artistColumn.sortDescriptorPrototype = NSSortDescriptor(key: "ar.0.name", ascending: true)
+        tableView.addTableColumn(artistColumn)
+        
+        // Album column
+        let albumColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("album"))
+        albumColumn.title = "Album"
+        albumColumn.width = 100
+        albumColumn.minWidth = 50
+        albumColumn.sortDescriptorPrototype = NSSortDescriptor(key: "al.name", ascending: true)
+        tableView.addTableColumn(albumColumn)
+        
+        // Duration column
+        let durationColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("duration"))
+        durationColumn.title = "Duration"
+        durationColumn.width = 60
+        durationColumn.minWidth = 60
+        durationColumn.maxWidth = 60
+        durationColumn.resizingMask = []
+        durationColumn.sortDescriptorPrototype = NSSortDescriptor(key: "dt", ascending: true)
+        tableView.addTableColumn(durationColumn)
+    }
+    
+    private func updateSelection() {
+        guard let songs = songs, let selectedItem = selectedItem else {
+            tableView.deselectAll(nil)
+            return
+        }
+        
+        if let index = songs.firstIndex(where: { $0.id == selectedItem }) {
+            tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+        }
+    }
+    
+    private func updateSortDescriptors() {
+        // Convert KeyPathComparator to NSSortDescriptor
+        var descriptors: [NSSortDescriptor] = []
+        
+        for comparator in sortOrder {
+            var keyPath: String = ""
+            let ascending = comparator.order == .forward
+            
+            // Manually map KeyPath to string based on the known sorting keys
+            if comparator.keyPath == \CloudMusicApi.Song.name {
+                keyPath = "name"
+            } else if comparator.keyPath == \CloudMusicApi.Song.ar[0].name {
+                keyPath = "ar.0.name"
+            } else if comparator.keyPath == \CloudMusicApi.Song.al.name {
+                keyPath = "al.name"
+            } else if comparator.keyPath == \CloudMusicApi.Song.dt {
+                keyPath = "dt"
+            }
+            
+            if !keyPath.isEmpty {
+                descriptors.append(NSSortDescriptor(key: keyPath, ascending: ascending))
+            }
+        }
+        
+        tableView.sortDescriptors = descriptors
+    }
+}
+
+// MARK: - NSTableViewDataSource
+
+extension SongTableViewController: NSTableViewDataSource {
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        return songs?.count ?? 0
+    }
+}
+
+// MARK: - NSTableViewDelegate
+
+extension SongTableViewController: NSTableViewDelegate {
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        guard let songs = songs, row < songs.count else { return nil }
+        let song = songs[row]
+        
+        guard let identifier = tableColumn?.identifier else { return nil }
+        
+        switch identifier.rawValue {
+        case "favorite":
+            let cellView = SongFavoriteTableCellView()
+            if let userInfo = userInfo {
+                cellView.configure(with: song, userInfo: userInfo)
+            }
+            return cellView
+            
+        case "title":
+            let cellView = SongTitleTableCellView()
+            if let playlistStatus = playlistStatus {
+                cellView.configure(with: song, playlistStatus: playlistStatus)
+            }
+            return cellView
+            
+        case "artist":
+            let cellView = SongArtistTableCellView()
+            cellView.configure(with: song)
+            return cellView
+            
+        case "album":
+            let cellView = NSTableCellView()
+            let textField = NSTextField()
+            textField.isBezeled = false
+            textField.drawsBackground = false
+            textField.isEditable = false
+            textField.isSelectable = false
+            textField.lineBreakMode = .byTruncatingTail
+            textField.maximumNumberOfLines = 1
+            textField.stringValue = song.al.name
+            cellView.addSubview(textField)
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor),
+                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor),
+                textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
+            ])
+            return cellView
+            
+        case "duration":
+            let cellView = SongDurationTableCellView()
+            cellView.configure(with: song)
+            return cellView
+            
+        default:
+            return nil
+        }
+    }
+    
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        let selectedRow = tableView.selectedRow
+        if selectedRow >= 0, let songs = songs, selectedRow < songs.count {
+            selectedItem = songs[selectedRow].id
+        } else {
+            selectedItem = nil
+        }
+    }
+    
+    func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+        // Convert NSSortDescriptor back to KeyPathComparator
+        var newSortOrder: [KeyPathComparator<CloudMusicApi.Song>] = []
+        
+        for descriptor in tableView.sortDescriptors {
+            if let keyPath = descriptor.key {
+                switch keyPath {
+                case "name":
+                    let comparator = KeyPathComparator(\CloudMusicApi.Song.name, order: descriptor.ascending ? .forward : .reverse)
+                    newSortOrder.append(comparator)
+                case "ar.0.name":
+                    let comparator = KeyPathComparator(\CloudMusicApi.Song.ar[0].name, order: descriptor.ascending ? .forward : .reverse)
+                    newSortOrder.append(comparator)
+                case "al.name":
+                    let comparator = KeyPathComparator(\CloudMusicApi.Song.al.name, order: descriptor.ascending ? .forward : .reverse)
+                    newSortOrder.append(comparator)
+                case "dt":
+                    let comparator = KeyPathComparator(\CloudMusicApi.Song.dt, order: descriptor.ascending ? .forward : .reverse)
+                    newSortOrder.append(comparator)
+                default:
+                    break
                 }
             }
         }
+        
+        // Handle double-click to clear sort
+        if !oldDescriptors.isEmpty && !newSortOrder.isEmpty &&
+           oldDescriptors.first?.key == newSortOrder.first?.keyPath.debugDescription &&
+           newSortOrder.first?.order == .forward {
+            newSortOrder.removeAll()
+        }
+        
+        sortOrder = newSortOrder
+        onSortChange?(sortOrder)
     }
+    
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+        return NSTableRowView()
+    }
+}
 
-    var body: some View {
-        let favorite = isFavorite
+// MARK: - Context Menu Support
 
-        Button(action: toggleFavorite) {
-            Image(systemName: favorite ? "heart.fill" : "heart")
-                .resizable()
-                .frame(width: 16, height: 14)
-                .help(favorite ? "Unfavor" : "Favor")
-                .padding(.trailing, 4)
+extension SongTableViewController {
+    override func rightMouseDown(with event: NSEvent) {
+        let point = tableView.convert(event.locationInWindow, from: nil)
+        let row = tableView.row(at: point)
+        
+        guard row >= 0, let songs = songs, row < songs.count else { return }
+        
+        // Select the row if it's not already selected
+        if !tableView.selectedRowIndexes.contains(row) {
+            tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        }
+        
+        let song = songs[row]
+        let menu = createContextMenu(for: song)
+        
+        NSMenu.popUpContextMenu(menu, with: event, for: tableView)
+    }
+    
+    private func createContextMenu(for song: CloudMusicApi.Song) -> NSMenu {
+        let menu = NSMenu()
+        // Play
+        let playItem = NSMenuItem(title: "Play", action: #selector(playSong(_:)), keyEquivalent: "")
+        playItem.target = self
+        playItem.representedObject = song
+        menu.addItem(playItem)
+        
+        // Add to Now Playing
+        let addToNowPlayingItem = NSMenuItem(title: "Add to Now Playing", action: #selector(addToNowPlaying(_:)), keyEquivalent: "")
+        addToNowPlayingItem.target = self
+        addToNowPlayingItem.representedObject = song
+        menu.addItem(addToNowPlayingItem)
+        
+        // Add to Playlist
+        let addToPlaylistItem = NSMenuItem(title: "Add to Playlist", action: #selector(addToPlaylist(_:)), keyEquivalent: "")
+        addToPlaylistItem.target = self
+        addToPlaylistItem.representedObject = song
+        menu.addItem(addToPlaylistItem)
+        
+        // Delete from Playlist (if applicable)
+        if case .netease = playlistMetadata {
+            let deleteItem = NSMenuItem(title: "Delete from Playlist", action: #selector(deleteFromPlaylist(_:)), keyEquivalent: "")
+            deleteItem.target = self
+            deleteItem.representedObject = song
+            menu.addItem(deleteItem)
+        }
+        
+        // Upload to Cloud
+        let uploadItem = NSMenuItem(title: "Upload to Cloud", action: #selector(uploadToCloud(_:)), keyEquivalent: "")
+        uploadItem.target = self
+        uploadItem.representedObject = song
+        menu.addItem(uploadItem)
+        
+        // Copy Title
+        let copyTitleItem = NSMenuItem(title: "Copy Title", action: #selector(copyTitle(_:)), keyEquivalent: "")
+        copyTitleItem.target = self
+        copyTitleItem.representedObject = song
+        menu.addItem(copyTitleItem)
+        
+        // Copy Link
+        let copyLinkItem = NSMenuItem(title: "Copy Link", action: #selector(copyLink(_:)), keyEquivalent: "")
+        copyLinkItem.target = self
+        copyLinkItem.representedObject = song
+        menu.addItem(copyLinkItem)
+        
+        return menu
+    }
+    
+    @objc private func playSong(_ sender: NSMenuItem) {
+        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        Task {
+            let newItem = loadItem(song: song)
+            let _ = await playlistStatus?.addItemAndSeekTo(newItem, shouldPlay: true)
         }
     }
+    
+    @objc private func addToNowPlaying(_ sender: NSMenuItem) {
+        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        let newItem = loadItem(song: song)
+        let _ = playlistStatus?.addItemToPlaylist(newItem)
+    }
+    
+    @objc private func addToPlaylist(_ sender: NSMenuItem) {
+        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        selectedSongToAdd?(song)
+    }
+    
+    @objc private func deleteFromPlaylist(_ sender: NSMenuItem) {
+        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        onDeleteFromPlaylist?(song)
+    }
+    
+    @objc private func uploadToCloud(_ sender: NSMenuItem) {
+        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        Task {
+            if let url = await selectAudioFile() {
+                onUploadToCloud?(song, url)
+            }
+        }
+    }
+    
+    @objc private func copyTitle(_ sender: NSMenuItem) {
+        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(song.name, forType: .string)
+    }
+    
+    @objc private func copyLink(_ sender: NSMenuItem) {
+        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("https://music.163.com/#/song?id=\(song.id)", forType: .string)
+    }
 }
 
-struct SongArtistCell: View {
-    let song: CloudMusicApi.Song
+// MARK: - Drag and Drop Support
 
-    // 缓存艺术家名称，避免重复计算
-    private let artistNames: String
-
-    init(song: CloudMusicApi.Song) {
-        self.song = song
-        self.artistNames = song.ar.map(\.name).joined(separator: ", ")
+extension SongTableViewController: NSDraggingDestination {
+    func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        return .copy
     }
-
-    var body: some View {
-        Text(artistNames)
-    }
-}
-
-struct SongDurationCell: View {
-    let song: CloudMusicApi.Song
-
-    // 缓存格式化的时长，避免重复计算
-    private let formattedDuration: String
-
-    init(song: CloudMusicApi.Song) {
-        self.song = song
-        let duration = song.parseDuration()
-        self.formattedDuration = String(format: "%02d:%02d", duration.minute, duration.second)
-    }
-
-    var body: some View {
-        Text(formattedDuration)
+    
+    func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let pasteboard = sender.draggingPasteboard
+        guard let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+              let url = urls.first else { return false }
+        
+        let point = tableView.convert(sender.draggingLocation, from: nil)
+        let row = tableView.row(at: point)
+        
+        guard row >= 0, let songs = songs, row < songs.count else { return false }
+        let song = songs[row]
+        
+        onUploadToCloud?(song, url)
+        return true
     }
 }
 
-struct SongTableView: View {
+// MARK: - SwiftUI Wrapper
+
+struct SongTableView: NSViewControllerRepresentable {
     let songs: [CloudMusicApi.Song]?
     @Binding var selectedItem: CloudMusicApi.Song.ID?
     @Binding var sortOrder: [KeyPathComparator<CloudMusicApi.Song>]
@@ -521,83 +978,26 @@ struct SongTableView: View {
     @Binding var selectedSongToAdd: CloudMusicApi.Song?
     let onDeleteFromPlaylist: (CloudMusicApi.Song) -> Void
     let onUploadToCloud: (CloudMusicApi.Song, URL) -> Void
-
-    var body: some View {
-        Table(
-            of: CloudMusicApi.Song.self,
-            selection: $selectedItem,
-            sortOrder: $sortOrder
-        ) {
-            TableColumn("") { song in
-                SongFavoriteButton(song: song, userInfo: userInfo)
-            }
-            .width(16)
-
-            TableColumn("Title", value: \.name) { song in
-                SongTitleCell(song: song, playlistStatus: playlistStatus)
-            }
-            .width(min: 500)
-
-            TableColumn("Artist", value: \.ar[0].name) { song in
-                SongArtistCell(song: song)
-            }
-
-            TableColumn("Album", value: \.al.name)
-
-            TableColumn("Duration", value: \.dt) { song in
-                SongDurationCell(song: song)
-            }
-            .width(max: 60)
-        } rows: {
-            if let songs = songs {
-                ForEach(songs) { song in
-                    TableRow(song)
-                        .contextMenu {
-                            SongContextMenu(
-                                song: song,
-                                playlistMetadata: playlistMetadata,
-                                onPlay: {
-                                    Task {
-                                        let newItem = loadItem(song: song)
-                                        let _ = await playlistStatus.addItemAndSeekTo(
-                                            newItem, shouldPlay: true)
-                                    }
-                                },
-                                onAddToNowPlaying: {
-                                    let newItem = loadItem(song: song)
-                                    let _ = playlistStatus.addItemToPlaylist(newItem)
-                                },
-                                onAddToPlaylist: {
-                                    selectedSongToAdd = song
-                                },
-                                onDeleteFromPlaylist: { onDeleteFromPlaylist(song) },
-                                onUploadToCloud: {
-                                    Task {
-                                        if let url = await selectAudioFile() {
-                                            onUploadToCloud(song, url)
-                                        }
-                                    }
-                                }
-                            )
-                        }
-                        .dropDestination(for: URL.self) { urls in
-                            if let url = urls.first {
-                                onUploadToCloud(song, url)
-                            }
-                        }
-                }
-            }
+    
+    func makeNSViewController(context: Context) -> SongTableViewController {
+        let controller = SongTableViewController()
+        controller.userInfo = userInfo
+        controller.playlistStatus = playlistStatus
+        controller.playlistMetadata = playlistMetadata
+        controller.onSortChange = onSortChange
+        controller.selectedSongToAdd = { song in
+            selectedSongToAdd = song
         }
-        .onChange(of: sortOrder) { prevSortOrder, newSortOrder in
-            if prevSortOrder.count >= 1, newSortOrder.count >= 1,
-                prevSortOrder[0].keyPath == newSortOrder[0].keyPath,
-                newSortOrder[0].order == .forward
-            {
-                sortOrder.removeAll()
-            }
-
-            onSortChange(sortOrder)
-        }
+        controller.onDeleteFromPlaylist = onDeleteFromPlaylist
+        controller.onUploadToCloud = onUploadToCloud
+        return controller
+    }
+    
+    func updateNSViewController(_ nsViewController: SongTableViewController, context: Context) {
+        nsViewController.songs = songs
+        nsViewController.selectedItem = selectedItem
+        nsViewController.sortOrder = sortOrder
+        nsViewController.playlistMetadata = playlistMetadata
     }
 }
 
