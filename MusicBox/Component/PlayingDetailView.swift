@@ -104,6 +104,7 @@ struct PlayingDetailView: View {
     @EnvironmentObject var playStatus: PlayStatus
     @State var hasRoma: Bool = false
     @State private var showNoLyricMessage: Bool = false
+    @State private var artworkUrl: URL?
 
     func updateLyric() async {
         showNoLyricMessage = false
@@ -127,6 +128,14 @@ struct PlayingDetailView: View {
             showNoLyricMessage = false
         }
     }
+    
+    func updateArtwork() async {
+        if let item = playStatus.currentItem {
+            artworkUrl = await item.getArtworkUrl()
+        } else {
+            artworkUrl = nil
+        }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -134,16 +143,30 @@ struct PlayingDetailView: View {
                 if let item = playStatus.currentItem {
                     HStack(alignment: .center) {
                         VStack {
-                            if let artworkUrl = item.artworkUrl {
+                            if let artworkUrl = artworkUrl {
                                 AsyncImageWithCache(url: artworkUrl) { image in
                                     image.resizable()
                                         .interpolation(.high)
                                         .scaledToFit()
                                 } placeholder: {
-                                    Color.white
+                                    Image(systemName: "music.note")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 60, height: 60)
+                                        .foregroundColor(.gray)
+                                        .background(Color.gray.opacity(0.2))
                                 }
                                 .frame(width: 200, height: 200)
                                 .cornerRadius(5)
+                            } else {
+                                Image(systemName: "music.note")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .foregroundColor(.gray)
+                                    .frame(width: 200, height: 200)
+                                    .background(Color.gray.opacity(0.2))
+                                    .cornerRadius(5)
                             }
                             Text(item.title)
                                 .font(.title)
@@ -172,10 +195,13 @@ struct PlayingDetailView: View {
                 }
             }.task {
                 await updateLyric()
+                await updateArtwork()
             }
             .onChange(of: playStatus.currentItem) {
+                artworkUrl = nil // Clear immediately for visual feedback
                 Task {
                     await updateLyric()
+                    await updateArtwork()
                 }
             }
             .navigationTitle(playStatus.currentItem?.title ?? "Playing")
