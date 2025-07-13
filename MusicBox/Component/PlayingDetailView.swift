@@ -103,8 +103,18 @@ struct PlayingDetailView: View {
     @State private var lyric: [CloudMusicApi.LyricLine]?
     @EnvironmentObject var playStatus: PlayStatus
     @State var hasRoma: Bool = false
+    @State private var showNoLyricMessage: Bool = false
 
     func updateLyric() async {
+        showNoLyricMessage = false
+
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second
+            if lyric == nil {
+                showNoLyricMessage = true
+            }
+        }
+
         if let currentId = playStatus.currentItem?.id,
             let lyric = await CloudMusicApi(cacheTtl: -1).lyric_new(id: currentId)
         {
@@ -114,6 +124,7 @@ struct PlayingDetailView: View {
             self.playStatus.lyricStatus.lyricTimeline = lyric.map { Int($0.time * 10) }
             self.playStatus.lyricStatus.resetLyricIndex(
                 currentTime: self.playStatus.playbackProgress.playedSecond)
+            showNoLyricMessage = false
         }
     }
 
@@ -151,7 +162,7 @@ struct PlayingDetailView: View {
                                     lyricStatus: playStatus.lyricStatus,
                                     hasRoma: $hasRoma
                                 )
-                            } else {
+                            } else if showNoLyricMessage {
                                 Text("还没有歌词")
                             }
                         }
