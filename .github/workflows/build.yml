@@ -41,11 +41,16 @@ jobs:
           LATEST_COMMIT=$(git ls-remote https://github.com/elsagranger/QCloudMusicApi.git HEAD | cut -f1)
           echo "commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
           echo "Latest QCloudMusicApi commit: $LATEST_COMMIT"
+      - name: QCloudMusicApi Path
+        id: qcloud-path
+        run: |
+          mkdir -p ../QCloudMusicApi
+          echo "path=$(realpath ../QCloudMusicApi)" >> $GITHUB_OUTPUT
       - name: Cache QCloudMusicApi
         id: cache-qcloud
         uses: actions/cache@v4
         with:
-          path: ../QCloudMusicApi
+          path: ${steps.qcloud-path.outputs.path}
           key: qcloud-musicapi-${{ steps.qcloud-commit.outputs.commit }}-${{ env.QT_VERSION }}-${{ env.BUILD_TYPE }}
       - name: Fetch QCloudMusicApi
         if: steps.cache-qcloud.outputs.cache-hit != 'true'
