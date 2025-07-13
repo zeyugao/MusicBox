@@ -76,25 +76,19 @@ class PlaylistDetailModel: ObservableObject {
 
                 if trackIds.count == tracks.count {
                     self.originalSongs = tracks
-                    await MainActor.run {
-                        self.songs = tracks
-                    }
+                    self.update()
                 } else {
                     if let playlist = await CloudMusicApi(cacheTtl: cacheTtl).song_detail(
                         ids: trackIds)
                     {
                         self.originalSongs = playlist
-                        await MainActor.run {
-                            self.songs = playlist
-                        }
+                        self.update()
                     }
                 }
             }
         case .songs(let songs, _, _):
             self.originalSongs = songs
-            await MainActor.run {
-                self.songs = songs
-            }
+            self.update()
         }
     }
 
@@ -674,10 +668,10 @@ class SongTableViewController: NSViewController {
         durationColumn.maxWidth = 60
         durationColumn.resizingMask = []
         tableView.addTableColumn(durationColumn)
-        
+
         updateColumnSortingCapability()
     }
-    
+
     func updateColumnSortingCapability() {
         let shouldEnableSorting: Bool
         if case .songs = playlistMetadata {
@@ -685,17 +679,21 @@ class SongTableViewController: NSViewController {
         } else {
             shouldEnableSorting = true
         }
-        
+
         for column in tableView.tableColumns {
             switch column.identifier.rawValue {
             case "title":
-                column.sortDescriptorPrototype = shouldEnableSorting ? NSSortDescriptor(key: "name", ascending: true) : nil
+                column.sortDescriptorPrototype =
+                    shouldEnableSorting ? NSSortDescriptor(key: "name", ascending: true) : nil
             case "artist":
-                column.sortDescriptorPrototype = shouldEnableSorting ? NSSortDescriptor(key: "ar.0.name", ascending: true) : nil
+                column.sortDescriptorPrototype =
+                    shouldEnableSorting ? NSSortDescriptor(key: "ar.0.name", ascending: true) : nil
             case "album":
-                column.sortDescriptorPrototype = shouldEnableSorting ? NSSortDescriptor(key: "al.name", ascending: true) : nil
+                column.sortDescriptorPrototype =
+                    shouldEnableSorting ? NSSortDescriptor(key: "al.name", ascending: true) : nil
             case "duration":
-                column.sortDescriptorPrototype = shouldEnableSorting ? NSSortDescriptor(key: "dt", ascending: true) : nil
+                column.sortDescriptorPrototype =
+                    shouldEnableSorting ? NSSortDescriptor(key: "dt", ascending: true) : nil
             default:
                 break
             }
@@ -879,47 +877,75 @@ extension SongTableViewController: NSTableViewDelegate {
             tableView.sortDescriptors = []
             return
         }
-        
-        // Convert NSSortDescriptor back to KeyPathComparator
-        var newSortOrder: [KeyPathComparator<CloudMusicApi.Song>] = []
 
-        for descriptor in tableView.sortDescriptors {
-            if let keyPath = descriptor.key {
-                switch keyPath {
-                case "name":
-                    let comparator = KeyPathComparator(
-                        \CloudMusicApi.Song.name, order: descriptor.ascending ? .forward : .reverse)
-                    newSortOrder.append(comparator)
-                case "ar.0.name":
-                    let comparator = KeyPathComparator(
-                        \CloudMusicApi.Song.ar[0].name,
-                        order: descriptor.ascending ? .forward : .reverse)
-                    newSortOrder.append(comparator)
-                case "al.name":
-                    let comparator = KeyPathComparator(
-                        \CloudMusicApi.Song.al.name,
-                        order: descriptor.ascending ? .forward : .reverse)
-                    newSortOrder.append(comparator)
-                case "dt":
-                    let comparator = KeyPathComparator(
-                        \CloudMusicApi.Song.dt, order: descriptor.ascending ? .forward : .reverse)
-                    newSortOrder.append(comparator)
-                default:
-                    break
+        // Get the clicked column key
+        guard let newDescriptor = tableView.sortDescriptors.first,
+            let clickedKey = newDescriptor.key
+        else {
+            sortOrder = []
+            onSortChange?(sortOrder)
+            return
+        }
+
+        // Determine current state and next state for the clicked column
+        let currentSortKey = sortOrder.first?.keyPath
+        let nextSortOrder: [KeyPathComparator<CloudMusicApi.Song>]
+
+        // Check if we're clicking on the same column that's currently sorted
+        let isSameColumn =
+            (clickedKey == "name" && currentSortKey == \CloudMusicApi.Song.name)
+            || (clickedKey == "ar.0.name" && currentSortKey == \CloudMusicApi.Song.ar[0].name)
+            || (clickedKey == "al.name" && currentSortKey == \CloudMusicApi.Song.al.name)
+            || (clickedKey == "dt" && currentSortKey == \CloudMusicApi.Song.dt)
+
+        if isSameColumn {
+            // Same column clicked - cycle through states
+            if let currentOrder = sortOrder.first?.order {
+                if currentOrder == .forward {
+                    // Was ascending, now make it descending
+                    nextSortOrder = createSortOrder(for: clickedKey, ascending: false)
+                } else {
+                    // Was descending, now clear sort
+                    nextSortOrder = []
                 }
+            } else {
+                // No current sort, start with ascending
+                nextSortOrder = createSortOrder(for: clickedKey, ascending: true)
             }
+        } else {
+            // Different column clicked - start with ascending
+            nextSortOrder = createSortOrder(for: clickedKey, ascending: true)
         }
 
-        // Handle double-click to clear sort
-        if !oldDescriptors.isEmpty && !newSortOrder.isEmpty
-            && oldDescriptors.first?.key == newSortOrder.first?.keyPath.debugDescription
-            && newSortOrder.first?.order == .forward
-        {
-            newSortOrder.removeAll()
+        // Update table view descriptors to match our decision
+        if nextSortOrder.isEmpty {
+            tableView.sortDescriptors = []
+        } else {
+            let ascending = nextSortOrder.first?.order == .forward
+            tableView.sortDescriptors = [NSSortDescriptor(key: clickedKey, ascending: ascending)]
         }
 
-        sortOrder = newSortOrder
+        sortOrder = nextSortOrder
         onSortChange?(sortOrder)
+    }
+
+    private func createSortOrder(for keyPath: String, ascending: Bool) -> [KeyPathComparator<
+        CloudMusicApi.Song
+    >] {
+        let order: SortOrder = ascending ? .forward : .reverse
+
+        switch keyPath {
+        case "name":
+            return [KeyPathComparator(\CloudMusicApi.Song.name, order: order)]
+        case "ar.0.name":
+            return [KeyPathComparator(\CloudMusicApi.Song.ar[0].name, order: order)]
+        case "al.name":
+            return [KeyPathComparator(\CloudMusicApi.Song.al.name, order: order)]
+        case "dt":
+            return [KeyPathComparator(\CloudMusicApi.Song.dt, order: order)]
+        default:
+            return []
+        }
     }
 
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
@@ -1729,18 +1755,19 @@ struct PlayListView: View {
                 }
 
                 searchText = ""
-                sortOrder = []
             }
         }
     }
 
     private func handleSortChange(sortOrder: [KeyPathComparator<CloudMusicApi.Song>]) {
         guard !sortOrder.isEmpty else {
+            DispatchQueue.main.async { self.sortOrder = [] }
             model.resetSorting()
             model.update()
             return
         }
 
+        DispatchQueue.main.async { self.sortOrder = sortOrder }
         model.applySorting(by: [sortOrder[0]])
         model.update()
     }
