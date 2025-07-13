@@ -466,14 +466,19 @@ class SongTitleTableCellView: NSTableCellView {
             statusIcon.isHidden = false
         } else {
             switch song.fee {
-            case .vip, .album:
+            case .vip:
                 statusIcon.image = NSImage(
-                    systemSymbolName: "dollarsign.circle", accessibilityDescription: nil)
-                statusIcon.toolTip = "Need buy"
+                    systemSymbolName: "crown.fill", accessibilityDescription: nil)
+                statusIcon.toolTip = "VIP required"
+                statusIcon.isHidden = false
+            case .album:
+                statusIcon.image = NSImage(
+                    systemSymbolName: "opticaldisc", accessibilityDescription: nil)
+                statusIcon.toolTip = "Purchase album"
                 statusIcon.isHidden = false
             case .trial:
-                statusIcon.image = NSImage(systemSymbolName: "gift", accessibilityDescription: nil)
-                statusIcon.toolTip = "Trial"
+                statusIcon.image = NSImage(systemSymbolName: "waveform.path", accessibilityDescription: nil)
+                statusIcon.toolTip = "Free trial quality"
                 statusIcon.isHidden = false
             default:
                 statusIcon.isHidden = true
