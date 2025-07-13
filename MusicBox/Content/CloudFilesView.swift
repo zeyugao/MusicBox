@@ -61,6 +61,11 @@ struct CloudFilesView: View {
                     },
                     onMatchWith: { file in
                         selectedFileForMatch = file
+                    },
+                    onUnmatch: { file in
+                        Task {
+                            await matchCloudFile(file, adjustSongId: 0)
+                        }
                     }
                 )
 
@@ -147,7 +152,38 @@ struct CloudFilesView: View {
         while hasMoreFiles {
             await loadMoreFiles()
             // Add a small delay to prevent blocking the UI
-            try? await Task.sleep(nanoseconds: 10_000_000) // 0.01 second
+            try? await Task.sleep(nanoseconds: 10_000_000)  // 0.01 second
+        }
+    }
+
+    private func matchCloudFile(
+        _ cloudFile: CloudMusicApi.CloudFile, adjustSongId: UInt64,
+        onSuccess: @escaping () -> Void = {}
+    ) async {
+        guard let userId = userInfo.profile?.userId else { return }
+
+        do {
+            try await CloudMusicApi().cloud_match(
+                userId: UInt64(userId),
+                songId: cloudFile.privateCloud.songId,
+                adjustSongId: adjustSongId
+            )
+
+            DispatchQueue.main.async {
+                onSuccess()
+                Task {
+                    await self.loadCloudFiles(reset: true)
+                }
+            }
+
+        } catch let error as RequestError {
+            DispatchQueue.main.async {
+                AlertModal.showAlert(error.localizedDescription)
+            }
+        } catch {
+            DispatchQueue.main.async {
+                AlertModal.showAlert(error.localizedDescription)
+            }
         }
     }
 }
@@ -328,6 +364,7 @@ class CloudFileTableViewController: NSViewController {
     var pageSize: Int = 100
     var onLoadMore: (() -> Void)?
     var onMatchWith: ((CloudMusicApi.CloudFile) -> Void)?
+    var onUnmatch: ((CloudMusicApi.CloudFile) -> Void)?
 
     override func loadView() {
         view = NSView()
@@ -505,6 +542,7 @@ extension CloudFileTableViewController: NSTableViewDelegate {
 
     private func createContextMenu(for cloudFile: CloudMusicApi.CloudFile, row: Int) -> NSMenu {
         let menu = NSMenu()
+
         let matchWithItem = NSMenuItem(
             title: "Match with",
             action: #selector(matchWithAction(_:)),
@@ -513,6 +551,15 @@ extension CloudFileTableViewController: NSTableViewDelegate {
         matchWithItem.target = self
         matchWithItem.tag = row
         menu.addItem(matchWithItem)
+
+        let unmatchItem = NSMenuItem(
+            title: "Unmatch",
+            action: #selector(unmatchAction(_:)),
+            keyEquivalent: ""
+        )
+        unmatchItem.target = self
+        unmatchItem.tag = row
+        menu.addItem(unmatchItem)
 
         return menu
     }
@@ -526,6 +573,12 @@ extension CloudFileTableViewController {
         guard row >= 0 && row < cloudFiles.count else { return }
         onMatchWith?(cloudFiles[row])
     }
+
+    @objc private func unmatchAction(_ sender: NSMenuItem) {
+        let row = sender.tag
+        guard row >= 0 && row < cloudFiles.count else { return }
+        onUnmatch?(cloudFiles[row])
+    }
 }
 
 // MARK: - SwiftUI Wrapper
@@ -537,11 +590,13 @@ struct CloudFileTableView: NSViewControllerRepresentable {
     let pageSize: Int
     let onLoadMore: () -> Void
     let onMatchWith: (CloudMusicApi.CloudFile) -> Void
+    let onUnmatch: (CloudMusicApi.CloudFile) -> Void
 
     func makeNSViewController(context: Context) -> CloudFileTableViewController {
         let controller = CloudFileTableViewController()
         controller.onLoadMore = onLoadMore
         controller.onMatchWith = onMatchWith
+        controller.onUnmatch = onUnmatch
         controller.pageSize = pageSize
         return controller
     }
@@ -672,7 +727,7 @@ struct MatchWithModalView: View {
                 Button("Confirm") {
                     if let selectedSong = selectedSongForMatch {
                         Task {
-                            await matchCloudFile(targetSong: selectedSong)
+                            await performCloudMatch(adjustSongId: selectedSong.id)
                         }
                     }
                 }
@@ -697,14 +752,14 @@ struct MatchWithModalView: View {
         }
     }
 
-    private func matchCloudFile(targetSong: CloudMusicApi.Song) async {
+    private func performCloudMatch(adjustSongId: UInt64) async {
         guard let userId = userInfo.profile?.userId else { return }
 
         do {
             try await CloudMusicApi().cloud_match(
                 userId: UInt64(userId),
                 songId: cloudFile.privateCloud.songId,
-                adjustSongId: targetSong.id
+                adjustSongId: adjustSongId
             )
 
             DispatchQueue.main.async {
@@ -724,4 +779,5 @@ struct MatchWithModalView: View {
             }
         }
     }
+
 }
