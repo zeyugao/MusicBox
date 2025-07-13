@@ -650,7 +650,6 @@ class SongTableViewController: NSViewController {
         titleColumn.title = "Title"
         titleColumn.width = 400
         titleColumn.minWidth = 200
-        titleColumn.sortDescriptorPrototype = NSSortDescriptor(key: "name", ascending: true)
         tableView.addTableColumn(titleColumn)
 
         // Artist column
@@ -658,7 +657,6 @@ class SongTableViewController: NSViewController {
         artistColumn.title = "Artist"
         artistColumn.width = 100
         artistColumn.minWidth = 50
-        artistColumn.sortDescriptorPrototype = NSSortDescriptor(key: "ar.0.name", ascending: true)
         tableView.addTableColumn(artistColumn)
 
         // Album column
@@ -666,7 +664,6 @@ class SongTableViewController: NSViewController {
         albumColumn.title = "Album"
         albumColumn.width = 100
         albumColumn.minWidth = 50
-        albumColumn.sortDescriptorPrototype = NSSortDescriptor(key: "al.name", ascending: true)
         tableView.addTableColumn(albumColumn)
 
         // Duration column
@@ -676,8 +673,33 @@ class SongTableViewController: NSViewController {
         durationColumn.minWidth = 60
         durationColumn.maxWidth = 60
         durationColumn.resizingMask = []
-        durationColumn.sortDescriptorPrototype = NSSortDescriptor(key: "dt", ascending: true)
         tableView.addTableColumn(durationColumn)
+        
+        updateColumnSortingCapability()
+    }
+    
+    func updateColumnSortingCapability() {
+        let shouldEnableSorting: Bool
+        if case .songs = playlistMetadata {
+            shouldEnableSorting = false
+        } else {
+            shouldEnableSorting = true
+        }
+        
+        for column in tableView.tableColumns {
+            switch column.identifier.rawValue {
+            case "title":
+                column.sortDescriptorPrototype = shouldEnableSorting ? NSSortDescriptor(key: "name", ascending: true) : nil
+            case "artist":
+                column.sortDescriptorPrototype = shouldEnableSorting ? NSSortDescriptor(key: "ar.0.name", ascending: true) : nil
+            case "album":
+                column.sortDescriptorPrototype = shouldEnableSorting ? NSSortDescriptor(key: "al.name", ascending: true) : nil
+            case "duration":
+                column.sortDescriptorPrototype = shouldEnableSorting ? NSSortDescriptor(key: "dt", ascending: true) : nil
+            default:
+                break
+            }
+        }
     }
 
     private func setupNotificationObservers() {
@@ -851,6 +873,13 @@ extension SongTableViewController: NSTableViewDelegate {
     func tableView(
         _ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]
     ) {
+        // Check if sorting should be disabled for .songs playlist
+        if case .songs = playlistMetadata {
+            // Reset sort descriptors and return early to prevent sorting
+            tableView.sortDescriptors = []
+            return
+        }
+        
         // Convert NSSortDescriptor back to KeyPathComparator
         var newSortOrder: [KeyPathComparator<CloudMusicApi.Song>] = []
 
@@ -1078,6 +1107,7 @@ struct SongTableView: NSViewControllerRepresentable {
         nsViewController.selectedItem = selectedItem
         nsViewController.sortOrder = sortOrder
         nsViewController.playlistMetadata = playlistMetadata
+        nsViewController.updateColumnSortingCapability()
     }
 }
 
