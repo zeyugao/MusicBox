@@ -134,7 +134,10 @@ class CloudFileNameTableCellView: NSTableCellView {
     }
 
     func configure(with cloudFile: CloudMusicApi.CloudFile) {
-        nameLabel.stringValue = cloudFile.fileName
+        // Replace \n characters and ensure no line breaks
+        let cleanFileName = cloudFile.fileName.replacingOccurrences(of: "\n", with: " ")
+        nameLabel.stringValue = cleanFileName
+        nameLabel.maximumNumberOfLines = 1
     }
 }
 
@@ -211,10 +214,15 @@ class CloudFileInfoTableCellView: NSTableCellView {
             let albumName = simpleSong.al?.name,
             let name = simpleSong.name
         {
-            infoLabel.stringValue = "\(name) - \(artistName) - \(albumName)"
+            // Clean up any newline characters and ensure single line display
+            let cleanName = name.replacingOccurrences(of: "\n", with: " ")
+            let cleanArtist = artistName.replacingOccurrences(of: "\n", with: " ")
+            let cleanAlbum = albumName.replacingOccurrences(of: "\n", with: " ")
+            infoLabel.stringValue = "\(cleanName) - \(cleanArtist) - \(cleanAlbum)"
         } else {
             infoLabel.stringValue = ""
         }
+        infoLabel.maximumNumberOfLines = 1
     }
 }
 
