@@ -73,6 +73,13 @@ struct LyricView: View {
                     }
                 }
                 .padding(.vertical)
+                .onAppear {
+                    if let currentIndex = lyricStatus.currentLyricIndex {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            scrollToIdx(currentIndex)
+                        }
+                    }
+                }
                 .onChange(of: lyricStatus.currentLyricIndex) { _, newIndex in
                     scrollToIdx(newIndex ?? 0)
                 }
@@ -128,7 +135,7 @@ struct PlayingDetailView: View {
             showNoLyricMessage = false
         }
     }
-    
+
     func updateArtwork() async {
         if let item = playStatus.currentItem {
             artworkUrl = await item.getArtworkUrl()
@@ -198,7 +205,7 @@ struct PlayingDetailView: View {
                 await updateArtwork()
             }
             .onChange(of: playStatus.currentItem) {
-                artworkUrl = nil // Clear immediately for visual feedback
+                artworkUrl = nil  // Clear immediately for visual feedback
                 Task {
                     await updateLyric()
                     await updateArtwork()
