@@ -2,9 +2,9 @@ name: Xcode - Build
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
@@ -26,10 +26,10 @@ jobs:
           host: mac
           target: desktop
           arch: clang_64
-          install-deps: 'true'
-          cache: 'true'
-          aqtversion: '==3.1.*'
-          modules: 'qt5compat'
+          install-deps: "true"
+          cache: "true"
+          aqtversion: "==3.1.*"
+          modules: "qt5compat"
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
