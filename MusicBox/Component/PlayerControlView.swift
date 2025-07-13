@@ -174,6 +174,7 @@ struct PlayerControlView: View {
     @State var isHovered: Bool = false
 
     @State var artworkUrl: URL?
+    @State private var currentItemId: UInt64?
 
     @Binding private var navigationPath: NavigationPath
 
@@ -384,11 +385,27 @@ struct PlayerControlView: View {
         .frame(minWidth: 800)
         .onAppear {
             Task {
-                artworkUrl = await playlistStatus.currentItem?.getArtworkUrl()
+                if let item = playlistStatus.currentItem {
+                    currentItemId = item.id
+                    artworkUrl = await item.getArtworkUrl()
+                }
             }
         }
         .onChange(of: playlistStatus.currentItem) { _, item in
             if let item = item {
+                currentItemId = item.id
+                artworkUrl = nil // Clear immediately for visual feedback
+                Task {
+                    artworkUrl = await item.getArtworkUrl()
+                }
+            } else {
+                currentItemId = nil
+                artworkUrl = nil
+            }
+        }
+        .onChange(of: playlistStatus.currentItem?.id) { _, _ in
+            // Additional trigger when currentItem ID changes
+            if let item = playlistStatus.currentItem {
                 Task {
                     artworkUrl = await item.getArtworkUrl()
                 }
