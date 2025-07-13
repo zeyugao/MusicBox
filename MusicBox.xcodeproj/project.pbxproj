@@ -33,6 +33,7 @@
 		2D553D4C2DF599CC005ECEAA /* libssl.1.1.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2D553D4A2DF599CC005ECEAA /* libssl.1.1.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		2D8C7C272E20B7F600EB9855 /* CloudFilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D8C7C262E20B7F600EB9855 /* CloudFilesView.swift */; };
 		2DC3B2352E240BE900DE6301 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC3B2332E240BE900DE6301 /* AppSettings.swift */; };
+		2DC3B2372E240BE900DE6301 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC3B2362E240BE900DE6301 /* BuildInfo.swift */; };
 		2DC73A7E2BFA38BF0015EB06 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A7D2BFA38BF0015EB06 /* Utils.swift */; };
 		2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */; };
 		2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */; };
@@ -112,6 +113,7 @@
 		2D553D4A2DF599CC005ECEAA /* libssl.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libssl.1.1.dylib; path = "../QCloudMusicApi/build/3rdparty/openssl-cmake/ssl/Release/libssl.1.1.dylib"; sourceTree = "<group>"; };
 		2D8C7C262E20B7F600EB9855 /* CloudFilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudFilesView.swift; sourceTree = "<group>"; };
 		2DC3B2332E240BE900DE6301 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		2DC3B2362E240BE900DE6301 /* BuildInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildInfo.swift; sourceTree = "<group>"; };
 		2DC73A7D2BFA38BF0015EB06 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
 		2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItem.swift; sourceTree = "<group>"; };
 		2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItemConfiguration.swift; sourceTree = "<group>"; };
@@ -224,6 +226,7 @@
 			isa = PBXGroup;
 			children = (
 				2DC3B2332E240BE900DE6301 /* AppSettings.swift */,
+				2DC3B2362E240BE900DE6301 /* BuildInfo.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -373,6 +376,7 @@
 				2DFB58E52BF5997B00D488F4 /* PlayingDetailView.swift in Sources */,
 				2D2800DD2BD21FE9007A55D5 /* PlaylistItem.swift in Sources */,
 				2DC3B2352E240BE900DE6301 /* AppSettings.swift in Sources */,
+				2DC3B2372E240BE900DE6301 /* BuildInfo.swift in Sources */,
 				2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */,
 				2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */,
 				2D8C7C272E20B7F600EB9855 /* CloudFilesView.swift in Sources */,

@@ -329,6 +329,11 @@ struct SettingsView: View {
                     AccountActionsSection()
                         .environmentObject(userInfo)
 
+                    Divider()
+
+                    // About Section
+                    AboutSection()
+
                     Spacer(minLength: 20)
                 }
                 .frame(maxWidth: 500)
@@ -575,6 +580,65 @@ struct SettingRow: View {
             control
         }
         .padding(.vertical, 4)
+    }
+}
+
+struct AboutSection: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Image(systemName: "info.circle.fill")
+                    .foregroundColor(.accentColor)
+                    .font(.title2)
+                Text("About MusicBox")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+
+            VStack(spacing: 12) {
+                SettingRow(
+                    icon: "app.badge",
+                    title: "Version",
+                    description: BuildInfo.versionString,
+                    control: AnyView(
+                        Button(action: {
+                            let pasteboard = NSPasteboard.general
+                            pasteboard.clearContents()
+                            pasteboard.setString(BuildInfo.versionString, forType: .string)
+                        }) {
+                            Text("Copy")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    )
+                )
+
+                if BuildInfo.gitCommit != "Development" && BuildInfo.gitCommit != "Unknown" {
+                    SettingRow(
+                        icon: "doc.text.fill",
+                        title: "Build Information",
+                        description: "Branch: \(BuildInfo.gitBranch) • Commit: \(String(BuildInfo.gitCommit.prefix(8)))",
+                        control: AnyView(
+                            Button(action: {
+                                let pasteboard = NSPasteboard.general
+                                pasteboard.clearContents()
+                                pasteboard.setString(BuildInfo.gitCommit, forType: .string)
+                            }) {
+                                Text("Copy Commit")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        )
+                    )
+                }
+            }
+            .padding(16)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(12)
+        }
     }
 }
 
