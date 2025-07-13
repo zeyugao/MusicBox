@@ -130,6 +130,37 @@ struct TextWithImage: View {
     }
 }
 
+struct PlaylistRowView: View {
+    let playlist: CloudMusicApi.PlayListItem
+
+    var body: some View {
+        HStack {
+            AsyncImageWithCache(url: URL(string: playlist.coverImgUrl.https)) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+            }
+            .frame(width: 36, height: 36)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+
+            VStack(alignment: .leading) {
+                Text(playlist.name)
+                    .font(.body)
+                    .lineLimit(1)
+                Text(playlist.creator.nickname)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 // final class NavigationStore: ObservableObject {
 //     @Published var path = NavigationPath()
 
@@ -274,7 +305,7 @@ struct ContentView: View {
                                     playlist in
                                     let metadata = PlaylistMetadata.netease(
                                         playlist.id, playlist.name)
-                                    TextWithImage(playlist.name, image: "music.note.list")
+                                    PlaylistRowView(playlist: playlist)
                                         .tag(NavigationScreen.playlist(playlist: metadata))
                                 }
                             }
@@ -284,7 +315,7 @@ struct ContentView: View {
                                     playlist in
                                     let metadata = PlaylistMetadata.netease(
                                         playlist.id, playlist.name)
-                                    TextWithImage(playlist.name, image: "music.note.list")
+                                    PlaylistRowView(playlist: playlist)
                                         .tag(NavigationScreen.playlist(playlist: metadata))
                                 }
                             }

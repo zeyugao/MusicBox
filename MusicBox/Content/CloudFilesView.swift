@@ -194,31 +194,8 @@ struct MatchWithModalView: View {
                 .navigationTitle("Select Playlist")
             } else {
                 List(userInfo.playlists, id: \.id, selection: $selectedPlaylist) { playlist in
-                    HStack {
-                        AsyncImage(url: URL(string: playlist.coverImgUrl.https)) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                        }
-                        .frame(width: 40, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                        VStack(alignment: .leading) {
-                            Text(playlist.name)
-                                .font(.body)
-                                .lineLimit(1)
-                            Text(playlist.creator.nickname)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-                    }
-                    .padding(.vertical, 2)
-                    .tag(playlist)
+                    PlaylistRowView(playlist: playlist)
+                        .tag(playlist)
                 }
                 .listStyle(SidebarListStyle())
                 .navigationTitle("Select Playlist")
@@ -302,7 +279,7 @@ struct MatchWithModalView: View {
             }
 
             ToolbarItem(placement: .confirmationAction) {
-                Button("Confirm Match") {
+                Button("Confirm") {
                     if let selectedSong = selectedSongForMatch {
                         Task {
                             await matchCloudFile(targetSong: selectedSong)

@@ -124,7 +124,7 @@ struct PlayingDetailView: View {
                     HStack(alignment: .center) {
                         VStack {
                             if let artworkUrl = item.artworkUrl {
-                                AsyncImage(url: artworkUrl) { image in
+                                AsyncImageWithCache(url: artworkUrl) { image in
                                     image.resizable()
                                         .interpolation(.high)
                                         .scaledToFit()

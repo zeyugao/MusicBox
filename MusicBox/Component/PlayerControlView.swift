@@ -193,7 +193,7 @@ struct PlayerControlView: View {
     var body: some View {
         HStack(spacing: 16) {
             if let url = artworkUrl {
-                AsyncImage(url: url) { image in
+                AsyncImageWithCache(url: url) { image in
                     image.resizable()
                         .scaledToFit()
                         .frame(width: height, height: height)
