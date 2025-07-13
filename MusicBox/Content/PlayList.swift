@@ -477,7 +477,8 @@ class SongTitleTableCellView: NSTableCellView {
                 statusIcon.toolTip = "Purchase album"
                 statusIcon.isHidden = false
             case .trial:
-                statusIcon.image = NSImage(systemSymbolName: "waveform.path", accessibilityDescription: nil)
+                statusIcon.image = NSImage(
+                    systemSymbolName: "waveform.path", accessibilityDescription: nil)
                 statusIcon.toolTip = "Free trial quality"
                 statusIcon.isHidden = false
             default:
