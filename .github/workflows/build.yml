@@ -70,27 +70,44 @@ jobs:
         with:
           name: ${{ env.archiveName }}
           path: ${{ env.archiveName }}.tar.gz
-      - name: Delete existing nightly release
+      - name: Delete current release assets
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: 8Mi-Tech/delete-release-assets-action@main
+        with:
+          github_token: ${{ github.token }}
+          tag: nightly
+          deleteOnlyFromDrafts: false
+        continue-on-error: true
+      - name: Set Build Time
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          # Delete the existing nightly release if it exists
-          gh release delete nightly --yes || true
-          # Delete the nightly tag if it exists
-          git push origin --delete refs/tags/nightly || true
+          echo "BUILDTIME=$(TZ=Asia/Shanghai date)" >> $GITHUB_ENV
+        shell: bash
+      - name: Tag Repo
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: richardsimko/update-tag@v1
+        with:
+          tag_name: nightly
         env:
           GITHUB_TOKEN: ${{ github.token }}
         continue-on-error: true
-      - name: Create nightly pre-release
+      - name: Create release notes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cat > release.txt << 'EOF'
+          Release created at ${{ env.BUILDTIME }}
+          Nightly build from commit ${{ github.sha }}
+
+          This is an automated pre-release build. Use at your own risk.
+          EOF
+      - name: Update nightly pre-release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nightly
           name: nightly
           prerelease: true
-          body: |
-            Nightly build from commit ${{ github.sha }}
-
-            This is an automated pre-release build. Use at your own risk.
+          body_path: release.txt
           files: |
             ${{ env.archiveName }}-dysym.tar.gz
             ${{ env.archiveName }}.tar.gz
