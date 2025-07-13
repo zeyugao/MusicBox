@@ -16,14 +16,39 @@ struct CloudFilesView: View {
     @State private var isLoadingMore = false
     @State private var hasMoreFiles = true
     @State private var selectedFileForMatch: CloudMusicApi.CloudFile?
+    @State private var searchText = ""
+    @State private var allFilesLoaded = false
     private let pageSize = 100
+
+    var filteredCloudFiles: [CloudMusicApi.CloudFile] {
+        if searchText.isEmpty {
+            return cloudFiles
+        } else {
+            return cloudFiles.filter { file in
+                let fileName = file.fileName.lowercased()
+                let searchLower = searchText.lowercased()
+
+                if fileName.contains(searchLower) {
+                    return true
+                }
+
+                if let simpleSong = file.simpleSong,
+                    let songName = simpleSong.name
+                {
+                    return songName.lowercased().contains(searchLower)
+                }
+
+                return false
+            }
+        }
+    }
 
     var body: some View {
         Group {
 
             VStack {
                 CloudFileTableView(
-                    cloudFiles: cloudFiles,
+                    cloudFiles: filteredCloudFiles,
                     isLoadingMore: isLoadingMore,
                     hasMoreFiles: hasMoreFiles,
                     pageSize: pageSize,
@@ -45,6 +70,14 @@ struct CloudFilesView: View {
                 }
             }
         }
+        .searchable(text: $searchText, prompt: "Search by file name or song name")
+        .onChange(of: searchText) { _, newValue in
+            if !newValue.isEmpty && !allFilesLoaded {
+                Task {
+                    await loadAllFilesInBackground()
+                }
+            }
+        }
         .task {
             await loadCloudFiles()
         }
@@ -62,6 +95,7 @@ struct CloudFilesView: View {
             DispatchQueue.main.async {
                 self.cloudFiles = []
                 self.hasMoreFiles = true
+                self.allFilesLoaded = false
             }
         }
 
@@ -71,12 +105,14 @@ struct CloudFilesView: View {
                 self.cloudFiles = files
                 self.hasMoreFiles = files.count == self.pageSize
                 self.isLoading = false
+                self.allFilesLoaded = files.count < self.pageSize
             }
         } else {
             DispatchQueue.main.async {
                 self.cloudFiles = []
                 self.hasMoreFiles = false
                 self.isLoading = false
+                self.allFilesLoaded = true
             }
         }
     }
@@ -92,12 +128,26 @@ struct CloudFilesView: View {
                 self.cloudFiles.append(contentsOf: newFiles)
                 self.hasMoreFiles = newFiles.count == self.pageSize
                 self.isLoadingMore = false
+                if newFiles.count < self.pageSize {
+                    self.allFilesLoaded = true
+                }
             }
         } else {
             DispatchQueue.main.async {
                 self.hasMoreFiles = false
                 self.isLoadingMore = false
+                self.allFilesLoaded = true
             }
+        }
+    }
+
+    private func loadAllFilesInBackground() async {
+        guard !allFilesLoaded else { return }
+
+        while hasMoreFiles {
+            await loadMoreFiles()
+            // Add a small delay to prevent blocking the UI
+            try? await Task.sleep(nanoseconds: 10_000_000) // 0.01 second
         }
     }
 }
@@ -360,17 +410,17 @@ class CloudFileTableViewController: NSViewController {
 
         let visibleRect = scrollView.documentVisibleRect
         // let documentRect = scrollView.documentView?.bounds ?? .zero
-        
+
         // Calculate remaining rows to trigger loading more aggressively
-        let rowHeight: CGFloat = 24 // As defined in heightOfRow
+        let rowHeight: CGFloat = 24  // As defined in heightOfRow
         let totalRows = cloudFiles.count
         let visibleRowsFromTop = Int(visibleRect.minY / rowHeight)
         let visibleRowsCount = Int(visibleRect.height / rowHeight)
         let lastVisibleRow = visibleRowsFromTop + visibleRowsCount
-        
+
         // Trigger loading when we have pageSize/3 or fewer items remaining
         let remainingRows = totalRows - lastVisibleRow
-        let loadThreshold = pageSize / 3 // About 33 items with pageSize = 100
+        let loadThreshold = pageSize / 3  // About 33 items with pageSize = 100
         let shouldLoadMore = remainingRows <= loadThreshold
 
         if shouldLoadMore && hasMoreFiles && !isLoadingMore {
