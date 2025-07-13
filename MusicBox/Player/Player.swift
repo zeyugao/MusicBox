@@ -541,6 +541,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
 
     @Published var playlist: [PlaylistItem] = []
     @Published private var currentItemIndex: Int? = nil
+    var currentPlayingItemIndex: Int? {
+        return currentItemIndex
+    }
     var currentItem: PlaylistItem? {
         if let currentItemIndex = currentItemIndex {
             return playlist[currentItemIndex]

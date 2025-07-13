@@ -15,6 +15,7 @@ import UniformTypeIdentifiers
 extension Notification.Name {
     static let uploadToCloud = Notification.Name("uploadToCloud")
     static let refreshPlaylist = Notification.Name("refreshPlaylist")
+    static let focusCurrentPlayingItem = Notification.Name("focusCurrentPlayingItem")
 }
 
 enum PlaylistMetadata: Hashable, Equatable {
@@ -591,6 +592,8 @@ class SongTableViewController: NSViewController {
     var onDeleteFromPlaylist: ((CloudMusicApi.Song) -> Void)?
     var onUploadToCloud: ((CloudMusicApi.Song, URL) -> Void)?
 
+    private var focusCurrentPlayingItemObserver: NSObjectProtocol?
+
     override func loadView() {
         view = NSView()
         setupTableView()
@@ -599,6 +602,7 @@ class SongTableViewController: NSViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupColumns()
+        setupNotificationObservers()
     }
 
     private func setupTableView() {
@@ -674,6 +678,45 @@ class SongTableViewController: NSViewController {
         durationColumn.resizingMask = []
         durationColumn.sortDescriptorPrototype = NSSortDescriptor(key: "dt", ascending: true)
         tableView.addTableColumn(durationColumn)
+    }
+
+    private func setupNotificationObservers() {
+        focusCurrentPlayingItemObserver = NotificationCenter.default.addObserver(
+            forName: .focusCurrentPlayingItem,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.focusCurrentPlayingItem()
+        }
+    }
+
+    private func focusCurrentPlayingItem() {
+        guard let songs = songs,
+            let playlistStatus = playlistStatus,
+            let currentItem = playlistStatus.currentItem,
+            case .songs = playlistMetadata
+        else { return }
+
+        if let index = songs.firstIndex(where: { $0.id == currentItem.id }) {
+            // Scroll to center the selected row
+            let visibleRect = tableView.visibleRect
+            let rowHeight = tableView.rowHeight
+            let visibleRows = Int(visibleRect.height / rowHeight)
+            let halfVisibleRows = visibleRows / 2
+
+            // Calculate the target scroll position to center the row
+            let targetRow = max(0, index - halfVisibleRows)
+            let targetRect = tableView.rect(ofRow: targetRow)
+
+            tableView.scroll(NSPoint(x: 0, y: targetRect.minY))
+            tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+        }
+    }
+
+    deinit {
+        if let observer = focusCurrentPlayingItemObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     private func updateSelection() {
@@ -1507,6 +1550,7 @@ struct PlayListView: View {
     @State private var selectedSongToAdd: CloudMusicApi.Song?
 
     var playlistMetadata: PlaylistMetadata?
+    var onLoadComplete: (() -> Void)?
 
     private func handleUploadToCloud(song: CloudMusicApi.Song, url: URL) async {
         // 发送通知给 UploadButton 来处理上传队列
@@ -1647,6 +1691,11 @@ struct PlayListView: View {
                 // Only update loading state if this is still the current task
                 if taskId == currentLoadingTaskId {
                     isLoading = false
+
+                    // Call the completion callback on main actor
+                    await MainActor.run {
+                        onLoadComplete?()
+                    }
                 }
 
                 searchText = ""

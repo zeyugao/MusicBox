@@ -307,14 +307,24 @@ struct ContentView: View {
                         case .nowPlaying:
                             let songs = playlistStatus.playlist.compactMap { $0.nsSong }
                             let metadata = PlaylistMetadata.songs(songs, 0, "Now Playing")
-                            PlayListView(playlistMetadata: metadata)
-                                .environmentObject(userInfo)
-                                .environmentObject(playlistStatus)
-                                .navigationTitle("Now Playing")
-                                .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                    PlayingDetailView()
-                                        .environmentObject(playStatus)
+                            PlayListView(
+                                playlistMetadata: metadata,
+                                onLoadComplete: {
+                                    NotificationCenter.default.post(
+                                        name: .focusCurrentPlayingItem, object: nil)
                                 }
+                            )
+                            .environmentObject(userInfo)
+                            .environmentObject(playlistStatus)
+                            .navigationTitle("Now Playing")
+                            .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                PlayingDetailView()
+                                    .environmentObject(playStatus)
+                            }
+                            .onChange(of: playlistStatus.currentPlayingItemIndex, initial: false) {
+                                NotificationCenter.default.post(
+                                    name: .focusCurrentPlayingItem, object: nil)
+                            }
                         case .cloudFiles:
                             CloudFilesView()
                                 .environmentObject(userInfo)
