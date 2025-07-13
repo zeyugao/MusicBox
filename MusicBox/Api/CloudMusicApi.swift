@@ -257,8 +257,8 @@ class CloudMusicApi {
 
         struct SimpleSong: Codable {
             let name: String?
-            let al: SimpleAlbum
-            let ar: [SimpleArtist]
+            let al: SimpleAlbum?
+            let ar: [SimpleArtist]?
 
             struct SimpleAlbum: Codable {
                 let name: String?

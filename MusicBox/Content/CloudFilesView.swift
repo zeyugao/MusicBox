@@ -207,8 +207,8 @@ class CloudFileInfoTableCellView: NSTableCellView {
 
     func configure(with cloudFile: CloudMusicApi.CloudFile) {
         if let simpleSong = cloudFile.simpleSong,
-            let artistName = simpleSong.ar.first?.name,
-            let albumName = simpleSong.al.name,
+            let artistName = simpleSong.ar?.first?.name,
+            let albumName = simpleSong.al?.name,
             let name = simpleSong.name
         {
             infoLabel.stringValue = "\(name) - \(artistName) - \(albumName)"
