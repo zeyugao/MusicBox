@@ -305,7 +305,10 @@ struct ContentView: View {
                                         .environmentObject(playStatus)
                                 }
                         case .nowPlaying:
-                            NowPlayingView()
+                            let songs = playlistStatus.playlist.compactMap { $0.nsSong }
+                            let metadata = PlaylistMetadata.songs(songs, 0, "Now Playing")
+                            PlayListView(playlistMetadata: metadata)
+                                .environmentObject(userInfo)
                                 .environmentObject(playlistStatus)
                                 .navigationTitle("Now Playing")
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
