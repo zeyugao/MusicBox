@@ -1082,30 +1082,6 @@ extension SongTableViewController {
     }
 }
 
-// MARK: - Drag and Drop Support
-
-extension SongTableViewController: NSDraggingDestination {
-    func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        return .copy
-    }
-
-    func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        let pasteboard = sender.draggingPasteboard
-        guard let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
-            let url = urls.first
-        else { return false }
-
-        let point = tableView.convert(sender.draggingLocation, from: nil)
-        let row = tableView.row(at: point)
-
-        guard row >= 0, let songs = songs, row < songs.count else { return false }
-        let song = songs[row]
-
-        onUploadToCloud?(song, url)
-        return true
-    }
-}
-
 // MARK: - SwiftUI Wrapper
 
 struct SongTableView: NSViewControllerRepresentable {
