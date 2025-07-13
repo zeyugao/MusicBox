@@ -1052,42 +1052,44 @@ struct PlaylistToolbar: ToolbarContent {
             }
         } else {
             ToolbarItemGroup {
-                Button(action: {
-                    Task {
-                        let newItems = songs.map { song in
-                            loadItem(song: song)
-                        }
-                        let _ = await playlistStatus.replacePlaylist(
-                            newItems, continuePlaying: true, shouldSaveState: true)
-                    }
-                }) {
-                    Image(systemName: "play")
-                }
-                .help("Play All")
-
-                Button(action: {
-                    Task {
-                        let newItems = songs.map { song in
-                            loadItem(song: song)
-                        }
-                        let _ = await playlistStatus.addItemsToPlaylist(
-                            newItems, continuePlaying: false, shouldSaveState: true)
-                    }
-                }) {
-                    Image(systemName: "plus")
-                }
-                .help("Add All to Playlist")
-
                 DownloadAllButton(songs: songs)
 
                 UploadButton(userInfo: userInfo, onRefresh: onRefresh)
 
-                if case .netease = playlistMetadata {
-                    Button(action: onRefresh) {
-                        Image(systemName: "arrow.clockwise")
+                Menu {
+                    Button(action: {
+                        Task {
+                            let newItems = songs.map { song in
+                                loadItem(song: song)
+                            }
+                            let _ = await playlistStatus.replacePlaylist(
+                                newItems, continuePlaying: true, shouldSaveState: true)
+                        }
+                    }) {
+                        Label("Play All", systemImage: "play")
                     }
-                    .help("Refresh Playlist")
+
+                    Button(action: {
+                        Task {
+                            let newItems = songs.map { song in
+                                loadItem(song: song)
+                            }
+                            let _ = await playlistStatus.addItemsToPlaylist(
+                                newItems, continuePlaying: false, shouldSaveState: true)
+                        }
+                    }) {
+                        Label("Add All to Playlist", systemImage: "plus")
+                    }
+
+                    if case .netease = playlistMetadata {
+                        Button(action: onRefresh) {
+                            Label("Refresh Playlist", systemImage: "arrow.clockwise")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
+                .help("More Actions")
             }
         }
     }
