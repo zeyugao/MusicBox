@@ -359,7 +359,7 @@ class CloudFileTableViewController: NSViewController {
         guard let scrollView = notification.object as? NSScrollView else { return }
 
         let visibleRect = scrollView.documentVisibleRect
-        let documentRect = scrollView.documentView?.bounds ?? .zero
+        // let documentRect = scrollView.documentView?.bounds ?? .zero
         
         // Calculate remaining rows to trigger loading more aggressively
         let rowHeight: CGFloat = 24 // As defined in heightOfRow
