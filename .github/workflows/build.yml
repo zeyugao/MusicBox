@@ -41,28 +41,24 @@ jobs:
           LATEST_COMMIT=$(git ls-remote https://github.com/elsagranger/QCloudMusicApi.git HEAD | cut -f1)
           echo "commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
           echo "Latest QCloudMusicApi commit: $LATEST_COMMIT"
-      - name: QCloudMusicApi Path
-        id: qcloud-path
-        run: |
-          mkdir -p ../QCloudMusicApi
-          echo "path=$(realpath ../QCloudMusicApi)" >> $GITHUB_OUTPUT
       - name: Cache QCloudMusicApi
         id: cache-qcloud
         uses: actions/cache@v4
         with:
-          path: ${steps.qcloud-path.outputs.path}
+          path: ${{ runner.temp }}/QCloudMusicApi
           key: qcloud-musicapi-${{ steps.qcloud-commit.outputs.commit }}-${{ env.QT_VERSION }}-${{ env.BUILD_TYPE }}
       - name: Fetch QCloudMusicApi
         if: steps.cache-qcloud.outputs.cache-hit != 'true'
         run: |
-          git clone --recurse-submodules --depth=1 https://github.com/elsagranger/QCloudMusicApi.git ../QCloudMusicApi \
-          && cd ../QCloudMusicApi \
+          git clone --recurse-submodules --depth=1 https://github.com/elsagranger/QCloudMusicApi.git ${{ runner.temp }}/QCloudMusicApi \
+          && cd ${{ runner.temp }}/QCloudMusicApi \
           && cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_PREFIX_PATH=$(pwd)/../Qt/6.7.0/macos/lib/cmake -GXcode -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
           && cd build \
           && xcodebuild -project QCloudMusicApiProject.xcodeproj -target QCloudMusicApi build -configuration ${{ env.BUILD_TYPE }} ONLY_ACTIVE_ARCH=NO
       - name: Build
         run: |
-          xcodebuild -project MusicBox.xcodeproj -scheme MusicBox build -configuration ${{ env.BUILD_TYPE }} CONFIGURATION_BUILD_DIR=$(pwd)/build CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM="" ONLY_ACTIVE_ARCH=NO \
+          ln -s ${{ runner.temp }}/QCloudMusicApi ../QCloudMusicApi \
+          && xcodebuild -project MusicBox.xcodeproj -scheme MusicBox build -configuration ${{ env.BUILD_TYPE }} CONFIGURATION_BUILD_DIR=$(pwd)/build CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM="" ONLY_ACTIVE_ARCH=NO \
           && cp MusicBox/MusicBox.entitlements build/MusicBox.entitlements \
           && cp .github/install.sh build/install.sh \
           && tar czf ${{ env.archiveName }}-dysym.tar.gz -C build . \
