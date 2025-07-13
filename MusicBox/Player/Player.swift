@@ -109,7 +109,7 @@ class PlayStatus: ObservableObject {
         }
         updateCurrentPlaybackInfo()
         NowPlayingCenter.handleSetPlaybackState(playing: false)
-        
+
         // Notify about playback state change
         NotificationCenter.default.post(
             name: .playbackStateChanged,
@@ -129,7 +129,7 @@ class PlayStatus: ObservableObject {
         }
         updateCurrentPlaybackInfo()
         NowPlayingCenter.handleSetPlaybackState(playing: true)
-        
+
         // Notify about playback state change
         NotificationCenter.default.post(
             name: .playbackStateChanged,
@@ -229,7 +229,7 @@ class PlayStatus: ObservableObject {
         await updateDuration(duration: item.duration.seconds)
 
         let playerItem: AVPlayerItem
-        if let url = item.getLocalUrl() {
+        if let url = await item.getLocalUrl() {
             print("local url: \(url)")
             let asset = AVURLAsset(
                 url: url,
@@ -331,7 +331,7 @@ class PlayStatus: ObservableObject {
             Task { @MainActor in
                 let oldState = self.playerState
                 self.playerState = isPlaying ? .playing : .paused
-                
+
                 // Only send notification if state actually changed
                 if (oldState == .playing) != isPlaying {
                     NotificationCenter.default.post(
@@ -433,7 +433,7 @@ class PlayStatus: ObservableObject {
                                 self?.playbackProgress.duration = 0.0
                                 self?.playbackProgress.playedSecond = 0.0
                                 self?.playerState = .stopped
-                                
+
                                 // Notify about playback state change
                                 NotificationCenter.default.post(
                                     name: .playbackStateChanged,
@@ -578,6 +578,13 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     }
     var currentItem: PlaylistItem? {
         if let currentItemIndex = currentItemIndex {
+            if currentItemIndex < 0 || currentItemIndex >= playlist.count {
+                print(
+                    "Current item index out of bounds: \(currentItemIndex), playlist count: \(playlist.count)"
+                )
+                return nil
+            }
+
             return playlist[currentItemIndex]
         }
         return nil
@@ -748,7 +755,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     func replacePlaylist(
         _ items: [PlaylistItem], continuePlaying: Bool = true, shouldSaveState: Bool = true
     ) async {
-        playlist = items
+        await MainActor.run {
+            playlist = items
+        }
         await seekToItem(offset: 0, shouldPlay: continuePlaying)
         if shouldSaveState {
             saveState()

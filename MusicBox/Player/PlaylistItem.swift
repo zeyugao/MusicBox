@@ -220,23 +220,9 @@ class PlaylistItem: Identifiable, Codable, Equatable {
         try container.encodeIfPresent(nsSong, forKey: .nsSong)
     }
 
-    func isUrlReady() -> Bool {
-        if let url = self.url {
-            return isLocalURL(url)
-        } else if let cachedFile = getCachedMusicFile(id: id) {
-            self.url = cachedFile
-            return true
-        }
-
-        return false
-    }
-
-    func getLocalUrl() -> URL? {
-        if let url = self.url, isLocalURL(url) {
+    func getLocalUrl() async -> URL? {
+        if let url = await self.getUrl(), isLocalURL(url) {
             return url
-        } else if let cachedFile = getCachedMusicFile(id: id) {
-            self.url = cachedFile
-            return self.url
         }
         return nil
     }
@@ -267,22 +253,20 @@ class PlaylistItem: Identifiable, Codable, Equatable {
     }
 
     func getUrl() async -> URL? {
-        if let url = self.url, isLocalURL(url) {
-            return self.url
-        } else {
-            if let cachedFile = getCachedMusicFile(id: id) {
-                self.url = cachedFile
-                return self.url
+        if let cachedFile = getCachedMusicFile(id: id) {
+            return cachedFile
+        }
+        if let url = self.url {
+            return url
+        }
+        if let songData = await CloudMusicApi().song_url_v1(id: [id]) {
+            let songData = songData[0]
+            self.ext = songData.type
+            if self.ext == "" {
+                self.ext = songData.encodeType
             }
-            if let songData = await CloudMusicApi().song_url_v1(id: [id]) {
-                let songData = songData[0]
-                self.ext = songData.type
-                if self.ext == "" {
-                    self.ext = songData.encodeType
-                }
-                if let url = URL(string: songData.url.https) {
-                    return url
-                }
+            if let url = URL(string: songData.url.https) {
+                return url
             }
         }
         print("Failed to get URL")
