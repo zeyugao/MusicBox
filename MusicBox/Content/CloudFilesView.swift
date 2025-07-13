@@ -16,59 +16,32 @@ struct CloudFilesView: View {
     @State private var isLoadingMore = false
     @State private var hasMoreFiles = true
     @State private var selectedFileForMatch: CloudMusicApi.CloudFile?
-    private let pageSize = 30
+    private let pageSize = 100
 
     var body: some View {
         Group {
-            if isLoading {
-                VStack {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Loading cloud files...")
-                        .foregroundColor(.secondary)
-                        .padding(.top)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if cloudFiles.isEmpty {
-                VStack {
-                    Image(systemName: "icloud.slash")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    Text("No cloud files found")
-                        .foregroundColor(.secondary)
-                        .padding(.top)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                VStack {
-                    CloudFileTableView(
-                        cloudFiles: cloudFiles,
-                        isLoadingMore: isLoadingMore,
-                        hasMoreFiles: hasMoreFiles,
-                        onLoadMore: {
-                            if hasMoreFiles && !isLoadingMore {
-                                Task {
-                                    await loadMoreFiles()
-                                }
-                            }
-                        },
-                        onMatchWith: { file in
-                            selectedFileForMatch = file
-                        }
-                    )
 
-                    // if isLoadingMore {
-                    //     HStack {
-                    //         Spacer()
-                    //         ProgressView()
-                    //             .scaleEffect(0.5)
-                    //         Text("Loading more...")
-                    //             .font(.caption)
-                    //             .foregroundColor(.secondary)
-                    //         Spacer()
-                    //     }
-                    //     .padding()
-                    // }
+            VStack {
+                CloudFileTableView(
+                    cloudFiles: cloudFiles,
+                    isLoadingMore: isLoadingMore,
+                    hasMoreFiles: hasMoreFiles,
+                    pageSize: pageSize,
+                    onLoadMore: {
+                        if hasMoreFiles && !isLoadingMore {
+                            Task {
+                                await loadMoreFiles()
+                            }
+                        }
+                    },
+                    onMatchWith: { file in
+                        selectedFileForMatch = file
+                    }
+                )
+
+                if isLoading {
+                    LoadingIndicatorView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -294,6 +267,7 @@ class CloudFileTableViewController: NSViewController {
 
     var isLoadingMore: Bool = false
     var hasMoreFiles: Bool = true
+    var pageSize: Int = 100
     var onLoadMore: (() -> Void)?
     var onMatchWith: ((CloudMusicApi.CloudFile) -> Void)?
 
@@ -378,11 +352,20 @@ class CloudFileTableViewController: NSViewController {
 
         let visibleRect = scrollView.documentVisibleRect
         let documentRect = scrollView.documentView?.bounds ?? .zero
+        
+        // Calculate remaining rows to trigger loading more aggressively
+        let rowHeight: CGFloat = 24 // As defined in heightOfRow
+        let totalRows = cloudFiles.count
+        let visibleRowsFromTop = Int(visibleRect.minY / rowHeight)
+        let visibleRowsCount = Int(visibleRect.height / rowHeight)
+        let lastVisibleRow = visibleRowsFromTop + visibleRowsCount
+        
+        // Trigger loading when we have pageSize/3 or fewer items remaining
+        let remainingRows = totalRows - lastVisibleRow
+        let loadThreshold = pageSize / 3 // About 33 items with pageSize = 100
+        let shouldLoadMore = remainingRows <= loadThreshold
 
-        // Check if we're near the bottom (within 100 points)
-        let isNearBottom = visibleRect.maxY >= documentRect.height - 100
-
-        if isNearBottom && hasMoreFiles && !isLoadingMore {
+        if shouldLoadMore && hasMoreFiles && !isLoadingMore {
             onLoadMore?()
         }
     }
@@ -493,6 +476,7 @@ struct CloudFileTableView: NSViewControllerRepresentable {
     let cloudFiles: [CloudMusicApi.CloudFile]
     let isLoadingMore: Bool
     let hasMoreFiles: Bool
+    let pageSize: Int
     let onLoadMore: () -> Void
     let onMatchWith: (CloudMusicApi.CloudFile) -> Void
 
@@ -500,6 +484,7 @@ struct CloudFileTableView: NSViewControllerRepresentable {
         let controller = CloudFileTableViewController()
         controller.onLoadMore = onLoadMore
         controller.onMatchWith = onMatchWith
+        controller.pageSize = pageSize
         return controller
     }
 
@@ -508,6 +493,7 @@ struct CloudFileTableView: NSViewControllerRepresentable {
         nsViewController.cloudFiles = cloudFiles
         nsViewController.isLoadingMore = isLoadingMore
         nsViewController.hasMoreFiles = hasMoreFiles
+        nsViewController.pageSize = pageSize
     }
 }
 
