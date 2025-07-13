@@ -32,6 +32,7 @@
 		2D553D4B2DF599CC005ECEAA /* libssl.1.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D553D4A2DF599CC005ECEAA /* libssl.1.1.dylib */; };
 		2D553D4C2DF599CC005ECEAA /* libssl.1.1.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 2D553D4A2DF599CC005ECEAA /* libssl.1.1.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		2D8C7C272E20B7F600EB9855 /* CloudFilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D8C7C262E20B7F600EB9855 /* CloudFilesView.swift */; };
+		2DC3B2352E240BE900DE6301 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC3B2332E240BE900DE6301 /* AppSettings.swift */; };
 		2DC73A7E2BFA38BF0015EB06 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC73A7D2BFA38BF0015EB06 /* Utils.swift */; };
 		2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */; };
 		2DC8FDB42BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */; };
@@ -110,6 +111,7 @@
 		2D553D472DF599C3005ECEAA /* libcrypto.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libcrypto.1.1.dylib; path = "../QCloudMusicApi/build/3rdparty/openssl-cmake/crypto/Release/libcrypto.1.1.dylib"; sourceTree = "<group>"; };
 		2D553D4A2DF599CC005ECEAA /* libssl.1.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libssl.1.1.dylib; path = "../QCloudMusicApi/build/3rdparty/openssl-cmake/ssl/Release/libssl.1.1.dylib"; sourceTree = "<group>"; };
 		2D8C7C262E20B7F600EB9855 /* CloudFilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudFilesView.swift; sourceTree = "<group>"; };
+		2DC3B2332E240BE900DE6301 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		2DC73A7D2BFA38BF0015EB06 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
 		2DC8FDAD2BF7C58900D21F6A /* CachingPlayerItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItem.swift; sourceTree = "<group>"; };
 		2DC8FDAE2BF7C58900D21F6A /* CachingPlayerItemConfiguration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CachingPlayerItemConfiguration.swift; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 		2D2800922BCE1F20007A55D5 /* MusicBox */ = {
 			isa = PBXGroup;
 			children = (
+				2DC3B2342E240BE900DE6301 /* Models */,
 				2D01B1382C0A19A3004E6102 /* Info.plist */,
 				2D2800972BCE1F21007A55D5 /* Assets.xcassets */,
 				2DC73A812BFA3D840015EB06 /* Api */,
@@ -215,6 +218,14 @@
 				2DED51ED2BD3F62100F9D181 /* Extensions.swift */,
 			);
 			path = General;
+			sourceTree = "<group>";
+		};
+		2DC3B2342E240BE900DE6301 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				2DC3B2332E240BE900DE6301 /* AppSettings.swift */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 		2DC73A7F2BFA3CE70015EB06 /* Component */ = {
@@ -361,6 +372,7 @@
 				2D2800DE2BD21FE9007A55D5 /* RemoteCommandCenter.swift in Sources */,
 				2DFB58E52BF5997B00D488F4 /* PlayingDetailView.swift in Sources */,
 				2D2800DD2BD21FE9007A55D5 /* PlaylistItem.swift in Sources */,
+				2DC3B2352E240BE900DE6301 /* AppSettings.swift in Sources */,
 				2DED51CB2BD2823E00F9D181 /* PlayList.swift in Sources */,
 				2DC8FDB32BF7C58900D21F6A /* CachingPlayerItem.swift in Sources */,
 				2D8C7C272E20B7F600EB9855 /* CloudFilesView.swift in Sources */,

@@ -272,6 +272,7 @@ struct ContentView: View {
     @State private var selection: NavigationScreen = .explore
     @StateObject private var userInfo = UserInfo()
     @StateObject private var playingDetailModel = PlayingDetailModel()
+    @StateObject private var appSettings = AppSettings.shared
 
     @StateObject private var alertModel = AlertModal()
 
@@ -289,7 +290,7 @@ struct ContentView: View {
                                 TextWithImage("Explore", image: "music.house")
                                     .tag(NavigationScreen.explore)
                             }
-                            TextWithImage("Account", image: "person.crop.circle")
+                            TextWithImage("Settings", image: "gearshape.fill")
                                 .tag(NavigationScreen.account)
                             if userInfo.profile != nil {
                                 TextWithImage("Now Playing", image: "dot.radiowaves.left.and.right")
@@ -330,7 +331,8 @@ struct ContentView: View {
                             AccountView()
                                 .environmentObject(userInfo)
                                 .environmentObject(playlistStatus)
-                                .navigationTitle("Account")
+                                .environmentObject(appSettings)
+                                .navigationTitle("Settings")
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
                                         .environmentObject(playStatus)

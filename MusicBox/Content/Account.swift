@@ -285,68 +285,296 @@ struct LoginView: View {
 
 struct AccountView: View {
     @EnvironmentObject private var userInfo: UserInfo
+    @StateObject private var appSettings = AppSettings.shared
 
     var body: some View {
-        if let profile = userInfo.profile {
-            VStack {
-                VStack(spacing: 8) {
-                    AsyncImageWithCache(url: URL(string: profile.avatarUrl.https)!) { image in
-                        image.resizable()
-                            .interpolation(.high)
-                    } placeholder: {
-                        Color.white
-                    }
-                    .scaledToFit()
-                    .clipShape(Circle())
-                    .frame(width: 64, height: 64)
-
-                    Text(profile.nickname)
-                        .font(.system(size: 16))
-                }
-
-                HStack {
-                    Button(action: {
-                        Task {
-                            await CloudMusicApi().logout()
-                            userInfo.profile = nil
-                            userInfo.likelist = []
-                            userInfo.playlists = []
-
-                            saveEncodableState(forKey: "profile", data: userInfo.profile)
-                        }
-                    }) {
-                        Text("Logout")
-                    }
-                }
-
-                HStack {
-                    Button(action: {
-                        if let containerURL = FileManager.default.containerURL(
-                            forSecurityApplicationGroupIdentifier: "me.elsanna.MusicBox")
-                        {
-                            let tmpFolderPath = containerURL.appendingPathComponent("tmp")
-                            if FileManager.default.fileExists(atPath: tmpFolderPath.path) {
-                                do {
-                                    try FileManager.default.removeItem(at: tmpFolderPath)
-                                } catch {
-                                    print("Error when deleting \(tmpFolderPath): \(error)")
-
-                                    AlertModal.showAlert("Error", "Clean failed: \(error)")
-
-                                    return
-                                }
-                            }
-                            AlertModal.showAlert("Info", "Clean successful")
-                        }
-                    }) {
-                        Text("Clean cache")
-                    }
-                }
-            }
-
+        if userInfo.profile != nil {
+            SettingsView()
+                .environmentObject(userInfo)
+                .environmentObject(appSettings)
         } else {
             LoginView()
         }
+    }
+}
+
+struct SettingsView: View {
+    @EnvironmentObject private var userInfo: UserInfo
+    @EnvironmentObject private var appSettings: AppSettings
+
+    var body: some View {
+        ScrollView {
+            HStack {
+                Spacer()
+
+                VStack(spacing: 24) {
+                    // Profile Section
+                    ProfileSection()
+                        .environmentObject(userInfo)
+
+                    Divider()
+
+                    // General Settings Section
+                    GeneralSettingsSection()
+                        .environmentObject(appSettings)
+
+                    Divider()
+
+                    // Storage & Cache Section
+                    StorageCacheSection()
+
+                    Divider()
+
+                    // Account Actions Section
+                    AccountActionsSection()
+                        .environmentObject(userInfo)
+
+                    Spacer(minLength: 20)
+                }
+                .frame(maxWidth: 500)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
+
+                Spacer()
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+struct ProfileSection: View {
+    @EnvironmentObject private var userInfo: UserInfo
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Image(systemName: "person.circle.fill")
+                    .foregroundColor(.accentColor)
+                    .font(.title2)
+                Text("Profile")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+
+            HStack(spacing: 16) {
+                AsyncImageWithCache(url: URL(string: userInfo.profile?.avatarUrl.https ?? "")) {
+                    image in
+                    image.resizable()
+                        .interpolation(.high)
+                } placeholder: {
+                    Circle()
+                        .fill(Color.gray.opacity(0.3))
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .foregroundColor(.white)
+                                .font(.title)
+                        )
+                }
+                .scaledToFit()
+                .clipShape(Circle())
+                .frame(width: 80, height: 80)
+                .shadow(radius: 4)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(userInfo.profile?.nickname ?? "Unknown")
+                        .font(.title3)
+                        .fontWeight(.medium)
+
+                    Text("User ID: \(userInfo.profile?.userId ?? 0)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Text("\(userInfo.playlists.count) playlists")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(16)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(12)
+        }
+    }
+}
+
+struct GeneralSettingsSection: View {
+    @EnvironmentObject private var appSettings: AppSettings
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Image(systemName: "gearshape.fill")
+                    .foregroundColor(.accentColor)
+                    .font(.title2)
+                Text("General Settings")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+
+            VStack(spacing: 12) {
+                SettingRow(
+                    icon: "moon.fill",
+                    title: "Prevent Sleep When Playing",
+                    description: "Keeps your Mac awake while music is playing",
+                    control: AnyView(
+                        Toggle("", isOn: $appSettings.preventSleepWhenPlaying)
+                            .toggleStyle(SwitchToggleStyle())
+                    )
+                )
+            }
+            .padding(16)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(12)
+        }
+    }
+}
+
+struct StorageCacheSection: View {
+    @State private var showingCleanAlert = false
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Image(systemName: "internaldrive.fill")
+                    .foregroundColor(.accentColor)
+                    .font(.title2)
+                Text("Storage & Cache")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+
+            VStack(spacing: 12) {
+                SettingRow(
+                    icon: "trash.fill",
+                    title: "Clear Cache",
+                    description: "Remove cached music files to free up space",
+                    control: AnyView(
+                        Button(action: {
+                            cleanCache()
+                        }) {
+                            Text("Clean")
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 6)
+                                .background(Color.red)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    )
+                )
+            }
+            .padding(16)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(12)
+        }
+    }
+
+    private func cleanCache() {
+        if let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "me.elsanna.MusicBox")
+        {
+            let tmpFolderPath = containerURL.appendingPathComponent("tmp")
+            if FileManager.default.fileExists(atPath: tmpFolderPath.path) {
+                do {
+                    try FileManager.default.removeItem(at: tmpFolderPath)
+                    AlertModal.showAlert("Success", "Cache cleaned successfully")
+                } catch {
+                    print("Error when deleting \(tmpFolderPath): \(error)")
+                    AlertModal.showAlert("Error", "Clean failed: \(error.localizedDescription)")
+                }
+            } else {
+                AlertModal.showAlert("Info", "No cache to clean")
+            }
+        }
+    }
+}
+
+struct AccountActionsSection: View {
+    @EnvironmentObject private var userInfo: UserInfo
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Image(systemName: "person.badge.key.fill")
+                    .foregroundColor(.accentColor)
+                    .font(.title2)
+                Text("Account")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+
+            VStack(spacing: 12) {
+                SettingRow(
+                    icon: "arrow.right.square.fill",
+                    title: "Sign Out",
+                    description: "Sign out of your NetEase Cloud Music account",
+                    control: AnyView(
+                        Button(action: {
+                            Task {
+                                await signOut()
+                            }
+                        }) {
+                            Text("Sign Out")
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 6)
+                                .background(Color.orange)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    )
+                )
+            }
+            .padding(16)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(12)
+        }
+    }
+
+    private func signOut() async {
+        await CloudMusicApi().logout()
+        userInfo.profile = nil
+        userInfo.likelist = []
+        userInfo.playlists = []
+
+        saveEncodableState(forKey: "profile", data: userInfo.profile)
+    }
+}
+
+struct SettingRow: View {
+    let icon: String
+    let title: String
+    let description: String
+    let control: AnyView
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(.accentColor)
+                .font(.title3)
+                .frame(width: 24, height: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body)
+                    .fontWeight(.medium)
+
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+
+            control
+        }
+        .padding(.vertical, 4)
     }
 }
 

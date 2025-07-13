@@ -312,7 +312,7 @@ struct PlayerControlView: View {
                     .frame(maxWidth: 600)
             }
             .layoutPriority(1)
-            .frame(minWidth: 300)
+            .frame(minWidth: 240)
 
             Spacer()
 

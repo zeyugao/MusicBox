@@ -109,6 +109,13 @@ class PlayStatus: ObservableObject {
         }
         updateCurrentPlaybackInfo()
         NowPlayingCenter.handleSetPlaybackState(playing: false)
+        
+        // Notify about playback state change
+        NotificationCenter.default.post(
+            name: .playbackStateChanged,
+            object: nil,
+            userInfo: ["isPlaying": false]
+        )
     }
 
     func startPlay() async {
@@ -122,6 +129,13 @@ class PlayStatus: ObservableObject {
         }
         updateCurrentPlaybackInfo()
         NowPlayingCenter.handleSetPlaybackState(playing: true)
+        
+        // Notify about playback state change
+        NotificationCenter.default.post(
+            name: .playbackStateChanged,
+            object: nil,
+            userInfo: ["isPlaying": true]
+        )
     }
 
     var volume: Float {
@@ -313,8 +327,19 @@ class PlayStatus: ObservableObject {
             guard let self = self else { return }
             guard player.status == .readyToPlay else { return }
 
+            let isPlaying = !player.rate.isZero
             Task { @MainActor in
-                self.playerState = player.rate.isZero ? .paused : .playing
+                let oldState = self.playerState
+                self.playerState = isPlaying ? .playing : .paused
+                
+                // Only send notification if state actually changed
+                if (oldState == .playing) != isPlaying {
+                    NotificationCenter.default.post(
+                        name: .playbackStateChanged,
+                        object: nil,
+                        userInfo: ["isPlaying": isPlaying]
+                    )
+                }
             }
         }
 
@@ -408,6 +433,13 @@ class PlayStatus: ObservableObject {
                                 self?.playbackProgress.duration = 0.0
                                 self?.playbackProgress.playedSecond = 0.0
                                 self?.playerState = .stopped
+                                
+                                // Notify about playback state change
+                                NotificationCenter.default.post(
+                                    name: .playbackStateChanged,
+                                    object: nil,
+                                    userInfo: ["isPlaying": false]
+                                )
                             }
                         }
                     }
