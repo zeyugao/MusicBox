@@ -45,8 +45,38 @@ jobs:
           xcodebuild -project MusicBox.xcodeproj -scheme MusicBox build -configuration ${{ env.BUILD_TYPE }} CONFIGURATION_BUILD_DIR=$(pwd)/build CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM="" ONLY_ACTIVE_ARCH=NO \
           && cp MusicBox/MusicBox.entitlements build/MusicBox.entitlements \
           && cp .github/install.sh build/install.sh \
-          && tar czf ${{ env.archiveName }}.tar.gz -C build .
+          && tar czf ${{ env.archiveName }}-dysym.tar.gz -C build . \
+          && tar czf ${{ env.archiveName }}.tar.gz -C build MusicBox.app install.sh MusicBox.entitlements
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.archiveName }}-dysym
+          path: ${{ env.archiveName }}-dysym.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.archiveName }}
           path: ${{ env.archiveName }}.tar.gz
+      - name: Delete existing nightly release
+        if: github.ref == 'refs/heads/main'
+        uses: dev-drprasad/delete-tag-and-release@v1.1
+        with:
+          delete_release: true
+          tag_name: nightly
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      - name: Create nightly pre-release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: nightly
+          prerelease: true
+          body: |
+            Nightly build from commit ${{ github.sha }}
+            
+            This is an automated pre-release build. Use at your own risk.
+          files: |
+            ${{ env.archiveName }}-dysym.tar.gz
+            ${{ env.archiveName }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
