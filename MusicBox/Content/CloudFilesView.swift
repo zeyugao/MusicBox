@@ -5,6 +5,7 @@
 //  Created by Elsa on 2024/5/6.
 //
 
+import Cocoa
 import Foundation
 import SwiftUI
 
@@ -39,72 +40,35 @@ struct CloudFilesView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List {
-                    ForEach(cloudFiles, id: \.id) { file in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(file.fileName)
-                                        .font(.body)
-                                        .lineLimit(1)
-
-                                    Spacer()
-
-                                    Text(file.parseFileSize())
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-
-                                    Image(
-                                        systemName: file.isMatched
-                                            ? "checkmark.circle.fill" : "xmark.circle.fill"
-                                    )
-                                    .foregroundColor(file.isMatched ? .green : .red)
-                                    .font(.caption)
-                                }
-
-                                if let simpleSong = file.simpleSong,
-                                    let artistName = simpleSong.ar.first?.name,
-                                    let albumName = simpleSong.al.name,
-                                    let name = simpleSong.name
-                                {
-                                    Text("\(name) - \(artistName) - \(albumName)")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
-                                }
-                            }
-                            .padding(.vertical, 2)
-                        }
-                        .contextMenu {
-                            Button("Match with") {
-                                selectedFileForMatch = file
-                            }
-                        }
-                        .onAppear {
-                            if file.id == cloudFiles.last?.id && hasMoreFiles && !isLoadingMore {
+                VStack {
+                    CloudFileTableView(
+                        cloudFiles: cloudFiles,
+                        isLoadingMore: isLoadingMore,
+                        hasMoreFiles: hasMoreFiles,
+                        onLoadMore: {
+                            if hasMoreFiles && !isLoadingMore {
                                 Task {
                                     await loadMoreFiles()
                                 }
                             }
+                        },
+                        onMatchWith: { file in
+                            selectedFileForMatch = file
                         }
-                    }
+                    )
 
-                    if isLoadingMore {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                                .scaleEffect(0.5)
-                            Text("Loading more...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        .padding()
-                    }
-                }
-                .listStyle(PlainListStyle())
-                .refreshable {
-                    await loadCloudFiles(reset: true)
+                    // if isLoadingMore {
+                    //     HStack {
+                    //         Spacer()
+                    //         ProgressView()
+                    //             .scaleEffect(0.5)
+                    //         Text("Loading more...")
+                    //             .font(.caption)
+                    //             .foregroundColor(.secondary)
+                    //         Spacer()
+                    //     }
+                    //     .padding()
+                    // }
                 }
             }
         }
@@ -162,6 +126,388 @@ struct CloudFilesView: View {
                 self.isLoadingMore = false
             }
         }
+    }
+}
+
+// MARK: - Custom NSTableCellView Classes
+
+class CloudFileNameTableCellView: NSTableCellView {
+    private let nameLabel = NSTextField()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupUI()
+    }
+
+    private func setupUI() {
+        nameLabel.isEditable = false
+        nameLabel.isBordered = false
+        nameLabel.drawsBackground = false
+        nameLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        nameLabel.lineBreakMode = .byTruncatingTail
+
+        addSubview(nameLabel)
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            nameLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            nameLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            nameLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    func configure(with cloudFile: CloudMusicApi.CloudFile) {
+        nameLabel.stringValue = cloudFile.fileName
+    }
+}
+
+class CloudFileStatusTableCellView: NSTableCellView {
+    private let statusIcon = NSImageView()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupUI()
+    }
+
+    private func setupUI() {
+        statusIcon.imageScaling = .scaleProportionallyUpOrDown
+
+        addSubview(statusIcon)
+        statusIcon.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            statusIcon.centerXAnchor.constraint(equalTo: centerXAnchor),
+            statusIcon.centerYAnchor.constraint(equalTo: centerYAnchor),
+            statusIcon.widthAnchor.constraint(equalToConstant: 16),
+            statusIcon.heightAnchor.constraint(equalToConstant: 16),
+        ])
+    }
+
+    func configure(with cloudFile: CloudMusicApi.CloudFile) {
+        let iconName = cloudFile.isMatched ? "checkmark.circle.fill" : "xmark.circle.fill"
+        let iconColor = cloudFile.isMatched ? NSColor.systemGreen : NSColor.systemRed
+
+        if let image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) {
+            statusIcon.image = image
+            statusIcon.contentTintColor = iconColor
+        }
+    }
+}
+
+class CloudFileInfoTableCellView: NSTableCellView {
+    private let infoLabel = NSTextField()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupUI()
+    }
+
+    private func setupUI() {
+        infoLabel.isEditable = false
+        infoLabel.isBordered = false
+        infoLabel.drawsBackground = false
+        infoLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        infoLabel.textColor = NSColor.labelColor
+        infoLabel.lineBreakMode = .byTruncatingTail
+
+        addSubview(infoLabel)
+        infoLabel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            infoLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            infoLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            infoLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    func configure(with cloudFile: CloudMusicApi.CloudFile) {
+        if let simpleSong = cloudFile.simpleSong,
+            let artistName = simpleSong.ar.first?.name,
+            let albumName = simpleSong.al.name,
+            let name = simpleSong.name
+        {
+            infoLabel.stringValue = "\(name) - \(artistName) - \(albumName)"
+        } else {
+            infoLabel.stringValue = ""
+        }
+    }
+}
+
+class CloudFileSizeTableCellView: NSTableCellView {
+    private let sizeLabel = NSTextField()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupUI()
+    }
+
+    private func setupUI() {
+        sizeLabel.isEditable = false
+        sizeLabel.isBordered = false
+        sizeLabel.drawsBackground = false
+        sizeLabel.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        sizeLabel.textColor = NSColor.secondaryLabelColor
+        sizeLabel.alignment = .right
+
+        addSubview(sizeLabel)
+        sizeLabel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            sizeLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            sizeLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            sizeLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    func configure(with cloudFile: CloudMusicApi.CloudFile) {
+        sizeLabel.stringValue = cloudFile.parseFileSize()
+    }
+}
+
+// MARK: - CloudFile Table View Controller
+
+class CloudFileTableViewController: NSViewController {
+    private let tableView = NSTableView()
+    private let scrollView = NSScrollView()
+
+    var cloudFiles: [CloudMusicApi.CloudFile] = [] {
+        didSet {
+            tableView.reloadData()
+        }
+    }
+
+    var isLoadingMore: Bool = false
+    var hasMoreFiles: Bool = true
+    var onLoadMore: (() -> Void)?
+    var onMatchWith: ((CloudMusicApi.CloudFile) -> Void)?
+
+    override func loadView() {
+        view = NSView()
+        setupTableView()
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupColumns()
+    }
+
+    private func setupTableView() {
+        scrollView.documentView = tableView
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.autohidesScrollers = true
+
+        // Add scroll notification observer for infinite scrolling
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(scrollViewDidScroll(_:)),
+            name: NSScrollView.didLiveScrollNotification,
+            object: scrollView
+        )
+
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.allowsColumnSelection = false
+        tableView.allowsMultipleSelection = false
+        tableView.allowsColumnReordering = false
+        tableView.usesAlternatingRowBackgroundColors = true
+        tableView.rowSizeStyle = .default
+        tableView.target = self
+
+        view.addSubview(scrollView)
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+    }
+
+    private func setupColumns() {
+        // Status column
+        let statusColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("status"))
+        statusColumn.title = ""
+        statusColumn.width = 24
+        statusColumn.minWidth = 24
+        statusColumn.maxWidth = 24
+        statusColumn.resizingMask = []
+        tableView.addTableColumn(statusColumn)
+
+        // File Name column
+        let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("fileName"))
+        nameColumn.title = "File Name"
+        nameColumn.width = 300
+        nameColumn.minWidth = 150
+        tableView.addTableColumn(nameColumn)
+
+        // Matched Song Info column
+        let infoColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("matchedInfo"))
+        infoColumn.title = "Matched Song"
+        infoColumn.width = 300
+        infoColumn.minWidth = 150
+        tableView.addTableColumn(infoColumn)
+
+        // File Size column
+        let sizeColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("fileSize"))
+        sizeColumn.title = "Size"
+        sizeColumn.width = 80
+        sizeColumn.minWidth = 60
+        sizeColumn.maxWidth = 100
+        tableView.addTableColumn(sizeColumn)
+    }
+
+    @objc private func scrollViewDidScroll(_ notification: Notification) {
+        guard let scrollView = notification.object as? NSScrollView else { return }
+
+        let visibleRect = scrollView.documentVisibleRect
+        let documentRect = scrollView.documentView?.bounds ?? .zero
+
+        // Check if we're near the bottom (within 100 points)
+        let isNearBottom = visibleRect.maxY >= documentRect.height - 100
+
+        if isNearBottom && hasMoreFiles && !isLoadingMore {
+            onLoadMore?()
+        }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+}
+
+// MARK: - NSTableViewDataSource
+
+extension CloudFileTableViewController: NSTableViewDataSource {
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        return cloudFiles.count
+    }
+}
+
+// MARK: - NSTableViewDelegate
+
+extension CloudFileTableViewController: NSTableViewDelegate {
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int)
+        -> NSView?
+    {
+        guard row < cloudFiles.count else { return nil }
+        let cloudFile = cloudFiles[row]
+
+        guard let identifier = tableColumn?.identifier else { return nil }
+
+        switch identifier.rawValue {
+        case "status":
+            let cellView = CloudFileStatusTableCellView()
+            cellView.configure(with: cloudFile)
+            return cellView
+
+        case "fileName":
+            let cellView = CloudFileNameTableCellView()
+            cellView.configure(with: cloudFile)
+            return cellView
+
+        case "matchedInfo":
+            let cellView = CloudFileInfoTableCellView()
+            cellView.configure(with: cloudFile)
+            return cellView
+
+        case "fileSize":
+            let cellView = CloudFileSizeTableCellView()
+            cellView.configure(with: cloudFile)
+            return cellView
+
+        default:
+            return nil
+        }
+    }
+
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        return 24
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        return true
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        let point = tableView.convert(event.locationInWindow, from: nil)
+        let row = tableView.row(at: point)
+
+        guard row >= 0, row < cloudFiles.count else { return }
+
+        // Select the row if it's not already selected
+        if !tableView.selectedRowIndexes.contains(row) {
+            tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        }
+
+        let cloudFile = cloudFiles[row]
+        let menu = createContextMenu(for: cloudFile, row: row)
+
+        NSMenu.popUpContextMenu(menu, with: event, for: tableView)
+    }
+
+    private func createContextMenu(for cloudFile: CloudMusicApi.CloudFile, row: Int) -> NSMenu {
+        let menu = NSMenu()
+        let matchWithItem = NSMenuItem(
+            title: "Match with",
+            action: #selector(matchWithAction(_:)),
+            keyEquivalent: ""
+        )
+        matchWithItem.target = self
+        matchWithItem.tag = row
+        menu.addItem(matchWithItem)
+
+        return menu
+    }
+}
+
+// MARK: - Context Menu Actions
+
+extension CloudFileTableViewController {
+    @objc private func matchWithAction(_ sender: NSMenuItem) {
+        let row = sender.tag
+        guard row >= 0 && row < cloudFiles.count else { return }
+        onMatchWith?(cloudFiles[row])
+    }
+}
+
+// MARK: - SwiftUI Wrapper
+
+struct CloudFileTableView: NSViewControllerRepresentable {
+    let cloudFiles: [CloudMusicApi.CloudFile]
+    let isLoadingMore: Bool
+    let hasMoreFiles: Bool
+    let onLoadMore: () -> Void
+    let onMatchWith: (CloudMusicApi.CloudFile) -> Void
+
+    func makeNSViewController(context: Context) -> CloudFileTableViewController {
+        let controller = CloudFileTableViewController()
+        controller.onLoadMore = onLoadMore
+        controller.onMatchWith = onMatchWith
+        return controller
+    }
+
+    func updateNSViewController(_ nsViewController: CloudFileTableViewController, context: Context)
+    {
+        nsViewController.cloudFiles = cloudFiles
+        nsViewController.isLoadingMore = isLoadingMore
+        nsViewController.hasMoreFiles = hasMoreFiles
     }
 }
 
