@@ -410,6 +410,9 @@ struct ContentView: View {
             }
         )
         .task {
+            // Connect PlayStatus with PlayingDetailModel before loading state
+            playStatus.setPlayingDetailModel(playingDetailModel)
+
             await withTaskGroup(of: Void.self) { group in
                 group.addTask {
                     await initUserData(userInfo: userInfo)

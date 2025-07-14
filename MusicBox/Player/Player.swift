@@ -6,6 +6,7 @@
 //
 
 import AVFoundation
+import Combine
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
@@ -25,41 +26,171 @@ class LyricStatus: ObservableObject {
     @Published var lyricTimeline: [Int] = []  // We align to 0.1s, 12.32 -> 123
     @Published var currentLyricIndex: Int? = nil
 
+    private var lastSearchIndex: Int = 0  // Cache last search position for performance
+
     func resetLyricIndex(currentTime: Double) {
+        lastSearchIndex = 0
         Task { @MainActor [weak self] in
             guard let self = self else { return }
-            self.currentLyricIndex = self.monotonouslyUpdateLyric(
-                lyricIndex: 0, newTime: currentTime)
+            self.currentLyricIndex = self.findLyricIndex(for: currentTime)
         }
     }
 
-    func monotonouslyUpdateLyric(lyricIndex: Int, newTime: Double? = nil, currentTime: Double = 0)
-        -> Int?
-    {
-        var lyricIndex = lyricIndex
+    private func findLyricIndex(for currentTime: Double) -> Int? {
+        guard !lyricTimeline.isEmpty else { return nil }
 
-        let roundedPlayedSecond = Int((newTime ?? currentTime) * 10)
-        while lyricIndex < self.lyricTimeline.count
-            && roundedPlayedSecond >= self.lyricTimeline[lyricIndex]
-        {
-            lyricIndex += 1
+        let roundedPlayedSecond = Int(currentTime * 10)
+
+        // Use binary search for better performance O(log n)
+        var left = 0
+        var right = lyricTimeline.count - 1
+        var result: Int? = nil
+
+        while left <= right {
+            let mid = (left + right) / 2
+
+            if lyricTimeline[mid] <= roundedPlayedSecond {
+                result = mid
+                left = mid + 1
+            } else {
+                right = mid - 1
+            }
         }
-        if lyricIndex > 0 {
-            return lyricIndex - 1
-        }
-        return nil
+
+        return result
     }
 
     func updateLyricIndex(currentTime: Double) {
         let initIdx = self.currentLyricIndex
-        let newIdx = self.monotonouslyUpdateLyric(
-            lyricIndex: initIdx ?? 0, currentTime: currentTime)
+        let newIdx = self.findLyricIndex(for: currentTime)
 
         if newIdx != initIdx {
             Task { @MainActor [weak self] in
                 self?.currentLyricIndex = newIdx
             }
         }
+    }
+
+    // Get the time of the next lyric change for smart synchronization
+    func getNextLyricChangeTime(currentTime: Double) -> Double? {
+        guard !lyricTimeline.isEmpty else { return nil }
+
+        let roundedPlayedSecond = Int(currentTime * 10)
+
+        // Find the next lyric time that is greater than current time
+        for timeStamp in lyricTimeline {
+            if timeStamp > roundedPlayedSecond {
+                return Double(timeStamp) / 10.0
+            }
+        }
+
+        return nil
+    }
+}
+
+class SmartLyricSynchronizer: ObservableObject {
+    private weak var lyricStatus: LyricStatus?
+    fileprivate var preciseTimer: Timer?
+    private var getCurrentTime: (() -> Double)?
+    private var shouldSynchronize: (() -> Bool)?
+
+    init(
+        lyricStatus: LyricStatus, getCurrentTime: @escaping () -> Double,
+        shouldSynchronize: @escaping () -> Bool
+    ) {
+        self.lyricStatus = lyricStatus
+        self.getCurrentTime = getCurrentTime
+        self.shouldSynchronize = shouldSynchronize
+    }
+
+    func startSynchronization() {
+        guard shouldSynchronize?() == true else { return }
+
+        // Immediately update lyric index when starting synchronization
+        if let getCurrentTime = getCurrentTime,
+            let lyricStatus = lyricStatus
+        {
+            lyricStatus.updateLyricIndex(currentTime: getCurrentTime())
+        }
+
+        scheduleNextLyricUpdate()
+    }
+
+    func stopSynchronization() {
+        preciseTimer?.invalidate()
+        preciseTimer = nil
+    }
+
+    func updateSynchronizationState() {
+        if shouldSynchronize?() == true {
+            if preciseTimer == nil {
+                startSynchronization()
+            }
+        } else {
+            stopSynchronization()
+        }
+    }
+
+    // Force update lyric index immediately (useful when detail view opens)
+    func updateLyricIndexNow() {
+        if let getCurrentTime = getCurrentTime,
+            let lyricStatus = lyricStatus
+        {
+            lyricStatus.updateLyricIndex(currentTime: getCurrentTime())
+        }
+    }
+
+    // Restart synchronization (useful after seeking)
+    func restartSynchronization() {
+        guard shouldSynchronize?() == true else { return }
+        stopSynchronization()
+        startSynchronization()
+    }
+
+    private func scheduleNextLyricUpdate() {
+        preciseTimer?.invalidate()
+
+        guard shouldSynchronize?() == true,
+            let getCurrentTime = getCurrentTime,
+            let lyricStatus = lyricStatus
+        else {
+            return
+        }
+
+        let currentTime = getCurrentTime()
+
+        if let nextChangeTime = lyricStatus.getNextLyricChangeTime(currentTime: currentTime) {
+            let timeInterval = max(nextChangeTime - currentTime, 0.01)  // Minimum 10ms
+
+            if timeInterval > 0 && timeInterval < 10.0 {  // Only schedule if within reasonable range
+                preciseTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false)
+                { [weak self] _ in
+                    self?.performLyricUpdate()
+                }
+            }
+        } else {
+            // No next lyric change found, schedule a regular check after 1 second
+            preciseTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) {
+                [weak self] _ in
+                self?.performLyricUpdate()
+            }
+        }
+    }
+
+    private func performLyricUpdate() {
+        guard shouldSynchronize?() == true,
+            let getCurrentTime = getCurrentTime,
+            let lyricStatus = lyricStatus
+        else { return }
+
+        lyricStatus.updateLyricIndex(currentTime: getCurrentTime())
+
+        // Schedule the next update
+        scheduleNextLyricUpdate()
+    }
+
+    deinit {
+        stopSynchronization()
     }
 }
 
@@ -68,6 +199,9 @@ class PlayStatus: ObservableObject {
 
     var playbackProgress = PlaybackProgress()
     var lyricStatus = LyricStatus()
+    private var lyricSynchronizer: SmartLyricSynchronizer?
+    private weak var playingDetailModel: PlayingDetailModel?
+    private var detailModelCancellable: AnyCancellable?
 
     @Published var isLoading: Bool = false
     @Published var loadingProgress: Double? = nil
@@ -110,6 +244,9 @@ class PlayStatus: ObservableObject {
         updateCurrentPlaybackInfo()
         NowPlayingCenter.handleSetPlaybackState(playing: false)
 
+        // Stop smart lyric synchronization
+        lyricSynchronizer?.stopSynchronization()
+
         // Notify about playback state change
         NotificationCenter.default.post(
             name: .playbackStateChanged,
@@ -129,6 +266,9 @@ class PlayStatus: ObservableObject {
         }
         updateCurrentPlaybackInfo()
         NowPlayingCenter.handleSetPlaybackState(playing: true)
+
+        // Update smart lyric synchronization state
+        lyricSynchronizer?.updateSynchronizationState()
 
         // Notify about playback state change
         NotificationCenter.default.post(
@@ -178,10 +318,17 @@ class PlayStatus: ObservableObject {
 
             await player.seek(to: newTime, toleranceBefore: .zero, toleranceAfter: .zero)
             await MainActor.run {
-                self.lyricStatus.currentLyricIndex = self.lyricStatus.monotonouslyUpdateLyric(
-                    lyricIndex: 0, newTime: newTime.seconds)
+                self.lyricStatus.updateLyricIndex(currentTime: newTime.seconds)
             }
             updateCurrentPlaybackInfo()
+
+            // Restart lyric synchronization after seeking
+            if playerState == .playing {
+                // Small delay to ensure player state is stable
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.lyricSynchronizer?.restartSynchronization()
+                }
+            }
         }
         await seekingTask?.value
     }
@@ -261,6 +408,11 @@ class PlayStatus: ObservableObject {
         if let playedSecond = playedSecond, playedSecond > 0 {
             await seekToOffset(offset: playedSecond)
         }
+
+        // Restart lyric synchronization for new track
+        if playerState == .playing {
+            lyricSynchronizer?.restartSynchronization()
+        }
     }
 
     private var scrobbled: Bool = false
@@ -339,12 +491,19 @@ class PlayStatus: ObservableObject {
                         object: nil,
                         userInfo: ["isPlaying": isPlaying]
                     )
+
+                    // Update lyric synchronization when playback state changes
+                    if isPlaying {
+                        self.lyricSynchronizer?.updateSynchronizationState()
+                    } else {
+                        self.lyricSynchronizer?.stopSynchronization()
+                    }
                 }
             }
         }
 
         periodicTimeObserverToken = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.1, preferredTimescale: timeScale), queue: .main
+            forInterval: CMTime(seconds: 0.25, preferredTimescale: timeScale), queue: .main
         ) { [weak self] time in
             guard let self = self else { return }
             if !self.switchingItem && self.readyToPlay {
@@ -355,8 +514,6 @@ class PlayStatus: ObservableObject {
                     }
                     self.updateCurrentPlaybackInfo()
                 }
-
-                self.lyricStatus.updateLyricIndex(currentTime: newTime)
             }
         }
     }
@@ -494,9 +651,52 @@ class PlayStatus: ObservableObject {
         }
     }
 
+    func setPlayingDetailModel(_ playingDetailModel: PlayingDetailModel) {
+        self.playingDetailModel = playingDetailModel
+
+        // Initialize lyric synchronizer with detail model dependency
+        lyricSynchronizer = SmartLyricSynchronizer(
+            lyricStatus: lyricStatus,
+            getCurrentTime: { [weak self] in
+                return self?.player.currentTime().seconds ?? 0.0
+            },
+            shouldSynchronize: { [weak playingDetailModel] in
+                return playingDetailModel?.isPresented == true
+            }
+        )
+
+        // Listen to playingDetailModel changes to update synchronization state
+        detailModelCancellable = playingDetailModel.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async {
+                // Small delay to ensure isPresented has been updated
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    let wasRunning = self?.lyricSynchronizer?.preciseTimer != nil
+                    self?.lyricSynchronizer?.updateSynchronizationState()
+
+                    // If detail view just opened and we weren't running before, force start
+                    if playingDetailModel.isPresented && !wasRunning {
+                        self?.lyricSynchronizer?.updateLyricIndexNow()
+                        // Force start synchronization if we're currently playing
+                        if self?.playerState == .playing {
+                            self?.lyricSynchronizer?.startSynchronization()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     deinit {
         deinitPlayerObservers()
         deinitNotificationObservers()
+
+        // Stop lyric synchronization
+        lyricSynchronizer?.stopSynchronization()
+        lyricSynchronizer = nil
+
+        // Cancel Combine subscriptions
+        detailModelCancellable?.cancel()
+        detailModelCancellable = nil
 
         // Cancel any pending tasks to prevent memory leaks
         seekingTask?.cancel()
