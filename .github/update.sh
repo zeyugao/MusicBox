@@ -5,14 +5,31 @@
 
 set -e # Exit on any error
 
+ORIGINAL_DIR="$(pwd)"
 cd "$(dirname "$0")" || exit 1
 
 echo "Starting MusicBox update process..."
 
+# Create temporary directory
+TEMP_DIR=$(mktemp -d)
+echo "Using temporary directory: $TEMP_DIR"
+
+# Cleanup function
+cleanup() {
+    echo "Cleaning up temporary files..."
+    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
+        rm -rf "$TEMP_DIR"
+        echo "Temporary directory $TEMP_DIR has been cleaned up."
+    fi
+}
+
+# Set trap to cleanup on exit (including errors)
+trap cleanup EXIT
+
 # Define variables
 DOWNLOAD_URL="https://github.com/zeyugao/MusicBox/releases/download/nightly/MusicBox.tar.gz"
-ARCHIVE_FILE="MusicBox.tar.gz"
-EXTRACT_DIR="MusicBox_temp"
+ARCHIVE_FILE="$TEMP_DIR/MusicBox.tar.gz"
+EXTRACT_DIR="$TEMP_DIR/MusicBox_temp"
 
 # Download the archive
 echo "Downloading MusicBox.tar.gz..."
@@ -35,9 +52,6 @@ INSTALL_SCRIPT=$(find "$EXTRACT_DIR" -name "install.sh" -type f | head -1)
 
 if [ -z "$INSTALL_SCRIPT" ]; then
     echo "Error: install.sh not found in the extracted files"
-    # Cleanup on error
-    rm -rf "$EXTRACT_DIR"
-    rm -f "$ARCHIVE_FILE"
     exit 1
 fi
 
@@ -50,12 +64,6 @@ cd "$(dirname "$INSTALL_SCRIPT")"
 ./install.sh
 
 # Return to original directory
-cd - >/dev/null
-
-# Cleanup
-echo "Cleaning up temporary files..."
-rm -rf "$EXTRACT_DIR"
-rm -f "$ARCHIVE_FILE"
+cd "$ORIGINAL_DIR" >/dev/null
 
 echo "MusicBox update completed successfully!"
-echo "Temporary files have been cleaned up."
