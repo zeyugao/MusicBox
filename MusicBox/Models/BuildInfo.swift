@@ -52,7 +52,7 @@ struct BuildInfo {
         #if DEBUG
         return "\(version) (\(build)) - Debug"
         #else
-        let components = build.components(separatedBy: ".")
+        let components = build.components(separatedBy: "-")
         if components.count >= 2 {
             let buildNumber = components[0]
             let commit = components[1]
