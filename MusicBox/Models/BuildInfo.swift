@@ -18,13 +18,13 @@ struct BuildInfo {
     
     static var buildId: String {
         // Extract build ID from build version (format: "buildNumber.gitCommit")
-        let components = buildVersion.components(separatedBy: ".")
+        let components = buildVersion.components(separatedBy: "-")
         return components.first ?? "Unknown"
     }
     
     static var gitCommit: String {
         // Extract git commit from build version (format: "buildNumber.gitCommit")
-        let components = buildVersion.components(separatedBy: ".")
+        let components = buildVersion.components(separatedBy: "-")
         if components.count >= 2 {
             return components[1]
         }
