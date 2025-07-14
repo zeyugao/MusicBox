@@ -324,8 +324,9 @@ class PlayStatus: ObservableObject {
 
             // Restart lyric synchronization after seeking
             if playerState == .playing {
+                await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
                 // Small delay to ensure player state is stable
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                await MainActor.run {
                     self.lyricSynchronizer?.restartSynchronization()
                 }
             }

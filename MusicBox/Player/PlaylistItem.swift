@@ -241,13 +241,7 @@ class PlaylistItem: Identifiable, Codable, Equatable {
 
     func getArtworkUrl() async -> URL? {
         if let artworkUrl = self.artworkUrl {
-            if isLocalURL(artworkUrl) {
-                return artworkUrl
-            } else {
-                self.artworkUrl = await downloadMusicFile(
-                    url: artworkUrl, id: id, ext: artworkUrl.pathExtension)
-                return self.artworkUrl
-            }
+            return artworkUrl
         }
         return nil
     }

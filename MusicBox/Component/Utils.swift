@@ -84,12 +84,24 @@ class ImageLoader: ObservableObject {
 
     private let url: URL?
     private var cancellable: AnyCancellable?
-    private let fileManager = FileManager.default
+    private static let fileManager = FileManager.default
     private static let urlSession = URLSession.shared
     private static let imageCache = NSCache<NSString, NSImage>()
 
+    // Track ongoing downloads to prevent duplicates
+    private static var activeDownloads = Set<String>()
+    private static let downloadLock = NSLock()
+
+    // Configure cache once
+    private static let cacheConfigured: Void = {
+        imageCache.countLimit = 100  // Limit to 100 images
+        imageCache.totalCostLimit = 50 * 1024 * 1024  // 50MB memory limit
+        return ()
+    }()
+
     init(url: URL?) {
         self.url = url
+        _ = Self.cacheConfigured  // Ensure cache is configured
         checkForCachedImage()
     }
 
@@ -105,38 +117,55 @@ class ImageLoader: ObservableObject {
         checkForSavedImage()
     }
 
-    private func getImagePath() -> URL? {
-        guard let url = url else { return nil }
-        let hash = md5(string: url.absoluteString)
+    private static var imageCacheDirectory: URL? = {
+        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let imageCachePath = documentsDir.appendingPathComponent("CacheImage")
 
-        let imageCachePath = getDocumentsDirectory().appendingPathComponent("CacheImage")
-
-        if !fileManager.fileExists(atPath: imageCachePath.path) {
-            do {
-                try fileManager.createDirectory(
-                    at: imageCachePath, withIntermediateDirectories: true)
-            } catch {
-                print("Failed to create directory: \(error)")
-                return nil
-            }
+        // Create directory once and reuse
+        do {
+            try FileManager.default.createDirectory(
+                at: imageCachePath, withIntermediateDirectories: true)
+            return imageCachePath
+        } catch {
+            return nil
         }
+    }()
 
-        return imageCachePath.appendingPathComponent("\(hash).dat")
+    private func getImagePath() -> URL? {
+        guard let url = url,
+            let cacheDir = Self.imageCacheDirectory
+        else { return nil }
+
+        let hash = md5(string: url.absoluteString)
+        return cacheDir.appendingPathComponent("\(hash).dat")
     }
 
     private func checkForSavedImage() {
-        guard let file = getImagePath(),
-            fileManager.fileExists(atPath: file.path),
-            let data = try? Data(contentsOf: file),
+        guard let file = getImagePath() else { return }
+
+        // Avoid file system check if we can
+        guard Self.fileManager.fileExists(atPath: file.path) else { return }
+
+        // Load image data in background to avoid blocking UI
+        Task { [weak self, file] in
+            guard let data = try? Data(contentsOf: file) else { return }
+
+            // Create image on main thread since NSImage is not Sendable
             let img = NSImage(data: data)
-        else { return }
+            guard let img = img else { return }
 
-        image = img
+            let imageSize = data.count
+            let urlString = self?.url?.absoluteString
 
-        // Cache in memory for faster access
-        if let url = url {
-            let cacheKey = NSString(string: url.absoluteString)
-            Self.imageCache.setObject(img, forKey: cacheKey)
+            DispatchQueue.main.async { [weak self] in
+                self?.image = img
+            }
+
+            // Cache in memory for faster access
+            if let urlString = urlString {
+                let cacheKey = NSString(string: urlString)
+                Self.imageCache.setObject(img, forKey: cacheKey, cost: imageSize)
+            }
         }
     }
 
@@ -147,38 +176,65 @@ class ImageLoader: ObservableObject {
     func load() {
         guard image == nil, cancellable == nil, let url = url else { return }
 
+        let urlString = url.absoluteString
+
+        // Check if this URL is already being downloaded
+        Self.downloadLock.lock()
+        defer { Self.downloadLock.unlock() }
+
+        if Self.activeDownloads.contains(urlString) {
+            // Already downloading, try again in a moment
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.checkForCachedImage()
+            }
+            return
+        }
+
+        Self.activeDownloads.insert(urlString)
+
         cancellable = Self.urlSession.dataTaskPublisher(for: url)
             .map { $0.data }
             .replaceError(with: nil)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] data in
+                defer {
+                    Self.downloadLock.lock()
+                    Self.activeDownloads.remove(urlString)
+                    Self.downloadLock.unlock()
+                }
+
                 guard let self = self, let data = data, let img = NSImage(data: data) else {
                     return
                 }
 
                 self.image = img
-                self.saveImage(data: data)
 
-                // Cache in memory for faster access
-                let cacheKey = NSString(string: url.absoluteString)
-                Self.imageCache.setObject(img, forKey: cacheKey)
+                // Save and cache in background
+                let urlString = url.absoluteString
+                let imageSize = data.count
+                Task { [weak self] in
+                    self?.saveImage(data: data)
+
+                    // Cache in memory for faster access (already on main thread)
+                    let cacheKey = NSString(string: urlString)
+                    Self.imageCache.setObject(img, forKey: cacheKey, cost: imageSize)
+                }
             }
     }
 
     private func saveImage(data: Data) {
-        let file = getImagePath()
+        guard let file = getImagePath() else { return }
 
-        guard let file = file else { return }
-
+        // Save image in background to avoid blocking
         do {
             try data.write(to: file)
         } catch {
-            print("Error saving image data to \(file): \(error)")
+            // Silently fail - memory cache is sufficient for most cases
         }
     }
 
     private func getDocumentsDirectory() -> URL {
-        fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        ImageLoader.fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
     private func md5(string: String) -> String {
