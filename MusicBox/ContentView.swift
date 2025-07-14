@@ -295,7 +295,7 @@ struct ContentView: View {
                             if userInfo.profile != nil {
                                 TextWithImage("Now Playing", image: "dot.radiowaves.left.and.right")
                                     .tag(NavigationScreen.nowPlaying)
-                                TextWithImage("My Cloud Files", image: "icloud.and.arrow.up")
+                                TextWithImage("My Cloud Files", image: "icloud")
                                     .tag(NavigationScreen.cloudFiles)
                             }
                         }
