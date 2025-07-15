@@ -58,6 +58,14 @@ class PlaylistDetailModel: ObservableObject {
     @Published var songs: [CloudMusicApi.Song]?
     var curId: UInt64?
 
+    // Incremental loading related properties
+    private var allTrackIds: [UInt64] = []
+    @Published var isLoading = false
+    @Published var isLoadingMore = false
+    @Published var hasMoreSongs = false
+    @Published var allSongsLoaded = false
+    private let pageSize = 100
+
     var sortOrder: [KeyPathComparator<CloudMusicApi.Song>]? = nil
     var searchText = ""
 
@@ -74,21 +82,105 @@ class PlaylistDetailModel: ObservableObject {
                     return
                 }
 
+                // Reset incremental loading state
+                await MainActor.run {
+                    self.allTrackIds = trackIds
+                    self.originalSongs = []
+                    self.isLoading = true
+                    self.hasMoreSongs = trackIds.count > pageSize
+                    self.allSongsLoaded = false
+                }
+
                 if trackIds.count == tracks.count {
-                    self.originalSongs = tracks
+                    await MainActor.run {
+                        self.originalSongs = tracks
+                        self.isLoading = false
+                        self.allSongsLoaded = true
+                        self.hasMoreSongs = false
+                    }
                     self.update()
                 } else {
-                    if let playlist = await CloudMusicApi(cacheTtl: cacheTtl).song_detail(
-                        ids: trackIds)
-                    {
-                        self.originalSongs = playlist
-                        self.update()
-                    }
+                    // Start incremental loading
+                    await loadInitialSongs(cacheTtl: cacheTtl)
                 }
             }
         case .songs(let songs, _, _):
-            self.originalSongs = songs
+            await MainActor.run {
+                self.originalSongs = songs
+                self.allSongsLoaded = true
+                self.hasMoreSongs = false
+                self.isLoading = false
+            }
             self.update()
+        }
+    }
+
+    private func loadInitialSongs(cacheTtl: Double) async {
+        let initialIds = Array(allTrackIds.prefix(pageSize))
+
+        if let songs = await CloudMusicApi(cacheTtl: cacheTtl).song_detail(ids: initialIds) {
+            await MainActor.run {
+                self.originalSongs = songs
+                self.isLoading = false
+                self.hasMoreSongs = allTrackIds.count > pageSize
+                if allTrackIds.count <= pageSize {
+                    self.allSongsLoaded = true
+                }
+            }
+            self.update()
+        } else {
+            await MainActor.run {
+                self.originalSongs = []
+                self.isLoading = false
+                self.hasMoreSongs = false
+                self.allSongsLoaded = true
+            }
+        }
+    }
+
+    func loadMoreSongs() async {
+        guard !isLoadingMore && hasMoreSongs && !allSongsLoaded else { return }
+
+        await MainActor.run {
+            self.isLoadingMore = true
+        }
+
+        let currentCount = originalSongs?.count ?? 0
+        let nextBatch = Array(allTrackIds.dropFirst(currentCount).prefix(pageSize))
+
+        if let newSongs = await CloudMusicApi().song_detail(ids: nextBatch) {
+            await MainActor.run {
+                if self.originalSongs == nil {
+                    self.originalSongs = newSongs
+                } else {
+                    self.originalSongs?.append(contentsOf: newSongs)
+                }
+
+                let totalLoaded = self.originalSongs?.count ?? 0
+                self.hasMoreSongs = totalLoaded < allTrackIds.count
+                self.isLoadingMore = false
+
+                if totalLoaded >= allTrackIds.count {
+                    self.allSongsLoaded = true
+                }
+            }
+            self.update()
+        } else {
+            await MainActor.run {
+                self.hasMoreSongs = false
+                self.isLoadingMore = false
+                self.allSongsLoaded = true
+            }
+        }
+    }
+
+    func loadAllSongsInBackground() async {
+        guard !allSongsLoaded else { return }
+
+        while hasMoreSongs {
+            await loadMoreSongs()
+            // Add small delay to prevent blocking UI
+            try? await Task.sleep(nanoseconds: 10_000_000)  // 0.01 second
         }
     }
 
@@ -592,6 +684,12 @@ class SongTableViewController: NSViewController {
     var onDeleteFromPlaylist: ((CloudMusicApi.Song) -> Void)?
     var onUploadToCloud: ((CloudMusicApi.Song, URL) -> Void)?
 
+    // Incremental loading related properties
+    var onLoadMore: (() -> Void)?
+    var isLoadingMore: Bool = false
+    var hasMoreSongs: Bool = false
+    private let pageSize = 100
+
     private var focusCurrentPlayingItemObserver: NSObjectProtocol?
 
     override func loadView() {
@@ -610,6 +708,14 @@ class SongTableViewController: NSViewController {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
+
+        // Add scroll notification observer for infinite scrolling
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(scrollViewDidScroll(_:)),
+            name: NSScrollView.didLiveScrollNotification,
+            object: scrollView
+        )
 
         tableView.dataSource = self
         tableView.delegate = self
@@ -740,7 +846,7 @@ class SongTableViewController: NSViewController {
                 let targetRect = tableView.rect(ofRow: targetRow)
                 tableView.scroll(NSPoint(x: 0, y: targetRect.minY))
             }
-            
+
             tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
         }
     }
@@ -749,6 +855,7 @@ class SongTableViewController: NSViewController {
         if let observer = focusCurrentPlayingItemObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func updateSelection() {
@@ -787,6 +894,26 @@ class SongTableViewController: NSViewController {
         }
 
         tableView.sortDescriptors = descriptors
+    }
+
+    @objc private func scrollViewDidScroll(_ notification: Notification) {
+        guard let scrollView = notification.object as? NSScrollView else { return }
+
+        let visibleRect = scrollView.documentVisibleRect
+        let rowHeight: CGFloat = 24  // 根据实际行高定义
+        let totalRows = songs?.count ?? 0
+        let visibleRowsFromTop = Int(visibleRect.minY / rowHeight)
+        let visibleRowsCount = Int(visibleRect.height / rowHeight)
+        let lastVisibleRow = visibleRowsFromTop + visibleRowsCount
+
+        // When remaining rows are less than or equal to pageSize/3, trigger loading
+        let remainingRows = totalRows - lastVisibleRow
+        let loadThreshold = pageSize / 3  // About 33 rows if pageSize=100
+        let shouldLoadMore = remainingRows <= loadThreshold
+
+        if shouldLoadMore && hasMoreSongs && !isLoadingMore {
+            onLoadMore?()
+        }
     }
 
     @objc private func handleDoubleClick(_ sender: NSTableView) {
@@ -1101,6 +1228,9 @@ struct SongTableView: NSViewControllerRepresentable {
     @Binding var selectedSongToAdd: CloudMusicApi.Song?
     let onDeleteFromPlaylist: (CloudMusicApi.Song) -> Void
     let onUploadToCloud: (CloudMusicApi.Song, URL) -> Void
+    let onLoadMore: () -> Void
+    let isLoadingMore: Bool
+    let hasMoreSongs: Bool
 
     func makeNSViewController(context: Context) -> SongTableViewController {
         let controller = SongTableViewController()
@@ -1113,6 +1243,7 @@ struct SongTableView: NSViewControllerRepresentable {
         }
         controller.onDeleteFromPlaylist = onDeleteFromPlaylist
         controller.onUploadToCloud = onUploadToCloud
+        controller.onLoadMore = onLoadMore
         return controller
     }
 
@@ -1121,6 +1252,8 @@ struct SongTableView: NSViewControllerRepresentable {
         nsViewController.selectedItem = selectedItem
         nsViewController.sortOrder = sortOrder
         nsViewController.playlistMetadata = playlistMetadata
+        nsViewController.isLoadingMore = isLoadingMore
+        nsViewController.hasMoreSongs = hasMoreSongs
         nsViewController.updateColumnSortingCapability()
     }
 }
@@ -1587,7 +1720,6 @@ struct PlayListView: View {
     @State private var selectedItem: CloudMusicApi.Song.ID?
     @State private var sortOrder = [KeyPathComparator<CloudMusicApi.Song>]()
     @State private var loadingTask: Task<Void, Never>? = nil
-    @State private var isLoading = false
     @State private var currentLoadingTaskId = UUID()
 
     @State private var searchText = ""
@@ -1641,11 +1773,28 @@ struct PlayListView: View {
                     Task {
                         await handleUploadToCloud(song: song, url: url)
                     }
-                }
+                },
+                onLoadMore: {
+                    // Incremental loading callback
+                    if model.hasMoreSongs && !model.isLoadingMore {
+                        Task {
+                            await model.loadMoreSongs()
+                        }
+                    }
+                },
+                isLoadingMore: model.isLoadingMore,
+                hasMoreSongs: model.hasMoreSongs
             )
             .onChange(of: searchText) { prevSearchText, searchText in
                 model.applySearch(by: searchText)
                 model.update()
+
+                // If searching and not all songs loaded, load all songs in background
+                if !searchText.isEmpty && !model.allSongsLoaded {
+                    Task {
+                        await model.loadAllSongsInBackground()
+                    }
+                }
             }
             .sheet(
                 isPresented: Binding<Bool>(
@@ -1700,7 +1849,7 @@ struct PlayListView: View {
                 }
             }
 
-            if isLoading {
+            if model.isLoading {
                 LoadingIndicatorView()
             }
         }
@@ -1711,16 +1860,20 @@ struct PlayListView: View {
         model.originalSongs = nil
         model.curId = nil
 
+        // Reset incremental loading state
+        model.isLoading = false
+        model.isLoadingMore = false
+        model.hasMoreSongs = false
+        model.allSongsLoaded = false
+
         searchText = ""
         sortOrder = []
     }
 
     private func updatePlaylist(force: Bool = false) {
         if let playlistMetadata = playlistMetadata {
-            isLoading = true
-
-            // model.songs = nil
-            // model.originalSongs = nil
+            // Use model's isLoading property instead of local isLoading
+            model.isLoading = true
 
             model.curId = playlistMetadata.id
             loadingTask?.cancel()
@@ -1734,8 +1887,6 @@ struct PlayListView: View {
 
                 // Only update loading state if this is still the current task
                 if taskId == currentLoadingTaskId {
-                    isLoading = false
-
                     // Call the completion callback on main actor
                     await MainActor.run {
                         onLoadComplete?()
