@@ -7,6 +7,7 @@
 
 import Cocoa
 import Foundation
+import UniformTypeIdentifiers
 
 // MARK: - String Extensions
 extension String {
@@ -51,9 +52,46 @@ extension Data {
         } catch {
             if !silent {
                 let userFriendlyError = "Failed to decode data: \(error.localizedDescription)"
-                AlertModal.showAlert("Decoding Error", userFriendlyError)
+
+                AlertModal.showAlertWithSaveOption(
+                    "Decoding Error",
+                    userFriendlyError
+                ) {
+                    self.saveRawDataToFile()
+                }
             }
             return nil
+        }
+    }
+
+    private func saveRawDataToFile() {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        let timestamp = formatter.string(from: Date())
+        let fileName = "raw_data_\(timestamp).json"
+
+        // Use NSSavePanel to let user choose location
+        let savePanel = NSSavePanel()
+        savePanel.title = "Save Raw Data"
+        savePanel.nameFieldStringValue = fileName
+        savePanel.allowedContentTypes = [.json]
+        savePanel.canCreateDirectories = true
+
+        // Run the save panel
+        let response = savePanel.runModal()
+        if response == .OK, let url = savePanel.url {
+            do {
+                try self.write(to: url)
+
+                // Show the file in Finder
+                NSWorkspace.shared.selectFile(
+                    url.path, inFileViewerRootedAtPath: url.deletingLastPathComponent().path)
+
+                AlertModal.showAlert("Success", "Raw data saved to: \(url.lastPathComponent)")
+            } catch {
+                AlertModal.showAlert(
+                    "Save Failed", "Could not save raw data file: \(error.localizedDescription)")
+            }
         }
     }
 

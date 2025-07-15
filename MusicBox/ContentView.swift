@@ -230,8 +230,14 @@ class PlayingDetailModel: ObservableObject {
 class AlertModal: ObservableObject {
     @Published var text: String = ""
     @Published var title: String = ""
+    @Published var showSaveOption: Bool = false
+    @Published var saveCallback: (() -> Void)?
 
     static let showAlertName = Notification.Name("showAlertName")
+    static let showAlertWithSaveName = Notification.Name("showAlertWithSaveName")
+
+    // Static property to hold the callback
+    static var pendingSaveCallback: (() -> Void)?
 
     static func showAlert(_ title: String, _ text: String) {
         NotificationCenter.default.post(
@@ -248,6 +254,22 @@ class AlertModal: ObservableObject {
         showAlert("Alert", text)
     }
 
+    static func showAlertWithSaveOption(
+        _ title: String, _ text: String, saveCallback: @escaping () -> Void
+    ) {
+        // Store the callback in a static property
+        pendingSaveCallback = saveCallback
+
+        NotificationCenter.default.post(
+            name: AlertModal.showAlertWithSaveName,
+            object: nil,
+            userInfo: [
+                "title": title,
+                "text": text,
+            ]
+        )
+    }
+
     init() {
         NotificationCenter.default.addObserver(
             forName: AlertModal.showAlertName,
@@ -262,6 +284,26 @@ class AlertModal: ObservableObject {
             if let text = notification.userInfo?["text"] as? String {
                 self?.text = text
             }
+            self?.showSaveOption = false
+            self?.saveCallback = nil
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: AlertModal.showAlertWithSaveName,
+            object: nil,
+            queue: OperationQueue.main
+        ) { [weak self] notification in
+            if let title = notification.userInfo?["title"] as? String {
+                self?.title = title
+            } else {
+                self?.title = "Alert"
+            }
+            if let text = notification.userInfo?["text"] as? String {
+                self?.text = text
+            }
+            // Get the callback from the static property
+            self?.saveCallback = AlertModal.pendingSaveCallback
+            self?.showSaveOption = true
         }
     }
 }
@@ -436,11 +478,26 @@ struct ContentView: View {
                     if !$0 {
                         alertModel.text = ""
                         alertModel.title = ""
+                        alertModel.showSaveOption = false
+                        alertModel.saveCallback = nil
+                        // Clear the static callback when alert is dismissed
+                        AlertModal.pendingSaveCallback = nil
                     }
                 }
             )
         ) {
-            Alert(title: Text(alertModel.title), message: Text(alertModel.text))
+            if alertModel.showSaveOption {
+                Alert(
+                    title: Text(alertModel.title),
+                    message: Text(alertModel.text),
+                    primaryButton: .default(Text("Save to File")) {
+                        alertModel.saveCallback?()
+                    },
+                    secondaryButton: .cancel(Text("OK"))
+                )
+            } else {
+                Alert(title: Text(alertModel.title), message: Text(alertModel.text))
+            }
         }
     }
 }

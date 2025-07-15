@@ -619,7 +619,8 @@ struct AboutSection: View {
                     SettingRow(
                         icon: "doc.text.fill",
                         title: "Build Information",
-                        description: "Branch: \(BuildInfo.gitBranch) • Commit: \(String(BuildInfo.gitCommit.prefix(8)))",
+                        description:
+                            "Branch: \(BuildInfo.gitBranch) • Commit: \(String(BuildInfo.gitCommit.prefix(8)))",
                         control: AnyView(
                             Button(action: {
                                 let pasteboard = NSPasteboard.general
