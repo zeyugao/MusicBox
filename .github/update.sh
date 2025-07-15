@@ -5,6 +5,44 @@
 
 set -e # Exit on any error
 
+# --- Version Check ---
+APP_PATH="/Applications/MusicBox.app"
+LOCAL_COMMIT_SHA=""
+
+if [ -d "$APP_PATH" ]; then
+    echo "Found existing MusicBox.app, checking version..."
+    # Format is build_number-short_sha, e.g., 123-a1b2c3d4
+    VERSION_STRING=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleVersion 2>/dev/null || echo "")
+    if [ -n "$VERSION_STRING" ] && [[ "$VERSION_STRING" == *-* ]]; then
+        LOCAL_COMMIT_SHA=$(echo "$VERSION_STRING" | cut -d'-' -f2)
+    else
+        echo "Could not determine local version from '$VERSION_STRING'. Proceeding with update."
+    fi
+fi
+
+# Get remote commit SHA from the 'nightly' release notes on GitHub
+echo "Fetching remote version information..."
+REMOTE_INFO=$(curl -s "https://api.github.com/repos/zeyugao/MusicBox/releases/tags/nightly")
+REMOTE_COMMIT_SHA=$(echo "$REMOTE_INFO" | grep 'Nightly build from commit' | sed -E 's/.*Nightly build from commit ([0-9a-f]{40}).*/\1/')
+
+if [ -z "$REMOTE_COMMIT_SHA" ]; then
+    echo "Warning: Could not determine remote commit SHA. Proceeding with update."
+else
+    # Compare versions if we have both local and remote SHAs
+    if [ -n "$LOCAL_COMMIT_SHA" ]; then
+        echo "Local short commit:  $LOCAL_COMMIT_SHA"
+        echo "Remote full commit: $REMOTE_COMMIT_SHA"
+        # Check if the full remote SHA starts with the local short SHA
+        if [[ "$REMOTE_COMMIT_SHA" == "$LOCAL_COMMIT_SHA"* ]]; then
+            echo "✅ You are already on the latest version."
+            exit 0
+        else
+            echo "A new version is available. Proceeding with update..."
+        fi
+    fi
+fi
+# --- End Version Check ---
+
 ORIGINAL_DIR="$(pwd)"
 cd "$(dirname "$0")" || exit 1
 
