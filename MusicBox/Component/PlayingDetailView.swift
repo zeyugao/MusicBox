@@ -21,7 +21,7 @@ struct LyricView: View {
         ScrollViewReader { proxy in
             let scrollToIdx: (Int) -> Void = { idx in
                 withAnimation(.spring) {
-                    proxy.scrollTo(idx, anchor: .center)
+                    proxy.scrollTo("lyric-\(idx)", anchor: .center)
                 }
             }
             ScrollView(showsIndicators: false) {
@@ -55,6 +55,7 @@ struct LyricView: View {
                                     Color(
                                         nsColor: currentPlaying
                                             ? NSColor.textColor : NSColor.placeholderTextColor))
+                                .id("lyric-\(index)")
 
                             if let tlyric = line.tlyric {
                                 Text(tlyric)
@@ -69,7 +70,6 @@ struct LyricView: View {
                         .padding()
 
                         Spacer()
-                            .id(index)
                     }
                 }
                 .padding(.vertical)
