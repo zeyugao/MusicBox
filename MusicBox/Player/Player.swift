@@ -167,6 +167,12 @@ class SmartLyricSynchronizer: ObservableObject {
                 { [weak self] _ in
                     self?.performLyricUpdate()
                 }
+            } else if timeInterval >= 10.0 {
+                // For long intervals, schedule a check every 5 seconds to maintain synchronization
+                preciseTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) {
+                    [weak self] _ in
+                    self?.performLyricUpdate()
+                }
             }
         } else {
             // No next lyric change found, schedule a regular check after 1 second

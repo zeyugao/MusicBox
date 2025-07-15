@@ -54,7 +54,8 @@ struct LyricView: View {
                                 .foregroundStyle(
                                     Color(
                                         nsColor: currentPlaying
-                                            ? NSColor.textColor : NSColor.placeholderTextColor))
+                                            ? NSColor.textColor : NSColor.placeholderTextColor)
+                                )
                                 .id("lyric-\(index)")
 
                             if let tlyric = line.tlyric {
@@ -81,7 +82,11 @@ struct LyricView: View {
                     }
                 }
                 .onChange(of: lyricStatus.currentLyricIndex) { _, newIndex in
-                    scrollToIdx(newIndex ?? 0)
+                    if let index = newIndex {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            scrollToIdx(index)
+                        }
+                    }
                 }
             }
             .toolbar {
@@ -132,10 +137,18 @@ struct PlayingDetailView: View {
             self.playStatus.lyricStatus.lyricTimeline = lyric.map { Int($0.time * 10) }
             self.playStatus.lyricStatus.resetLyricIndex(
                 currentTime: self.playStatus.playbackProgress.playedSecond)
-            
+
             // Force restart lyric synchronization with new lyrics
             if playStatus.playerState == .playing {
                 playStatus.restartLyricSynchronization()
+            }
+
+            // Ensure scroll position is updated after lyric index reset
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                if self.playStatus.lyricStatus.currentLyricIndex != nil {
+                    // Trigger scroll update by notifying the view
+                    self.playStatus.lyricStatus.objectWillChange.send()
+                }
             }
             showNoLyricMessage = false
         }
