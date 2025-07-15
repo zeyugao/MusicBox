@@ -730,11 +730,17 @@ class SongTableViewController: NSViewController {
             let visibleRows = Int(visibleRect.height / rowHeight)
             let halfVisibleRows = visibleRows / 2
 
-            // Calculate the target scroll position to center the row
-            let targetRow = max(0, index - halfVisibleRows)
-            let targetRect = tableView.rect(ofRow: targetRow)
-
-            tableView.scroll(NSPoint(x: 0, y: targetRect.minY))
+            // Handle beginning of list properly to avoid unwanted scrolling
+            if index < halfVisibleRows {
+                // For songs near the beginning, scroll to the top
+                tableView.scroll(NSPoint(x: 0, y: 0))
+            } else {
+                // For other songs, center them
+                let targetRow = index - halfVisibleRows
+                let targetRect = tableView.rect(ofRow: targetRow)
+                tableView.scroll(NSPoint(x: 0, y: targetRect.minY))
+            }
+            
             tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
         }
     }

@@ -267,8 +267,9 @@ class PlayStatus: ObservableObject {
         updateCurrentPlaybackInfo()
         NowPlayingCenter.handleSetPlaybackState(playing: true)
 
-        // Update smart lyric synchronization state
+        // Update smart lyric synchronization state and force immediate lyric index update
         lyricSynchronizer?.updateSynchronizationState()
+        lyricSynchronizer?.updateLyricIndexNow()
 
         // Notify about playback state change
         NotificationCenter.default.post(
@@ -285,6 +286,10 @@ class PlayStatus: ObservableObject {
         set {
             player.volume = newValue
         }
+    }
+    
+    func restartLyricSynchronization() {
+        lyricSynchronizer?.restartSynchronization()
     }
 
     private var inSeeking: Bool = false
@@ -410,7 +415,7 @@ class PlayStatus: ObservableObject {
             await seekToOffset(offset: playedSecond)
         }
 
-        // Restart lyric synchronization for new track
+        // Restart lyric synchronization for new track if currently playing
         if playerState == .playing {
             lyricSynchronizer?.restartSynchronization()
         }

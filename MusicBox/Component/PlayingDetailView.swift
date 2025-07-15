@@ -132,6 +132,11 @@ struct PlayingDetailView: View {
             self.playStatus.lyricStatus.lyricTimeline = lyric.map { Int($0.time * 10) }
             self.playStatus.lyricStatus.resetLyricIndex(
                 currentTime: self.playStatus.playbackProgress.playedSecond)
+            
+            // Force restart lyric synchronization with new lyrics
+            if playStatus.playerState == .playing {
+                playStatus.restartLyricSynchronization()
+            }
             showNoLyricMessage = false
         }
     }
