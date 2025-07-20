@@ -91,6 +91,7 @@ struct PlaySliderView: View {
     @ObservedObject var playbackProgress: PlaybackProgress
     @State private var isEditing: Bool = false
     @State private var targetValue: Double = 0.0
+    @State private var lastSeekTime: Date = Date.distantPast
 
     var body: some View {
         Slider(
@@ -100,7 +101,7 @@ struct PlaySliderView: View {
                         return self.playbackProgress.playedSecond
                     }
 
-                    if self.isEditing {
+                    if self.isEditing || self.playStatus.isSeeking {
                         return targetValue
                     } else {
                         return self.playbackProgress.playedSecond
@@ -112,11 +113,9 @@ struct PlaySliderView: View {
 
                     if isEditing {
                         targetValue = newValue
-                    } else {
-                        Task {
-                            await self.playStatus.seekToOffset(offset: newValue)
-                        }
                     }
+                    // 移除这里的 seek 调用，只在 onEditingChanged 中处理
+                    // 避免重复调用 seekToOffset
                 }
             ),
             in: 0...self.playbackProgress.duration
@@ -124,12 +123,23 @@ struct PlaySliderView: View {
             editing in
             guard !self.playStatus.isLoading else { return }
 
-            if !editing && self.isEditing != editing {
-                Task {
-                    await self.playStatus.seekToOffset(offset: targetValue)
+            // 避免重复回调：只在状态真正改变时处理
+            if self.isEditing != editing {
+                if !editing {
+                    // 防止重复调用：检查距离上次 seek 的时间间隔
+                    let now = Date()
+                    if now.timeIntervalSince(lastSeekTime) > 0.1 {
+                        lastSeekTime = now
+                        Task {
+                            await self.playStatus.seekToOffset(offset: targetValue)
+                        }
+                    }
+                } else {
+                    // 开始编辑时，确保 targetValue 是当前值
+                    targetValue = self.playbackProgress.playedSecond
                 }
+                self.isEditing = editing
             }
-            self.isEditing = editing
         }
         .disabled(self.playStatus.isLoading)
         .controlSize(.mini)

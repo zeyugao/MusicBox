@@ -303,16 +303,17 @@ class PlayStatus: ObservableObject {
     private var inSeeking: Bool = false
     private var switchingItem: Bool = false
     private var seekingTask: Task<Void, Never>?
+    @Published var isSeeking: Bool = false
 
     func seekToOffset(offset newTime: CMTime) async {
         guard loadingProgress == nil else {
-            print("Seeking while loading")
             return
         }
 
         seekingTask?.cancel()
         seekingTask = Task {
             await MainActor.run {
+                self.isSeeking = true
                 playbackProgress.playedSecond = newTime.seconds
             }
 
@@ -324,7 +325,6 @@ class PlayStatus: ObservableObject {
                 defer { inSeeking = false }
 
                 await seekToItem(item: item, playedSecond: newTime.seconds)
-                print("Seek a caching item to \(newTime.seconds)")
                 await startPlay()
                 return
             }
@@ -343,6 +343,9 @@ class PlayStatus: ObservableObject {
                     self.lyricSynchronizer?.restartSynchronization()
                 }
             }
+            await MainActor.run {
+                self.isSeeking = false
+            }
         }
         await seekingTask?.value
     }
@@ -350,6 +353,9 @@ class PlayStatus: ObservableObject {
     private let timeScale = CMTimeScale(NSEC_PER_SEC)
 
     func seekToOffset(offset: Double) async {
+        // 取消之前的 seek 任务，但允许新的 seek 操作
+        seekingTask?.cancel()
+        
         let newTime = CMTime(seconds: offset, preferredTimescale: timeScale)
         await seekToOffset(offset: newTime)
     }
@@ -534,7 +540,8 @@ class PlayStatus: ObservableObject {
             forInterval: CMTime(seconds: 0.25, preferredTimescale: timeScale), queue: .main
         ) { [weak self] time in
             guard let self = self else { return }
-            if !self.switchingItem && self.readyToPlay {
+            // 在切换项目、未准备好播放或正在 seeking 时不更新播放进度
+            if !self.switchingItem && self.readyToPlay && !self.isSeeking {
                 let newTime = self.player.currentTime().seconds
                 if Int(self.playbackProgress.playedSecond) != Int(newTime) {
                     Task { @MainActor in
@@ -655,11 +662,25 @@ class PlayStatus: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: "PlayStatus") {
             do {
                 let status = try JSONDecoder().decode(Storage.self, from: data)
-                print("playedSecond: \(status.playedSecond)")
-                await self.seekToOffset(offset: status.playedSecond)
+                
+                // 如果有要恢复的播放进度且当前有播放项目
+                if status.playedSecond > 0, let item = currentItem {
+                    // 等待当前的切换操作完成
+                    while switchingItem {
+                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
+                    }
+                    
+                    // 如果播放器已经有了当前项目，直接seek；否则重新加载
+                    if player.currentItem != nil {
+                        await seekToOffset(offset: status.playedSecond)
+                    } else {
+                        await seekToItem(item: item, playedSecond: status.playedSecond)
+                    }
+                }
+                
                 volume = status.volume
             } catch {
-                print("Failed to load PlayStatus")
+                print("Failed to load PlayStatus: \(error)")
             }
         }
     }
