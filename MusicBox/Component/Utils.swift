@@ -108,8 +108,8 @@ class ImageLoader: ObservableObject {
     private func checkForCachedImage() {
         guard let url = url else { return }
 
-        let cacheKey = NSString(string: url.absoluteString)
-        if let cachedImage = Self.imageCache.object(forKey: cacheKey) {
+        // Check memory cache first using shared method
+        if let cachedImage = Self.loadImageFromMemoryCache(url: url) {
             image = cachedImage
             return
         }
@@ -131,40 +131,20 @@ class ImageLoader: ObservableObject {
         }
     }()
 
-    private func getImagePath() -> URL? {
-        guard let url = url,
-            let cacheDir = Self.imageCacheDirectory
-        else { return nil }
-
-        let hash = md5(string: url.absoluteString)
-        return cacheDir.appendingPathComponent("\(hash).dat")
-    }
-
     private func checkForSavedImage() {
-        guard let file = getImagePath() else { return }
+        guard let url = url else { return }
 
-        // Avoid file system check if we can
-        guard Self.fileManager.fileExists(atPath: file.path) else { return }
-
-        // Load image data in background to avoid blocking UI
-        Task { [weak self, file] in
-            guard let data = try? Data(contentsOf: file) else { return }
-
-            // Create image on main thread since NSImage is not Sendable
-            let img = NSImage(data: data)
-            guard let img = img else { return }
-
-            let imageSize = data.count
-            let urlString = self?.url?.absoluteString
-
-            DispatchQueue.main.async { [weak self] in
-                self?.image = img
-            }
-
-            // Cache in memory for faster access
-            if let urlString = urlString {
-                let cacheKey = NSString(string: urlString)
-                Self.imageCache.setObject(img, forKey: cacheKey, cost: imageSize)
+        // Use shared async method but adapt for sync context
+        Task { [weak self] in
+            if let imageData = await Self.loadImageFromFileCache(url: url) {
+                await MainActor.run { [weak self] in
+                    let cachedImage = NSImage(data: imageData)
+                    self?.image = cachedImage
+                    // Cache in memory using shared method
+                    if let cachedImage = cachedImage {
+                        Self.cacheImageInMemory(cachedImage, for: url)
+                    }
+                }
             }
         }
     }
@@ -179,10 +159,15 @@ class ImageLoader: ObservableObject {
         let urlString = url.absoluteString
 
         // Check if this URL is already being downloaded
-        Self.downloadLock.lock()
-        defer { Self.downloadLock.unlock() }
+        let isAlreadyDownloading = Self.downloadLock.withLock {
+            let isDownloading = Self.activeDownloads.contains(urlString)
+            if !isDownloading {
+                Self.activeDownloads.insert(urlString)
+            }
+            return isDownloading
+        }
 
-        if Self.activeDownloads.contains(urlString) {
+        if isAlreadyDownloading {
             // Already downloading, try again in a moment
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.checkForCachedImage()
@@ -190,17 +175,15 @@ class ImageLoader: ObservableObject {
             return
         }
 
-        Self.activeDownloads.insert(urlString)
-
         cancellable = Self.urlSession.dataTaskPublisher(for: url)
             .map { $0.data }
             .replaceError(with: nil)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] data in
                 defer {
-                    Self.downloadLock.lock()
-                    Self.activeDownloads.remove(urlString)
-                    Self.downloadLock.unlock()
+                    _ = Self.downloadLock.withLock {
+                        Self.activeDownloads.remove(urlString)
+                    }
                 }
 
                 guard let self = self, let data = data, let img = NSImage(data: data) else {
@@ -209,23 +192,58 @@ class ImageLoader: ObservableObject {
 
                 self.image = img
 
-                // Save and cache in background
-                let urlString = url.absoluteString
-                let imageSize = data.count
-                Task { [weak self] in
-                    self?.saveImage(data: data)
+                // Use shared methods for caching
+                Self.cacheImageInMemory(img, for: url, cost: data.count)
 
-                    // Cache in memory for faster access (already on main thread)
-                    let cacheKey = NSString(string: urlString)
-                    Self.imageCache.setObject(img, forKey: cacheKey, cost: imageSize)
+                // Save to file cache in background using shared method
+                Task {
+                    await Self.saveImageToFileCache(data: data, url: url)
                 }
             }
     }
 
-    private func saveImage(data: Data) {
-        guard let file = getImagePath() else { return }
+    // MARK: - Shared utility methods
+    private static func md5Hash(string: String) -> String {
+        let md5Data = Insecure.MD5.hash(data: Data(string.utf8))
+        return md5Data.map { String(format: "%02hhx", $0) }.joined()
+    }
 
-        // Save image in background to avoid blocking
+    private static func getImageFilePath(for url: URL) -> URL? {
+        guard let cacheDir = imageCacheDirectory else { return nil }
+        let hash = md5Hash(string: url.absoluteString)
+        return cacheDir.appendingPathComponent("\(hash).dat")
+    }
+
+    private static func loadImageFromMemoryCache(url: URL) -> NSImage? {
+        let cacheKey = NSString(string: url.absoluteString)
+        return imageCache.object(forKey: cacheKey)
+    }
+
+    private static func cacheImageInMemory(_ image: NSImage, for url: URL, cost: Int = 0) {
+        let cacheKey = NSString(string: url.absoluteString)
+        imageCache.setObject(image, forKey: cacheKey, cost: cost)
+    }
+
+    private static func loadImageFromFileCache(url: URL) async -> Data? {
+        guard let file = getImageFilePath(for: url),
+            fileManager.fileExists(atPath: file.path)
+        else { return nil }
+
+        return await withCheckedContinuation { continuation in
+            Task {
+                do {
+                    let data = try Data(contentsOf: file)
+                    continuation.resume(returning: data)
+                } catch {
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+
+    private static func saveImageToFileCache(data: Data, url: URL) async {
+        guard let file = getImageFilePath(for: url) else { return }
+
         do {
             try data.write(to: file)
         } catch {
@@ -233,13 +251,74 @@ class ImageLoader: ObservableObject {
         }
     }
 
-    private func getDocumentsDirectory() -> URL {
-        ImageLoader.fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    private static func downloadImageData(from url: URL) async throws -> Data {
+        let (data, _) = try await urlSession.data(from: url)
+        return data
     }
 
-    private func md5(string: String) -> String {
-        let md5Data = Insecure.MD5.hash(data: Data(string.utf8))
-        return md5Data.map { String(format: "%02hhx", $0) }.joined()
+    // MARK: - Static async method for NowPlayingCenter
+    static func loadImageAsync(from url: URL) async -> NSImage? {
+        // Ensure cache is configured
+        _ = Self.cacheConfigured
+
+        // Check memory cache first
+        if let cachedImage = loadImageFromMemoryCache(url: url) {
+            return cachedImage
+        }
+
+        // Check file cache
+        if let imageData = await loadImageFromFileCache(url: url),
+            let image = NSImage(data: imageData)
+        {
+            // Cache in memory for faster access
+            cacheImageInMemory(image, for: url)
+            return image
+        }
+
+        // Download from network with duplicate prevention
+        return await downloadAndCacheImage(url: url)
+    }
+
+    private static func downloadAndCacheImage(url: URL) async -> NSImage? {
+        let urlString = url.absoluteString
+
+        // Check if already downloading
+        let isAlreadyDownloading = downloadLock.withLock {
+            let isDownloading = activeDownloads.contains(urlString)
+            if !isDownloading {
+                activeDownloads.insert(urlString)
+            }
+            return isDownloading
+        }
+
+        if isAlreadyDownloading {
+            // Wait a bit and try cache again
+            try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
+            return loadImageFromMemoryCache(url: url)
+        }
+
+        defer {
+            _ = downloadLock.withLock {
+                activeDownloads.remove(urlString)
+            }
+        }
+
+        do {
+            let data = try await downloadImageData(from: url)
+            guard let image = NSImage(data: data) else { return nil }
+
+            // Cache in memory
+            cacheImageInMemory(image, for: url, cost: data.count)
+
+            // Save to file cache in background
+            Task {
+                await saveImageToFileCache(data: data, url: url)
+            }
+
+            return image
+        } catch {
+            return nil
+        }
     }
 }
 

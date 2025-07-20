@@ -385,12 +385,6 @@ class PlayStatus: ObservableObject {
         switchingItem = true
         defer {
             switchingItem = false
-            await MainActor.run {
-                if self.pendingItem?.id == item.id {
-                    self.isLoadingNewTrack = false
-                    self.pendingItem = nil
-                }
-            }
         }
 
         await MainActor.run {
@@ -439,6 +433,13 @@ class PlayStatus: ObservableObject {
         // Restart lyric synchronization for new track if currently playing
         if playerState == .playing {
             lyricSynchronizer?.restartSynchronization()
+        }
+        
+        await MainActor.run {
+            if self.pendingItem?.id == item.id {
+                self.isLoadingNewTrack = false
+                self.pendingItem = nil
+            }
         }
     }
 

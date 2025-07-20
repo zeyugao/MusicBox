@@ -32,8 +32,7 @@ class NowPlayingCenter {
             }
 
             if let artworkUrl = await currentItem.getArtworkUrl(),
-               let (imageData, _) = try? await URLSession.shared.data(from: artworkUrl),
-               let image = NSImage(data: imageData)
+                let image = await ImageLoader.loadImageAsync(from: artworkUrl)
             {
                 let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in
                     return image
