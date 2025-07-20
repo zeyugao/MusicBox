@@ -298,10 +298,20 @@ struct PlayerControlView: View {
             Spacer()
 
             VStack {
-                Text("\(playlistStatus.currentItem?.title ?? "Title")")
-                    .font(.system(size: 12))
-                    .lineLimit(1)
-                    .padding(.bottom, 1)
+                HStack(spacing: 8) {
+                    Text("\(playlistStatus.currentItem?.title ?? "Title")")
+                        .font(.system(size: 12))
+                        .lineLimit(1)
+
+                    if playStatus.isLoadingNewTrack {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(0.6)
+                            .frame(width: 12, height: 12)
+                    }
+                }
+                .padding(.bottom, 1)
+
                 Text("\(playlistStatus.currentItem?.artist ?? "Artists")")
                     .font(.system(size: 12))
                     .lineLimit(1)
@@ -394,7 +404,7 @@ struct PlayerControlView: View {
         .onChange(of: playlistStatus.currentItem) { _, item in
             if let item = item {
                 currentItemId = item.id
-                artworkUrl = nil // Clear immediately for visual feedback
+                artworkUrl = nil  // Clear immediately for visual feedback
                 Task {
                     artworkUrl = await item.getArtworkUrl()
                 }

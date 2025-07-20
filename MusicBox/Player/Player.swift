@@ -212,8 +212,10 @@ class PlayStatus: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var loadingProgress: Double? = nil
     @Published var readyToPlay: Bool = true
+    @Published var isLoadingNewTrack: Bool = false
 
     var currentItem: PlaylistItem? = nil
+    private var pendingItem: PlaylistItem? = nil
 
     enum PlayerState: Int {
         case unknown = 0
@@ -293,7 +295,7 @@ class PlayStatus: ObservableObject {
             player.volume = newValue
         }
     }
-    
+
     func restartLyricSynchronization() {
         lyricSynchronizer?.restartSynchronization()
     }
@@ -381,7 +383,20 @@ class PlayStatus: ObservableObject {
             return
         }
         switchingItem = true
-        defer { switchingItem = false }
+        defer {
+            switchingItem = false
+            await MainActor.run {
+                if self.pendingItem?.id == item.id {
+                    self.isLoadingNewTrack = false
+                    self.pendingItem = nil
+                }
+            }
+        }
+
+        await MainActor.run {
+            self.isLoadingNewTrack = true
+            self.pendingItem = item
+        }
 
         self.currentItem = item
 
@@ -588,6 +603,9 @@ class PlayStatus: ObservableObject {
                     case .switchItem:
                         if let argument = userInfo["argument"] as? [String: Any] {
                             if let item = argument["item"] as? PlaylistItem {
+                                // Cancel any existing seek task
+                                self.seekingTask?.cancel()
+
                                 let shouldPlay = argument["shouldPlay"] as? Bool ?? false
                                 let playedSecond = argument["playedSecond"] as? Double
                                 await self.seekToItem(item: item, playedSecond: playedSecond)
@@ -597,11 +615,14 @@ class PlayStatus: ObservableObject {
                                 }
                             }
                         } else {
+                            // Clear loading state when stopping
                             Task { @MainActor [weak self] in
                                 self?.currentItem = nil
                                 self?.playbackProgress.duration = 0.0
                                 self?.playbackProgress.playedSecond = 0.0
                                 self?.playerState = .stopped
+                                self?.isLoadingNewTrack = false
+                                self?.pendingItem = nil
 
                                 // Notify about playback state change
                                 NotificationCenter.default.post(
@@ -731,6 +752,8 @@ extension PlayStatus: CachingPlayerItemDelegate {
     func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
         Task { @MainActor [weak self] in
             self?.readyToPlay = true
+            self?.isLoadingNewTrack = false
+            self?.pendingItem = nil
         }
         print("Caching player item ready to play.")
     }
@@ -739,6 +762,13 @@ extension PlayStatus: CachingPlayerItemDelegate {
         let message = "playerItemDidFailToPlay: \(error?.localizedDescription ?? "No reason")"
         print(message)
         AlertModal.showAlert(message)
+
+        // Clear loading state on failure
+        Task { @MainActor [weak self] in
+            self?.isLoadingNewTrack = false
+            self?.pendingItem = nil
+        }
+
         self.nextTrack()
     }
 
@@ -766,6 +796,13 @@ extension PlayStatus: CachingPlayerItemDelegate {
             "Caching player item file download failed with error: \(error.localizedDescription)."
         print(message)
         AlertModal.showAlert(message)
+
+        // Clear loading state on failure
+        Task { @MainActor [weak self] in
+            self?.isLoadingNewTrack = false
+            self?.pendingItem = nil
+        }
+
         nextTrack()
     }
 }
@@ -918,6 +955,8 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         if let offset = offset {
             guard offset < playlist.count else { return }
 
+            let targetItem = playlist[offset]
+
             await MainActor.run {
                 currentItemIndex = offset
             }
@@ -930,7 +969,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             PlayStatus.controlPlayer(
                 command: .switchItem,
                 argument: [
-                    "item": playlist[offset],
+                    "item": targetItem,
                     "shouldPlay": shouldPlay,
                     "playedSecond": playedSecond!,
                 ])
