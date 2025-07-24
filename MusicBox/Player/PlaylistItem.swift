@@ -240,9 +240,21 @@ class PlaylistItem: Identifiable, Codable, Equatable {
     }
 
     func getArtworkUrl() async -> URL? {
+        #if DEBUG
+        let timestamp = Date().timeIntervalSince1970
+        print("🎨 PlaylistItem: getArtworkUrl called for '\(title)' (ID: \(id)) at \(timestamp)")
+        #endif
+        
         if let artworkUrl = self.artworkUrl {
+            #if DEBUG
+            print("🎨 PlaylistItem: Artwork URL found: \(artworkUrl.absoluteString)")
+            #endif
             return artworkUrl
         }
+        
+        #if DEBUG
+        print("🎨 PlaylistItem: No artwork URL available for '\(title)' (ID: \(id))")
+        #endif
         return nil
     }
 

@@ -50,6 +50,7 @@ struct LoadingIndicatorView: View {
 
 struct AsyncImageWithCache<I: View, P: View>: View {
     @StateObject private var loader: ImageLoader
+    private let url: URL?
     private let placeholder: P
     private let image: (Image) -> I
 
@@ -58,6 +59,7 @@ struct AsyncImageWithCache<I: View, P: View>: View {
         @ViewBuilder image: @escaping (Image) -> I,
         @ViewBuilder placeholder: () -> P
     ) {
+        self.url = url
         self.placeholder = placeholder()
         self.image = image
         _loader = StateObject(wrappedValue: ImageLoader(url: url))
@@ -66,12 +68,35 @@ struct AsyncImageWithCache<I: View, P: View>: View {
     var body: some View {
         content
             .onAppear(perform: loader.load)
+            .onChange(of: url) { _, newUrl in
+                loader.updateURL(newUrl)
+            }
     }
 
     private var content: some View {
         Group {
             if let uiImage = loader.image {
                 image(Image(nsImage: uiImage))
+            } else if loader.isLoading {
+                ZStack {
+                    placeholder
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.8)
+                }
+            } else if loader.hasError {
+                ZStack {
+                    placeholder
+                    Button(action: {
+                        loader.retryLoad()
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(.white)
+                            .font(.title2)
+                            .background(Circle().fill(Color.black.opacity(0.5)).frame(width: 32, height: 32))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
             } else {
                 placeholder
             }
@@ -81,9 +106,25 @@ struct AsyncImageWithCache<I: View, P: View>: View {
 
 class ImageLoader: ObservableObject {
     @Published var image: NSImage?
+    @Published var isLoading: Bool = false
+    @Published var hasError: Bool = false
 
-    private let url: URL?
+    private var url: URL?
     private var cancellable: AnyCancellable?
+    private var retryCount: Int = 0
+    private let maxRetries: Int = 3
+    private let retryDelay: TimeInterval = 1.0
+    private let loaderId: String = UUID().uuidString.prefix(8).lowercased()
+    
+    private func log(_ message: String) {
+        #if DEBUG
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        let timestamp = formatter.string(from: Date())
+        print("🖼️ [\(timestamp)] ImageLoader[\(loaderId)]: \(message)")
+        #endif
+    }
+    
     private static let fileManager = FileManager.default
     private static let urlSession = URLSession.shared
     private static let imageCache = NSCache<NSString, NSImage>()
@@ -106,15 +147,38 @@ class ImageLoader: ObservableObject {
     }
 
     private func checkForCachedImage() {
-        guard let url = url else { return }
-
-        // Check memory cache first using shared method
-        if let cachedImage = Self.loadImageFromMemoryCache(url: url) {
-            image = cachedImage
+        guard let url = url, isValidImageURL(url) else {
+            log("Invalid URL - \(url?.absoluteString ?? "nil")")
+            hasError = true
             return
         }
 
+        log("Checking cache for \(url.absoluteString)")
+
+        // Check memory cache first using shared method
+        if let cachedImage = Self.loadImageFromMemoryCache(url: url) {
+            log("✅ Found in memory cache")
+            image = cachedImage
+            hasError = false
+            return
+        }
+
+        log("❌ Not in memory cache, checking file cache")
         checkForSavedImage()
+    }
+    
+    private func isValidImageURL(_ url: URL) -> Bool {
+        let validSchemes = ["http", "https"]
+        guard let scheme = url.scheme?.lowercased(),
+              validSchemes.contains(scheme) else {
+            return false
+        }
+        
+        let pathExtension = url.pathExtension.lowercased()
+        let validExtensions = ["jpg", "jpeg", "png", "gif", "webp", "bmp"]
+        
+        // If no extension, assume it's valid (some APIs don't use file extensions)
+        return pathExtension.isEmpty || validExtensions.contains(pathExtension)
     }
 
     private static var imageCacheDirectory: URL? = {
@@ -139,11 +203,26 @@ class ImageLoader: ObservableObject {
             if let imageData = await Self.loadImageFromFileCache(url: url) {
                 await MainActor.run { [weak self] in
                     let cachedImage = NSImage(data: imageData)
-                    self?.image = cachedImage
-                    // Cache in memory using shared method
                     if let cachedImage = cachedImage {
+                        self?.log("✅ Found valid image in file cache")
+                        self?.image = cachedImage
+                        self?.hasError = false
+                        // Cache in memory using shared method
                         Self.cacheImageInMemory(cachedImage, for: url)
+                    } else {
+                        self?.log("💥 File cache data corrupted, removing and loading from network")
+                        // Remove corrupted cache file
+                        if let filePath = Self.getImageFilePath(for: url) {
+                            try? FileManager.default.removeItem(at: filePath)
+                        }
+                        // Try loading from network
+                        self?.load()
                     }
+                }
+            } else {
+                await MainActor.run { [weak self] in
+                    self?.log("❌ No file cache found, loading from network")
+                    self?.load()
                 }
             }
         }
@@ -153,11 +232,54 @@ class ImageLoader: ObservableObject {
         cancellable?.cancel()
     }
 
+    func updateURL(_ newURL: URL?) {
+        log("updateURL called - old: \(url?.absoluteString ?? "nil"), new: \(newURL?.absoluteString ?? "nil")")
+        
+        // Cancel any ongoing loading
+        cancellable?.cancel()
+        cancellable = nil
+        
+        // Reset state
+        retryCount = 0
+        isLoading = false
+        hasError = false
+        
+        // Update URL and check cache
+        url = newURL
+        image = nil
+        
+        checkForCachedImage()
+    }
+    
     func load() {
-        guard image == nil, cancellable == nil, let url = url else { return }
-
+        guard let url = url, isValidImageURL(url) else {
+            hasError = true
+            return
+        }
+        
+        // If already loading or has image, don't start again
+        guard !isLoading, image == nil else { return }
+        
+        loadWithRetry()
+    }
+    
+    func retryLoad() {
+        log("🔄 Manual retry requested")
+        // Reset retry count and error state
+        retryCount = 0
+        hasError = false
+        image = nil
+        
+        // Start loading
+        load()
+    }
+    
+    private func loadWithRetry() {
+        guard let url = url else { return }
+        
         let urlString = url.absoluteString
-
+        log("🚀 Starting loadWithRetry for \(urlString) (attempt \(retryCount + 1)/\(maxRetries + 1))")
+        
         // Check if this URL is already being downloaded
         let isAlreadyDownloading = Self.downloadLock.withLock {
             let isDownloading = Self.activeDownloads.contains(urlString)
@@ -168,38 +290,100 @@ class ImageLoader: ObservableObject {
         }
 
         if isAlreadyDownloading {
-            // Already downloading, try again in a moment
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.checkForCachedImage()
+            log("⏳ URL already downloading, waiting...")
+            // Already downloading, wait longer and check cache
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                // Check if image appeared in cache while waiting
+                if let cachedImage = Self.loadImageFromMemoryCache(url: url) {
+                    self.log("✅ Found image in cache after waiting")
+                    self.image = cachedImage
+                    self.hasError = false
+                } else {
+                    // Still not in cache, try to load again if not already loading
+                    if !self.isLoading {
+                        self.log("⚠️ Still not in cache after waiting, retrying...")
+                        self.loadWithRetry()
+                    }
+                }
             }
             return
         }
+        
+        isLoading = true
+        hasError = false
+        cancellable?.cancel()
 
         cancellable = Self.urlSession.dataTaskPublisher(for: url)
+            .timeout(.seconds(10), scheduler: DispatchQueue.global())
             .map { $0.data }
-            .replaceError(with: nil)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] data in
-                defer {
-                    _ = Self.downloadLock.withLock {
-                        Self.activeDownloads.remove(urlString)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    defer {
+                        _ = Self.downloadLock.withLock {
+                            Self.activeDownloads.remove(urlString)
+                        }
+                    }
+                    
+                    guard let self = self else { return }
+                    
+                    switch completion {
+                    case .finished:
+                        self.isLoading = false
+                        self.retryCount = 0
+                    case .failure(let error):
+                        self.isLoading = false
+                        self.log("💥 Network error: \(error.localizedDescription)")
+                        
+                        if self.retryCount < self.maxRetries {
+                            self.retryCount += 1
+                            let delay = self.retryDelay * Double(self.retryCount)
+                            self.log("🔄 Retrying in \(delay)s (attempt \(self.retryCount + 1)/\(self.maxRetries + 1))")
+                            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                                self.loadWithRetry()
+                            }
+                        } else {
+                            self.log("❌ Max retries exceeded, giving up")
+                            self.hasError = true
+                            self.retryCount = 0
+                        }
+                    }
+                },
+                receiveValue: { [weak self] data in
+                    guard let self = self else { return }
+                    
+                    self.log("📦 Received \(data.count) bytes")
+                    
+                    guard !data.isEmpty, let img = NSImage(data: data) else {
+                        self.log("💥 Invalid image data (\(data.count) bytes), retrying...")
+                        // Invalid data, treat as error and potentially retry
+                        if self.retryCount < self.maxRetries {
+                            self.retryCount += 1
+                            let delay = self.retryDelay * Double(self.retryCount)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                                self.loadWithRetry()
+                            }
+                        } else {
+                            self.log("❌ Max retries exceeded for invalid data")
+                            self.hasError = true
+                            self.retryCount = 0
+                        }
+                        return
+                    }
+
+                    self.log("✅ Successfully loaded image (\(Int(img.size.width))x\(Int(img.size.height)))")
+                    self.image = img
+                    self.hasError = false
+
+                    // Use shared methods for caching
+                    Self.cacheImageInMemory(img, for: url, cost: data.count)
+
+                    // Save to file cache in background using shared method
+                    Task {
+                        await Self.saveImageToFileCache(data: data, url: url)
                     }
                 }
-
-                guard let self = self, let data = data, let img = NSImage(data: data) else {
-                    return
-                }
-
-                self.image = img
-
-                // Use shared methods for caching
-                Self.cacheImageInMemory(img, for: url, cost: data.count)
-
-                // Save to file cache in background using shared method
-                Task {
-                    await Self.saveImageToFileCache(data: data, url: url)
-                }
-            }
+            )
     }
 
     // MARK: - Shared utility methods
