@@ -1322,6 +1322,7 @@ struct UploadQueueItem: Identifiable {
     let url: URL
     var isCompleted: Bool = false
     var isFailed: Bool = false
+    var isUploading: Bool = false
     var errorMessage: String?
 }
 
@@ -1356,10 +1357,20 @@ struct UploadProgressRow: View {
                         .foregroundColor(.red)
                         .help(item.errorMessage ?? "Upload failed")
                 }
-            } else {
+            } else if item.isUploading {
                 ProgressView()
                     .progressViewStyle(LinearProgressViewStyle())
                     .frame(width: 300)
+            } else {
+                HStack {
+                    Image(systemName: "clock")
+                        .foregroundColor(.orange)
+                        .font(.system(size: 16))
+                    Text("Waiting")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                }
+                .frame(width: 300, alignment: .trailing)
             }
         }
         .padding(.horizontal, 8)
@@ -1381,7 +1392,7 @@ struct UploadProgressDialog: View {
     }
 
     var isUploading: Bool {
-        uploadQueue.contains { !$0.isCompleted && !$0.isFailed }
+        uploadQueue.contains { $0.isUploading }
     }
 
     var body: some View {
@@ -1486,11 +1497,17 @@ class UploadManager: ObservableObject {
                 continue
             }
 
+            // Mark current item as uploading
+            await MainActor.run {
+                uploadQueue[i].isUploading = true
+            }
+
             do {
                 let success = try await uploadCloudFile(
                     songId: item.songId, url: item.url, userInfo: userInfo)
 
                 await MainActor.run {
+                    uploadQueue[i].isUploading = false
                     uploadQueue[i].isCompleted = success
                     if !success {
                         uploadQueue[i].isFailed = true
@@ -1501,11 +1518,13 @@ class UploadManager: ObservableObject {
                 }
             } catch let error as RequestError {
                 await MainActor.run {
+                    uploadQueue[i].isUploading = false
                     uploadQueue[i].isFailed = true
                     uploadQueue[i].errorMessage = error.localizedDescription
                 }
             } catch {
                 await MainActor.run {
+                    uploadQueue[i].isUploading = false
                     uploadQueue[i].isFailed = true
                     uploadQueue[i].errorMessage = error.localizedDescription
                 }
