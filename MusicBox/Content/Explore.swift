@@ -131,6 +131,7 @@ struct ExploreView: View {
                             }
                     }
                 }
+                .padding(.horizontal, 20)
             }
             .task(id: isInitialized) {
                 guard isInitialized else { return }
