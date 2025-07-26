@@ -331,46 +331,12 @@ struct ListPlaylistDialogView: View {
     var body: some View {
         VStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
                     ForEach(userInfo.playlists.filter { !$0.subscribed }) { playlist in
-                        Button(action: {
+                        PlaylistSelectionRowView(playlist: playlist, onSelect: {
                             onSelect?(playlist)
                             dismiss()
-                        }) {
-                            HStack {
-                                let height = 48.0
-                                AsyncImageWithCache(url: URL(string: playlist.coverImgUrl.https)) {
-                                    image in
-                                    image.resizable()
-                                        .scaledToFit()
-                                        .frame(width: height, height: height)
-                                        .cornerRadius(5)
-                                } placeholder: {
-                                    Image(systemName: "music.note")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 30, height: 30)
-                                        .padding()
-                                        .frame(width: height, height: height)
-                                        .background(Color.gray.opacity(0.2))
-                                }
-                                .padding(.trailing, 8)
-                                Text(playlist.name)
-                                // .font(.title2)
-                                Spacer()
-                            }
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity)
-                        .onHover { inside in
-                            if inside {
-                                NSCursor.pointingHand.push()
-                            } else {
-                                NSCursor.pop()
-                            }
-                        }
-                        .padding(.leading, 16)
+                        })
                     }
                 }
             }
@@ -382,6 +348,56 @@ struct ListPlaylistDialogView: View {
             }
             .padding(.bottom, 8)
         }
+    }
+}
+
+struct PlaylistSelectionRowView: View {
+    let playlist: CloudMusicApi.PlayListItem
+    let onSelect: () -> Void
+    @State private var isHovering = false
+    
+    var body: some View {
+        Button(action: onSelect) {
+            HStack {
+                let height = 48.0
+                AsyncImageWithCache(url: URL(string: playlist.coverImgUrl.https)) {
+                    image in
+                    image.resizable()
+                        .scaledToFit()
+                        .frame(width: height, height: height)
+                        .cornerRadius(5)
+                } placeholder: {
+                    Image(systemName: "music.note")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 30, height: 30)
+                        .padding()
+                        .frame(width: height, height: height)
+                        .background(Color.gray.opacity(0.2))
+                        .cornerRadius(5)
+                }
+                .padding(.trailing, 8)
+                Text(playlist.name)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(.primary)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isHovering ? Color.accentColor.opacity(0.1) : Color.clear)
+        )
+        .onHover { inside in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = inside
+            }
+        }
+        .padding(.horizontal, 8)
     }
 }
 
