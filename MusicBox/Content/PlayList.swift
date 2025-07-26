@@ -1350,6 +1350,7 @@ struct UploadQueueItem: Identifiable {
     var isUploading: Bool = false
     var errorMessage: String?
     var isRetry: Bool = false
+    var retryCount: Int = 0
 }
 
 struct UploadProgressRow: View {
@@ -1374,24 +1375,27 @@ struct UploadProgressRow: View {
             } else if item.isFailed {
                 HStack(spacing: 8) {
                     Text(truncatedErrorMessage)
-                        .foregroundColor(.red)
+                        .foregroundColor(item.retryCount < 2 ? .orange : .red)
                         .font(.caption)
                         .lineLimit(1)
-                        .frame(maxWidth: 220, alignment: .trailing)
+                        .frame(maxWidth: item.retryCount >= 2 ? 220 : 260, alignment: .trailing)
                         .help(item.errorMessage ?? "Upload failed")
 
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.red)
+                    Image(systemName: item.retryCount < 2 ? "arrow.clockwise" : "xmark.circle.fill")
+                        .foregroundColor(item.retryCount < 2 ? .orange : .red)
                         .help(item.errorMessage ?? "Upload failed")
                     
-                    Button(action: {
-                        onRetry?()
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundColor(.blue)
+                    // Only show retry button after second failure
+                    if item.retryCount >= 2 {
+                        Button(action: {
+                            onRetry?()
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(.blue)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Retry upload")
                     }
-                    .buttonStyle(.borderless)
-                    .help("Retry upload")
                 }
             } else if item.isUploading {
                 ProgressView()
@@ -1501,12 +1505,13 @@ class UploadManager: ObservableObject {
     func retryUpload(for item: UploadQueueItem) {
         guard let index = uploadQueue.firstIndex(where: { $0.id == item.id }) else { return }
         
-        // Reset the item's state and mark as retry
+        // Reset the item's state and increment retry count
         uploadQueue[index].isFailed = false
         uploadQueue[index].isCompleted = false
         uploadQueue[index].isUploading = false
         uploadQueue[index].errorMessage = nil
         uploadQueue[index].isRetry = true
+        uploadQueue[index].retryCount += 1
         
         // If not currently uploading, start the upload process
         if !isUploading {
@@ -1523,6 +1528,24 @@ class UploadManager: ObservableObject {
         }
     }
 
+    private func handleUploadError(index: Int, error: String) async {
+        await MainActor.run {
+            uploadQueue[index].isUploading = false
+            uploadQueue[index].retryCount += 1
+            
+            if uploadQueue[index].retryCount < 2 {
+                // First failure: automatically retry with appendZero
+                uploadQueue[index].isFailed = false
+                uploadQueue[index].isRetry = true
+                uploadQueue[index].errorMessage = "Retrying with alternative method..."
+            } else {
+                // Second failure: mark as failed and show retry button
+                uploadQueue[index].isFailed = true
+                uploadQueue[index].errorMessage = error
+            }
+        }
+    }
+    
     private func processUploadQueue() async {
         var hasAnySuccess = false
 
@@ -1530,7 +1553,8 @@ class UploadManager: ObservableObject {
             // Find the next item that needs to be processed
             guard let nextIndex = await MainActor.run(body: {
                 uploadQueue.firstIndex { item in
-                    !item.isCompleted && !item.isFailed && !item.isUploading
+                    !item.isCompleted && !item.isUploading && 
+                    (!item.isFailed || (item.isFailed && item.retryCount < 2))
                 }
             }) else {
                 // No more items to process
@@ -1559,17 +1583,9 @@ class UploadManager: ObservableObject {
                     }
                 }
             } catch let error as RequestError {
-                await MainActor.run {
-                    uploadQueue[nextIndex].isUploading = false
-                    uploadQueue[nextIndex].isFailed = true
-                    uploadQueue[nextIndex].errorMessage = error.localizedDescription
-                }
+                await handleUploadError(index: nextIndex, error: error.localizedDescription)
             } catch {
-                await MainActor.run {
-                    uploadQueue[nextIndex].isUploading = false
-                    uploadQueue[nextIndex].isFailed = true
-                    uploadQueue[nextIndex].errorMessage = error.localizedDescription
-                }
+                await handleUploadError(index: nextIndex, error: error.localizedDescription)
             }
         }
 
