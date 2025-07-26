@@ -859,12 +859,22 @@ class CloudMusicApi {
         }
     }
 
-    func cloud(filePath: URL, songName: String?, artist: String?, album: String?) async throws
+    func cloud(filePath: URL, songName: String?, artist: String?, album: String?, appendZero: Bool = false) async throws
         -> UInt64?
     {
-        guard
-            let data = try? Data(contentsOf: filePath).base64EncodedString()
-        else {
+        let data: String = {
+            guard var fileData = try? Data(contentsOf: filePath) else {
+                return ""
+            }
+            
+            if appendZero {
+                fileData.append(0)
+            }
+            
+            return fileData.base64EncodedString()
+        }()
+        
+        guard !data.isEmpty else {
             throw RequestError.Request("cloud failed to read file")
         }
 

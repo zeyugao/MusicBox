@@ -275,13 +275,14 @@ func likeSong(
     }
 }
 
-func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo) async throws -> Bool {
+func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo, appendZero: Bool = false) async throws -> Bool {
     if let metadata = await loadMetadata(url: url) {
         if let privateSongId = try await CloudMusicApi().cloud(
             filePath: url,
             songName: metadata.title,
             artist: metadata.artist,
-            album: metadata.album
+            album: metadata.album,
+            appendZero: appendZero
         ) {
             print("Private song ID: \(privateSongId)")
             try await CloudMusicApi().cloud_match(
@@ -1332,14 +1333,16 @@ struct UploadQueueItem: Identifiable {
     var isFailed: Bool = false
     var isUploading: Bool = false
     var errorMessage: String?
+    var isRetry: Bool = false
 }
 
 struct UploadProgressRow: View {
     let item: UploadQueueItem
+    let onRetry: (() -> Void)?
 
     private var truncatedErrorMessage: String {
         guard let errorMessage = item.errorMessage else { return "Upload failed" }
-        return errorMessage.count > 30 ? String(errorMessage.prefix(30)) + "..." : errorMessage
+        return errorMessage.count > 25 ? String(errorMessage.prefix(25)) + "..." : errorMessage
     }
 
     var body: some View {
@@ -1353,17 +1356,26 @@ struct UploadProgressRow: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
             } else if item.isFailed {
-                HStack {
+                HStack(spacing: 8) {
                     Text(truncatedErrorMessage)
                         .foregroundColor(.red)
                         .font(.caption)
                         .lineLimit(1)
-                        .frame(maxWidth: 300, alignment: .trailing)
+                        .frame(maxWidth: 220, alignment: .trailing)
                         .help(item.errorMessage ?? "Upload failed")
 
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.red)
                         .help(item.errorMessage ?? "Upload failed")
+                    
+                    Button(action: {
+                        onRetry?()
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Retry upload")
                 }
             } else if item.isUploading {
                 ProgressView()
@@ -1387,21 +1399,8 @@ struct UploadProgressRow: View {
 }
 
 struct UploadProgressDialog: View {
-    @Binding var uploadQueue: [UploadQueueItem]
+    @ObservedObject var uploadManager: UploadManager
     @Binding var isPresented: Bool
-    @Binding var canceled: Bool
-
-    var completedCount: Int {
-        uploadQueue.filter { $0.isCompleted }.count
-    }
-
-    var failedCount: Int {
-        uploadQueue.filter { $0.isFailed }.count
-    }
-
-    var isUploading: Bool {
-        uploadQueue.contains { $0.isUploading }
-    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -1413,25 +1412,27 @@ struct UploadProgressDialog: View {
 
             ScrollView {
                 VStack(spacing: 4) {
-                    ForEach(uploadQueue) { item in
-                        UploadProgressRow(item: item)
+                    ForEach(uploadManager.uploadQueue) { item in
+                        UploadProgressRow(item: item) {
+                            uploadManager.retryUpload(for: item)
+                        }
                     }
                 }
             }
             .frame(maxHeight: 200)
 
             HStack {
-                Text("Completed: \(completedCount), Failed: \(failedCount)")
+                Text("Completed: \(uploadManager.completedCount), Failed: \(uploadManager.failedCount)")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
                 Spacer()
 
-                if isUploading {
-                    Button(canceled ? "Canceling" : "Cancel") {
-                        canceled = true
+                if uploadManager.isUploading {
+                    Button(uploadManager.canceled ? "Canceling" : "Cancel") {
+                        uploadManager.canceled = true
                     }
-                    .disabled(canceled)
+                    .disabled(uploadManager.canceled)
                 }
             }
         }
@@ -1480,6 +1481,22 @@ class UploadManager: ObservableObject {
             startUploading()
         }
     }
+    
+    func retryUpload(for item: UploadQueueItem) {
+        guard let index = uploadQueue.firstIndex(where: { $0.id == item.id }) else { return }
+        
+        // Reset the item's state and mark as retry
+        uploadQueue[index].isFailed = false
+        uploadQueue[index].isCompleted = false
+        uploadQueue[index].isUploading = false
+        uploadQueue[index].errorMessage = nil
+        uploadQueue[index].isRetry = true
+        
+        // If not currently uploading, start the upload process
+        if !isUploading {
+            startUploading()
+        }
+    }
 
     private func startUploading() {
         isUploading = true
@@ -1493,52 +1510,51 @@ class UploadManager: ObservableObject {
     private func processUploadQueue() async {
         var hasAnySuccess = false
 
-        var i = 0
-        while i < uploadQueue.count {
-            if canceled {
+        while !canceled {
+            // Find the next item that needs to be processed
+            guard let nextIndex = await MainActor.run(body: {
+                uploadQueue.firstIndex { item in
+                    !item.isCompleted && !item.isFailed && !item.isUploading
+                }
+            }) else {
+                // No more items to process
                 break
-            }
-
-            let item = uploadQueue[i]
-            if item.isCompleted || item.isFailed {
-                i += 1
-                continue
             }
 
             // Mark current item as uploading
             await MainActor.run {
-                uploadQueue[i].isUploading = true
+                uploadQueue[nextIndex].isUploading = true
             }
+
+            let item = uploadQueue[nextIndex]
 
             do {
                 let success = try await uploadCloudFile(
-                    songId: item.songId, url: item.url, userInfo: userInfo)
+                    songId: item.songId, url: item.url, userInfo: userInfo, appendZero: item.isRetry)
 
                 await MainActor.run {
-                    uploadQueue[i].isUploading = false
-                    uploadQueue[i].isCompleted = success
+                    uploadQueue[nextIndex].isUploading = false
+                    uploadQueue[nextIndex].isCompleted = success
                     if !success {
-                        uploadQueue[i].isFailed = true
-                        uploadQueue[i].errorMessage = "Upload failed"
+                        uploadQueue[nextIndex].isFailed = true
+                        uploadQueue[nextIndex].errorMessage = "Upload failed"
                     } else {
                         hasAnySuccess = true
                     }
                 }
             } catch let error as RequestError {
                 await MainActor.run {
-                    uploadQueue[i].isUploading = false
-                    uploadQueue[i].isFailed = true
-                    uploadQueue[i].errorMessage = error.localizedDescription
+                    uploadQueue[nextIndex].isUploading = false
+                    uploadQueue[nextIndex].isFailed = true
+                    uploadQueue[nextIndex].errorMessage = error.localizedDescription
                 }
             } catch {
                 await MainActor.run {
-                    uploadQueue[i].isUploading = false
-                    uploadQueue[i].isFailed = true
-                    uploadQueue[i].errorMessage = error.localizedDescription
+                    uploadQueue[nextIndex].isUploading = false
+                    uploadQueue[nextIndex].isFailed = true
+                    uploadQueue[nextIndex].errorMessage = error.localizedDescription
                 }
             }
-
-            i += 1
         }
 
         await MainActor.run {
@@ -1619,9 +1635,8 @@ struct UploadButton: View {
         )
         .popover(isPresented: $showUploadDialog) {
             UploadProgressDialog(
-                uploadQueue: $uploadManager.uploadQueue,
-                isPresented: $showUploadDialog,
-                canceled: $uploadManager.canceled
+                uploadManager: uploadManager,
+                isPresented: $showUploadDialog
             )
         }
         .environmentObject(uploadManager)
