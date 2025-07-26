@@ -751,28 +751,28 @@ class SongTableViewController: NSViewController {
         favoriteColumn.resizingMask = []
         tableView.addTableColumn(favoriteColumn)
 
-        // Title column - primary expanding column
+        // Title column - primary expanding column with manual resize capability
         let titleColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("title"))
         titleColumn.title = "Title"
         titleColumn.width = 400
-        titleColumn.minWidth = 200
-        titleColumn.resizingMask = [.autoresizingMask]
+        titleColumn.minWidth = 250
+        titleColumn.resizingMask = [.autoresizingMask, .userResizingMask]
         tableView.addTableColumn(titleColumn)
 
-        // Artist column - fixed preferred width
+        // Artist column - manually resizable
         let artistColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("artist"))
         artistColumn.title = "Artist"
-        artistColumn.width = 120
+        artistColumn.width = 100
         artistColumn.minWidth = 80
-        artistColumn.resizingMask = []
+        artistColumn.resizingMask = [.userResizingMask]
         tableView.addTableColumn(artistColumn)
 
-        // Album column - fixed preferred width
+        // Album column - manually resizable
         let albumColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("album"))
         albumColumn.title = "Album"
-        albumColumn.width = 120
+        albumColumn.width = 100
         albumColumn.minWidth = 80
-        albumColumn.resizingMask = []
+        albumColumn.resizingMask = [.userResizingMask]
         tableView.addTableColumn(albumColumn)
 
         // Duration column
