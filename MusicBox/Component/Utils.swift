@@ -11,6 +11,12 @@ import CryptoKit
 import Foundation
 import SwiftUI
 
+extension Task {
+    func asAnyCancellable() -> AnyCancellable {
+        AnyCancellable { self.cancel() }
+    }
+}
+
 struct LoadingIndicatorView: View {
     @State private var isVisible = false
     @State private var delayTask: Task<Void, Never>?
@@ -111,9 +117,6 @@ class ImageLoader: ObservableObject {
 
     private var url: URL?
     private var cancellable: AnyCancellable?
-    private var retryCount: Int = 0
-    private let maxRetries: Int = 3
-    private let retryDelay: TimeInterval = 1.0
     private let loaderId: String = UUID().uuidString.prefix(8).lowercased()
     
     private func log(_ message: String) {
@@ -129,9 +132,18 @@ class ImageLoader: ObservableObject {
     private static let urlSession = URLSession.shared
     private static let imageCache = NSCache<NSString, NSImage>()
 
-    // Track ongoing downloads to prevent duplicates
-    private static var activeDownloads = Set<String>()
-    private static let downloadLock = NSLock()
+    // Sendable wrapper for NSImage to handle Swift 6 concurrency
+    private struct SendableImage: @unchecked Sendable {
+        let image: NSImage?
+        
+        init(_ image: NSImage?) {
+            self.image = image
+        }
+    }
+
+    // Track ongoing download tasks to prevent duplicates
+    private static var activeTasks: [String: Task<SendableImage, Never>] = [:]
+    private static let taskLock = NSLock()
 
     // Configure cache once
     private static let cacheConfigured: Void = {
@@ -240,7 +252,6 @@ class ImageLoader: ObservableObject {
         cancellable = nil
         
         // Reset state
-        retryCount = 0
         isLoading = false
         hasError = false
         
@@ -265,8 +276,7 @@ class ImageLoader: ObservableObject {
     
     func retryLoad() {
         log("🔄 Manual retry requested")
-        // Reset retry count and error state
-        retryCount = 0
+        // Reset error state
         hasError = false
         image = nil
         
@@ -277,113 +287,35 @@ class ImageLoader: ObservableObject {
     private func loadWithRetry() {
         guard let url = url else { return }
         
-        let urlString = url.absoluteString
-        log("🚀 Starting loadWithRetry for \(urlString) (attempt \(retryCount + 1)/\(maxRetries + 1))")
+        log("🚀 Starting loadWithRetry for \(url.absoluteString)")
         
-        // Check if this URL is already being downloaded
-        let isAlreadyDownloading = Self.downloadLock.withLock {
-            let isDownloading = Self.activeDownloads.contains(urlString)
-            if !isDownloading {
-                Self.activeDownloads.insert(urlString)
-            }
-            return isDownloading
-        }
-
-        if isAlreadyDownloading {
-            log("⏳ URL already downloading, waiting...")
-            // Already downloading, wait longer and check cache
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                // Check if image appeared in cache while waiting
-                if let cachedImage = Self.loadImageFromMemoryCache(url: url) {
-                    self.log("✅ Found image in cache after waiting")
-                    self.image = cachedImage
-                    self.hasError = false
-                } else {
-                    // Still not in cache, try to load again if not already loading
-                    if !self.isLoading {
-                        self.log("⚠️ Still not in cache after waiting, retrying...")
-                        self.loadWithRetry()
-                    }
-                }
-            }
-            return
-        }
+        // If already loading or has image, don't start again
+        guard !isLoading, image == nil else { return }
         
         isLoading = true
         hasError = false
+        
         cancellable?.cancel()
-
-        cancellable = Self.urlSession.dataTaskPublisher(for: url)
-            .timeout(.seconds(10), scheduler: DispatchQueue.global())
-            .map { $0.data }
-            .receive(on: DispatchQueue.main)
-            .sink(
-                receiveCompletion: { [weak self] completion in
-                    defer {
-                        _ = Self.downloadLock.withLock {
-                            Self.activeDownloads.remove(urlString)
-                        }
-                    }
-                    
-                    guard let self = self else { return }
-                    
-                    switch completion {
-                    case .finished:
-                        self.isLoading = false
-                        self.retryCount = 0
-                    case .failure(let error):
-                        self.isLoading = false
-                        self.log("💥 Network error: \(error.localizedDescription)")
-                        
-                        if self.retryCount < self.maxRetries {
-                            self.retryCount += 1
-                            let delay = self.retryDelay * Double(self.retryCount)
-                            self.log("🔄 Retrying in \(delay)s (attempt \(self.retryCount + 1)/\(self.maxRetries + 1))")
-                            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                                self.loadWithRetry()
-                            }
-                        } else {
-                            self.log("❌ Max retries exceeded, giving up")
-                            self.hasError = true
-                            self.retryCount = 0
-                        }
-                    }
-                },
-                receiveValue: { [weak self] data in
-                    guard let self = self else { return }
-                    
-                    self.log("📦 Received \(data.count) bytes")
-                    
-                    guard !data.isEmpty, let img = NSImage(data: data) else {
-                        self.log("💥 Invalid image data (\(data.count) bytes), retrying...")
-                        // Invalid data, treat as error and potentially retry
-                        if self.retryCount < self.maxRetries {
-                            self.retryCount += 1
-                            let delay = self.retryDelay * Double(self.retryCount)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                                self.loadWithRetry()
-                            }
-                        } else {
-                            self.log("❌ Max retries exceeded for invalid data")
-                            self.hasError = true
-                            self.retryCount = 0
-                        }
-                        return
-                    }
-
-                    self.log("✅ Successfully loaded image (\(Int(img.size.width))x\(Int(img.size.height)))")
-                    self.image = img
+        
+        // Use the shared download mechanism with retry logic
+        cancellable = Task { [weak self] in
+            let downloadedImage = await Self.downloadAndCacheImage(url: url)
+            
+            await MainActor.run { [weak self] in
+                guard let self = self else { return }
+                
+                self.isLoading = false
+                
+                if let downloadedImage = downloadedImage {
+                    self.log("✅ Successfully loaded image via shared task")
+                    self.image = downloadedImage.image
                     self.hasError = false
-
-                    // Use shared methods for caching
-                    Self.cacheImageInMemory(img, for: url, cost: data.count)
-
-                    // Save to file cache in background using shared method
-                    Task {
-                        await Self.saveImageToFileCache(data: data, url: url)
-                    }
+                } else {
+                    self.log("❌ Failed to load image via shared task")
+                    self.hasError = true
                 }
-            )
+            }
+        }.asAnyCancellable()
     }
 
     // MARK: - Shared utility methods
@@ -460,49 +392,68 @@ class ImageLoader: ObservableObject {
         }
 
         // Download from network with duplicate prevention
-        return await downloadAndCacheImage(url: url)
+        return await downloadAndCacheImage(url: url)?.image
     }
 
-    private static func downloadAndCacheImage(url: URL) async -> NSImage? {
+    private static func downloadAndCacheImage(url: URL) async -> SendableImage? {
         let urlString = url.absoluteString
 
-        // Check if already downloading
-        let isAlreadyDownloading = downloadLock.withLock {
-            let isDownloading = activeDownloads.contains(urlString)
-            if !isDownloading {
-                activeDownloads.insert(urlString)
+        // Check if there's already a task for this URL
+        let existingTask = taskLock.withLock {
+            return activeTasks[urlString]
+        }
+
+        if let existingTask = existingTask {
+            // Wait for the existing task to complete
+            return await existingTask.value
+        }
+
+        // Create new download task with retry logic
+        let downloadTask = Task<SendableImage, Never> {
+            let image = await downloadImageWithRetry(url: url)
+            return SendableImage(image)
+        }
+
+        // Store the task
+        taskLock.withLock {
+            activeTasks[urlString] = downloadTask
+        }
+
+        // Wait for completion and cleanup
+        let result = await downloadTask.value
+        
+        _ = taskLock.withLock {
+            activeTasks.removeValue(forKey: urlString)
+        }
+
+        return result
+    }
+
+    private static func downloadImageWithRetry(url: URL, maxRetries: Int = 3) async -> NSImage? {
+        for attempt in 1...maxRetries {
+            do {
+                let data = try await downloadImageData(from: url)
+                guard !data.isEmpty, let image = NSImage(data: data) else {
+                    throw URLError(.badServerResponse)
+                }
+
+                // Cache in memory
+                cacheImageInMemory(image, for: url, cost: data.count)
+
+                // Save to file cache in background
+                Task {
+                    await saveImageToFileCache(data: data, url: url)
+                }
+
+                return image
+            } catch {
+                if attempt < maxRetries {
+                    let delay = TimeInterval(attempt) * 1.0 // 1s, 2s, 3s
+                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                }
             }
-            return isDownloading
         }
-
-        if isAlreadyDownloading {
-            // Wait a bit and try cache again
-            try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 seconds
-            return loadImageFromMemoryCache(url: url)
-        }
-
-        defer {
-            _ = downloadLock.withLock {
-                activeDownloads.remove(urlString)
-            }
-        }
-
-        do {
-            let data = try await downloadImageData(from: url)
-            guard let image = NSImage(data: data) else { return nil }
-
-            // Cache in memory
-            cacheImageInMemory(image, for: url, cost: data.count)
-
-            // Save to file cache in background
-            Task {
-                await saveImageToFileCache(data: data, url: url)
-            }
-
-            return image
-        } catch {
-            return nil
-        }
+        return nil
     }
 }
 
