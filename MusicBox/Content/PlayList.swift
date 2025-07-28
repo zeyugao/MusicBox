@@ -570,7 +570,16 @@ class SongTitleTableCellView: NSTableCellView {
             speakerIcon.contentTintColor = .controlAccentColor
             speakerIcon.isHidden = false
         } else {
-            speakerIcon.isHidden = true
+            // Check if song is in play next queue
+            if let queueIndex = playlistStatus.playNextQueue.firstIndex(where: { $0.id == song.id }) {
+                speakerIcon.image = NSImage(
+                    systemSymbolName: "text.badge.plus", accessibilityDescription: nil)
+                speakerIcon.contentTintColor = .systemOrange
+                speakerIcon.isHidden = false
+                speakerIcon.toolTip = "Next in queue: #\(queueIndex + 1)"
+            } else {
+                speakerIcon.isHidden = true
+            }
         }
 
         // Status icon
@@ -948,7 +957,9 @@ class SongTableViewController: NSViewController {
         let song = songs[clickedRow]
 
         // 播放选中的歌曲
-        Task {
+        Task { @MainActor in
+            // Clear play next queue when playing immediately
+            playlistStatus?.clearPlayNextQueue()
             let newItem = loadItem(song: song)
             let _ = await playlistStatus?.addItemAndSeekTo(newItem, shouldPlay: true)
         }
@@ -1145,6 +1156,12 @@ extension SongTableViewController {
         playItem.representedObject = song
         menu.addItem(playItem)
 
+        // Play Next
+        let playNextItem = NSMenuItem(title: "Play Next", action: #selector(playNext(_:)), keyEquivalent: "")
+        playNextItem.target = self
+        playNextItem.representedObject = song
+        menu.addItem(playNextItem)
+
         // Add to Now Playing
         let addToNowPlayingItem = NSMenuItem(
             title: "Add to Now Playing", action: #selector(addToNowPlaying(_:)), keyEquivalent: "")
@@ -1195,16 +1212,28 @@ extension SongTableViewController {
 
     @objc private func playSong(_ sender: NSMenuItem) {
         guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
-        Task {
+        Task { @MainActor in
+            // Clear play next queue when playing immediately
+            playlistStatus?.clearPlayNextQueue()
             let newItem = loadItem(song: song)
             let _ = await playlistStatus?.addItemAndSeekTo(newItem, shouldPlay: true)
+        }
+    }
+    
+    @objc private func playNext(_ sender: NSMenuItem) {
+        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        Task { @MainActor in
+            let newItem = loadItem(song: song)
+            playlistStatus?.addToPlayNextQueue(newItem)
         }
     }
 
     @objc private func addToNowPlaying(_ sender: NSMenuItem) {
         guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
-        let newItem = loadItem(song: song)
-        let _ = playlistStatus?.addItemToPlaylist(newItem)
+        Task { @MainActor in
+            let newItem = loadItem(song: song)
+            let _ = playlistStatus?.addItemToPlaylist(newItem)
+        }
     }
 
     @objc private func addToPlaylist(_ sender: NSMenuItem) {

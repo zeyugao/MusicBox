@@ -8,6 +8,79 @@
 import Foundation
 import SwiftUI
 
+struct PlayNextQueueView: View {
+    @EnvironmentObject var playlistStatus: PlaylistStatus
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("Play Next Queue")
+                    .font(.headline)
+                Spacer()
+                Button("Clear All") {
+                    playlistStatus.clearPlayNextQueue()
+                }
+                .buttonStyle(.borderless)
+                .foregroundColor(playlistStatus.playNextQueue.isEmpty ? .secondary : .red)
+                .disabled(playlistStatus.playNextQueue.isEmpty)
+            }
+            
+            if playlistStatus.playNextQueue.isEmpty {
+                Text("No songs in queue")
+                    .foregroundColor(.secondary)
+                    .padding()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(Array(playlistStatus.playNextQueue.enumerated()), id: \.element.id) { index, item in
+                            HStack {
+                                // Queue position
+                                Text("\(index + 1)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .frame(width: 20)
+                                
+                                // Song info
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.title)
+                                        .font(.body)
+                                        .lineLimit(1)
+                                    Text(item.artist)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                }
+                                
+                                Spacer()
+                                
+                                // Remove button
+                                Button(action: {
+                                    playlistStatus.removeFromPlayNextQueue(at: index)
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.gray.opacity(0.1))
+                            )
+                        }
+                    }
+                }
+                .frame(maxHeight: 300)
+            }
+        }
+        .padding()
+        .frame(width: 400)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+}
+
 struct LyricView: View {
     var lyric: [CloudMusicApi.LyricLine]
     @EnvironmentObject var playStatus: PlayStatus
@@ -114,9 +187,11 @@ struct LyricView: View {
 struct PlayingDetailView: View {
     @State private var lyric: [CloudMusicApi.LyricLine]?
     @EnvironmentObject var playStatus: PlayStatus
+    @EnvironmentObject var playlistStatus: PlaylistStatus
     @State var hasRoma: Bool = false
     @State private var showNoLyricMessage: Bool = false
     @State private var artworkUrl: URL?
+    @State private var showQueuePopover: Bool = false
 
     func updateLyric() async {
         showNoLyricMessage = false
@@ -230,6 +305,33 @@ struct PlayingDetailView: View {
                 }
             }
             .navigationTitle(playStatus.currentItem?.title ?? "Playing")
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button(action: {
+                        showQueuePopover.toggle()
+                    }) {
+                        ZStack {
+                            Image(systemName: "list.number")
+                            
+                            // Badge showing queue count
+                            if !playlistStatus.playNextQueue.isEmpty {
+                                Text("\(playlistStatus.playNextQueue.count)")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(2)
+                                    .background(Color.primary)
+                                    .clipShape(Circle())
+                                    .offset(x: 8, y: -8)
+                            }
+                        }
+                    }
+                    .help(playlistStatus.playNextQueue.isEmpty ? "No songs in queue" : "\(playlistStatus.playNextQueue.count) song(s) in queue")
+                    .popover(isPresented: $showQueuePopover) {
+                        PlayNextQueueView(isPresented: $showQueuePopover)
+                            .environmentObject(playlistStatus)
+                    }
+                }
+            }
         }
     }
 }

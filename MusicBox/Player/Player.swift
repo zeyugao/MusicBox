@@ -837,12 +837,14 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         let playlist: [PlaylistItem]
         let currentItemIndex: Int?
         let loopMode: LoopMode
+        let playNextQueue: [PlaylistItem]
     }
 
     @Published var loopMode: LoopMode = .sequence
     private var switchingItem: Bool = false
 
     @Published var playlist: [PlaylistItem] = []
+    @Published var playNextQueue: [PlaylistItem] = []
     @Published private var currentItemIndex: Int? = nil
     var currentPlayingItemIndex: Int? {
         return currentItemIndex
@@ -905,6 +907,15 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
 
     func nextTrack() async {
         // doScrobble()
+        
+        // Check play next queue first
+        if let nextQueueItem = await getNextFromQueue() {
+            // Add the queued item to playlist and play it
+            let idIdx = addItemToPlaylist(nextQueueItem, continuePlaying: false)
+            await seekToItem(offset: idIdx, shouldPlay: true)
+            return
+        }
+        
         if loopMode == .once && currentItemIndex == playlist.count - 1 {
             pausePlay()
             await seekToItem(offset: nil)
@@ -1014,13 +1025,20 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     func addItemToPlaylist(
         _ item: PlaylistItem, continuePlaying: Bool = true, shouldSaveState: Bool = false
     ) -> Int {
-        var idIdx = findIdIndex(item.id)
+        let idIdx = findIdIndex(item.id)
         if idIdx == -1 {
-            playlist.append(item)
-            idIdx = playlist.count - 1
+            Task { @MainActor in
+                playlist.append(item)
+                if shouldSaveState {
+                    saveState()
+                }
+            }
+            return playlist.count // Return expected index
         }
         if shouldSaveState {
-            saveState()
+            Task { @MainActor in
+                saveState()
+            }
         }
         return idIdx
     }
@@ -1076,6 +1094,46 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         playlist = []
         saveState()
     }
+    
+    // MARK: - Play Next Queue Management
+    
+    func addToPlayNextQueue(_ item: PlaylistItem) {
+        Task { @MainActor in
+            playNextQueue.append(item)
+            saveState()
+        }
+    }
+    
+    func clearPlayNextQueue() {
+        Task { @MainActor in
+            playNextQueue.removeAll()
+            saveState()
+        }
+    }
+    
+    func removeFromPlayNextQueue(at index: Int) {
+        Task { @MainActor in
+            guard index >= 0 && index < playNextQueue.count else { return }
+            playNextQueue.remove(at: index)
+            saveState()
+        }
+    }
+    
+    func removeFromPlayNextQueue(itemId: UInt64) {
+        Task { @MainActor in
+            playNextQueue.removeAll { $0.id == itemId }
+            saveState()
+        }
+    }
+    
+    private func getNextFromQueue() async -> PlaylistItem? {
+        return await MainActor.run {
+            guard !playNextQueue.isEmpty else { return nil }
+            let nextItem = playNextQueue.removeFirst()
+            saveState()
+            return nextItem
+        }
+    }
 
     func addItemAndSeekTo(_ item: PlaylistItem, shouldPlay: Bool = false) async -> Int {
         let idIdx = addItemToPlaylist(item, continuePlaying: false)
@@ -1090,7 +1148,8 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             let storage = Storage(
                 playlist: playlist,
                 currentItemIndex: currentItemIndex,
-                loopMode: loopMode
+                loopMode: loopMode,
+                playNextQueue: playNextQueue
             )
             let data = try JSONEncoder().encode(storage)
             UserDefaults.standard.set(data, forKey: "PlaylistStatus")
@@ -1107,11 +1166,30 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                     playlist = storage.playlist
                     currentItemIndex = storage.currentItemIndex
                     loopMode = storage.loopMode
+                    playNextQueue = storage.playNextQueue
                 }
 
                 await seekToItem(offset: currentItemIndex)
             } catch {
-                print("Failed to load PlaylistStatus")
+                print("Failed to load PlaylistStatus: \(error)")
+                // Try to load without playNextQueue for backward compatibility
+                do {
+                    struct LegacyStorage: Codable {
+                        let playlist: [PlaylistItem]
+                        let currentItemIndex: Int?
+                        let loopMode: LoopMode
+                    }
+                    let legacyStorage = try JSONDecoder().decode(LegacyStorage.self, from: data)
+                    await MainActor.run {
+                        playlist = legacyStorage.playlist
+                        currentItemIndex = legacyStorage.currentItemIndex
+                        loopMode = legacyStorage.loopMode
+                        playNextQueue = []
+                    }
+                    await seekToItem(offset: currentItemIndex)
+                } catch {
+                    print("Failed to load PlaylistStatus with legacy format: \(error)")
+                }
             }
         }
     }

@@ -378,6 +378,7 @@ struct ContentView: View {
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
                                         .environmentObject(playStatus)
+                                        .environmentObject(playlistStatus)
                                 }
                         case .nowPlaying:
                             let songs = playlistStatus.playlist.compactMap { $0.nsSong }
@@ -395,6 +396,7 @@ struct ContentView: View {
                             .navigationDestination(for: PlayingDetailPath.self) { _ in
                                 PlayingDetailView()
                                     .environmentObject(playStatus)
+                                    .environmentObject(playlistStatus)
                             }
                             .onChange(of: playlistStatus.currentPlayingItemIndex, initial: false) {
                                 NotificationCenter.default.post(
@@ -407,6 +409,7 @@ struct ContentView: View {
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
                                         .environmentObject(playStatus)
+                                        .environmentObject(playlistStatus)
                                 }
                         case .explore:
                             ExploreView(
@@ -418,6 +421,7 @@ struct ContentView: View {
                             .navigationDestination(for: PlayingDetailPath.self) { _ in
                                 PlayingDetailView()
                                     .environmentObject(playStatus)
+                                    .environmentObject(playlistStatus)
                             }
                         case let .playlist(playlist):
                             let metadata = PlaylistMetadata.netease(
@@ -429,6 +433,7 @@ struct ContentView: View {
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
                                         .environmentObject(playStatus)
+                                        .environmentObject(playlistStatus)
                                 }
                         }
                     }

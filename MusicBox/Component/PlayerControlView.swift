@@ -182,6 +182,7 @@ struct PlayerControlView: View {
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject private var playingDetailModel: PlayingDetailModel
     @State var isHovered: Bool = false
+    @State private var showQueuePopover: Bool = false
 
     @State var artworkUrl: URL?
     @State private var currentItemId: UInt64?
@@ -375,6 +376,34 @@ struct PlayerControlView: View {
             }
             .buttonStyle(PlayControlButtonStyle())
             .foregroundColor(.primary)
+            
+            // Play Next Queue Button
+            Button(action: {
+                showQueuePopover.toggle()
+            }) {
+                ZStack {
+                    Image(systemName: "list.number")
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                    
+                    // Badge showing queue count
+                    if !playlistStatus.playNextQueue.isEmpty {
+                        Text("\(playlistStatus.playNextQueue.count)")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(2)
+                            .background(Color.primary)
+                            .clipShape(Circle())
+                            .offset(x: 8, y: -8)
+                    }
+                }
+            }
+            .buttonStyle(PlayControlButtonStyle())
+            .help(playlistStatus.playNextQueue.isEmpty ? "No songs in queue" : "\(playlistStatus.playNextQueue.count) song(s) in queue")
+            .popover(isPresented: $showQueuePopover) {
+                PlayNextQueueView(isPresented: $showQueuePopover)
+                    .environmentObject(playlistStatus)
+            }
 
             HStack(spacing: 32) {
                 HStack {
