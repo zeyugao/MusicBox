@@ -9,32 +9,6 @@ import Combine
 import Foundation
 import SwiftUI
 
-struct NowPlayingView: View {
-    @EnvironmentObject private var playlistStatus: PlaylistStatus
-    @State private var songs: [CloudMusicApi.Song] = []
-    @State private var playlistMetadata: PlaylistMetadata?
-    
-    var body: some View {
-        PlayListView(
-            playlistMetadata: playlistMetadata,
-            onLoadComplete: {}
-        )
-        .onAppear {
-            updateSongs()
-        }
-        .onChange(of: playlistStatus.playlist) { _, _ in
-            updateSongs()
-        }
-    }
-    
-    private func updateSongs() {
-        let newSongs = playlistStatus.playlist.compactMap { $0.nsSong }
-        songs = newSongs
-        // Use current timestamp to force PlayListView to update
-        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
-        playlistMetadata = PlaylistMetadata.songs(newSongs, timestamp, "Now Playing")
-    }
-}
 
 enum DisplayContentType {
     case userinfo
@@ -94,13 +68,12 @@ class UserInfo: ObservableObject {
 
 enum NavigationScreen: Hashable, Equatable, Encodable {
     case account
-    case nowPlaying
     case explore
     case cloudFiles
     case playlist(playlist: PlaylistMetadata)
 
     enum CodingKeys: String, CodingKey {
-        case account, nowPlaying, explore, playlist
+        case account, explore, playlist
     }
 
     func encode(to encoder: Encoder) throws {
@@ -108,8 +81,6 @@ enum NavigationScreen: Hashable, Equatable, Encodable {
         switch self {
         case .account:
             try container.encode("account", forKey: .account)
-        case .nowPlaying:
-            try container.encode("nowPlaying", forKey: .nowPlaying)
         case .explore:
             try container.encode("explore", forKey: .explore)
         case .playlist:
@@ -362,8 +333,6 @@ struct ContentView: View {
                             TextWithImage("Settings", image: "gearshape.fill")
                                 .tag(NavigationScreen.account)
                             if userInfo.profile != nil {
-                                TextWithImage("Now Playing", image: "dot.radiowaves.left.and.right")
-                                    .tag(NavigationScreen.nowPlaying)
                                 TextWithImage("My Cloud Files", image: "icloud")
                                     .tag(NavigationScreen.cloudFiles)
                             }
@@ -407,16 +376,6 @@ struct ContentView: View {
                                         .environmentObject(playStatus)
                                         .environmentObject(playlistStatus)
                                 }
-                        case .nowPlaying:
-                            NowPlayingView()
-                                .environmentObject(userInfo)
-                                .environmentObject(playlistStatus)
-                                .navigationTitle("Now Playing")
-                            .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                PlayingDetailView()
-                                    .environmentObject(playStatus)
-                                    .environmentObject(playlistStatus)
-                            }
                         case .cloudFiles:
                             CloudFilesView()
                                 .environmentObject(userInfo)

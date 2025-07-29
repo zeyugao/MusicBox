@@ -1101,7 +1101,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         _ items: [PlaylistItem], shouldSaveState: Bool = true
     ) async {
         for item in items {
-            // Use the single item method which handles duplicates properly
+            // Use the single item method which handles queue positioning properly
             await Task { @MainActor in
                 guard let currentIndex = currentItemIndex else {
                     // If no current item, add to beginning
@@ -1112,6 +1112,13 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 
                 // Check if item already exists in playlist
                 if let existingIndex = playlist.firstIndex(where: { $0.id == item.id }) {
+                    let wasPlayNextItem = existingIndex > currentIndex && existingIndex <= currentIndex + playNextItemsCount
+                    
+                    // If it's already in the play next queue, skip it
+                    if wasPlayNextItem {
+                        return
+                    }
+                    
                     // Remove from current position
                     playlist.remove(at: existingIndex)
                     
@@ -1119,12 +1126,13 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                     let adjustedCurrentIndex = existingIndex < currentIndex ? currentIndex - 1 : currentIndex
                     self.currentItemIndex = adjustedCurrentIndex
                     
-                    // Insert after (possibly adjusted) current item
-                    let insertIndex = adjustedCurrentIndex + 1
+                    // Insert at the end of play next queue
+                    let insertIndex = adjustedCurrentIndex + playNextItemsCount + 1
                     playlist.insert(item, at: insertIndex)
+                    playNextItemsCount += 1
                 } else {
-                    // Insert new item after current item
-                    let insertIndex = currentIndex + 1
+                    // Insert new item at the end of play next queue
+                    let insertIndex = currentIndex + playNextItemsCount + 1
                     playlist.insert(item, at: insertIndex)
                     playNextItemsCount += 1
                 }
@@ -1177,13 +1185,13 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             
             // Check if item already exists in playlist
             if let existingIndex = playlist.firstIndex(where: { $0.id == item.id }) {
-                // If it's already the next item, do nothing
-                if existingIndex == currentIndex + 1 {
-                    return
-                }
-                
                 // Check if the existing item was already a "play next" item
                 let wasPlayNextItem = existingIndex > currentIndex && existingIndex <= currentIndex + playNextItemsCount
+                
+                // If it's already in the play next queue, don't move it
+                if wasPlayNextItem {
+                    return
+                }
                 
                 // Remove from current position
                 playlist.remove(at: existingIndex)
@@ -1192,17 +1200,13 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 let adjustedCurrentIndex = existingIndex < currentIndex ? currentIndex - 1 : currentIndex
                 self.currentItemIndex = adjustedCurrentIndex
                 
-                // Insert after (possibly adjusted) current item
-                let insertIndex = adjustedCurrentIndex + 1
+                // Insert at the end of play next queue (after current + playNextItemsCount)
+                let insertIndex = adjustedCurrentIndex + playNextItemsCount + 1
                 playlist.insert(item, at: insertIndex)
-                
-                // If it wasn't already a play next item, increment the count
-                if !wasPlayNextItem {
-                    playNextItemsCount += 1
-                }
+                playNextItemsCount += 1
             } else {
-                // Insert new item after current item
-                let insertIndex = currentIndex + 1
+                // Insert new item at the end of play next queue
+                let insertIndex = currentIndex + playNextItemsCount + 1
                 playlist.insert(item, at: insertIndex)
                 playNextItemsCount += 1
             }

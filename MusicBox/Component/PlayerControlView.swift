@@ -13,6 +13,157 @@ import CoreAudio
 import Foundation
 import SwiftUI
 
+struct NowPlayingPopoverView: View {
+    @EnvironmentObject private var playlistStatus: PlaylistStatus
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            if playlistStatus.playlist.isEmpty {
+                // Header with padding when empty
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("Now Playing")
+                            .font(.headline)
+                        Spacer()
+                        Button("Clear All") {
+                            playlistStatus.clearPlaylist()
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundColor(.secondary)
+                        .disabled(true)
+                    }
+                    
+                    Text("No songs in playlist")
+                        .foregroundColor(.secondary)
+                        .padding()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+            } else {
+                // ScrollView with header inside for proxy access
+                ScrollViewReader { proxy in
+                    VStack(spacing: 0) {
+                        // Header with buttons
+                        HStack {
+                            Text("Now Playing")
+                                .font(.headline)
+                            Spacer()
+                            Button("Current") {
+                                scrollToCurrentSong(proxy: proxy)
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundColor(.accentColor)
+                            
+                            Button("Clear All") {
+                                playlistStatus.clearPlaylist()
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundColor(.red)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
+                        
+                        ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(Array(playlistStatus.playlist.enumerated()), id: \.element.id) { index, item in
+                            HStack {
+                                // Current playing indicator or position
+                                if index == playlistStatus.currentPlayingItemIndex {
+                                    Image(systemName: "speaker.3.fill")
+                                        .foregroundColor(.accentColor)
+                                        .frame(width: 20)
+                                        .font(.caption)
+                                } else {
+                                    Text("\(index + 1)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .frame(width: 20)
+                                }
+                                
+                                // Song info
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.title)
+                                        .font(.body)
+                                        .lineLimit(1)
+                                        .foregroundColor(index == playlistStatus.currentPlayingItemIndex ? .accentColor : .primary)
+                                    Text(item.artist)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                }
+                                
+                                Spacer()
+                                
+                                // Play next indicator
+                                if let currentIndex = playlistStatus.currentPlayingItemIndex,
+                                   index > currentIndex && index <= currentIndex + playlistStatus.playNextItemsCount {
+                                    Text("Next \(index - currentIndex)")
+                                        .font(.caption2)
+                                        .foregroundColor(.orange)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.orange.opacity(0.1))
+                                        .cornerRadius(4)
+                                }
+                                
+                                // Remove button
+                                Button(action: {
+                                    Task {
+                                        await playlistStatus.deleteBySongId(id: item.id)
+                                    }
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(index == playlistStatus.currentPlayingItemIndex ? Color.accentColor.opacity(0.1) : Color.gray.opacity(0.05))
+                            )
+                            .onTapGesture {
+                                Task {
+                                    await playlistStatus.playBySongId(id: item.id)
+                                }
+                            }
+                            .id("song-\(index)")
+                        }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .padding(.bottom, 16)
+                        }
+                        .frame(maxHeight: 400)
+                        .onAppear {
+                            scrollToCurrentSong(proxy: proxy)
+                        }
+                        .onChange(of: isPresented) { _, newValue in
+                            if newValue {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    scrollToCurrentSong(proxy: proxy)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .frame(width: 400)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+    
+    private func scrollToCurrentSong(proxy: ScrollViewProxy) {
+        if let currentIndex = playlistStatus.currentPlayingItemIndex {
+            proxy.scrollTo("song-\(currentIndex)", anchor: .center)
+        }
+    }
+}
+
 struct PlayControlButtonStyle: ButtonStyle {
     @ViewBuilder
     func makeBody(configuration: Configuration) -> some View {
@@ -185,6 +336,7 @@ struct PlayerControlView: View {
 
     @State var artworkUrl: URL?
     @State private var currentItemId: UInt64?
+    @State private var showNowPlayingPopover: Bool = false
 
     @Binding private var navigationPath: NavigationPath
 
@@ -376,6 +528,21 @@ struct PlayerControlView: View {
             .buttonStyle(PlayControlButtonStyle())
             .foregroundColor(.primary)
             
+            // Now Playing Button
+            Button(action: {
+                showNowPlayingPopover.toggle()
+            }) {
+                Image(systemName: "list.bullet")
+                    .resizable()
+                    .frame(width: 16, height: 16)
+            }
+            .buttonStyle(PlayControlButtonStyle())
+            .foregroundColor(.primary)
+            .help("Now Playing")
+            .popover(isPresented: $showNowPlayingPopover) {
+                NowPlayingPopoverView(isPresented: $showNowPlayingPopover)
+                    .environmentObject(playlistStatus)
+            }
 
             HStack(spacing: 32) {
                 HStack {
