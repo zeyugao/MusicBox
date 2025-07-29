@@ -9,6 +9,33 @@ import Combine
 import Foundation
 import SwiftUI
 
+struct NowPlayingView: View {
+    @EnvironmentObject private var playlistStatus: PlaylistStatus
+    @State private var songs: [CloudMusicApi.Song] = []
+    @State private var playlistMetadata: PlaylistMetadata?
+    
+    var body: some View {
+        PlayListView(
+            playlistMetadata: playlistMetadata,
+            onLoadComplete: {}
+        )
+        .onAppear {
+            updateSongs()
+        }
+        .onChange(of: playlistStatus.playlist) { _, _ in
+            updateSongs()
+        }
+    }
+    
+    private func updateSongs() {
+        let newSongs = playlistStatus.playlist.compactMap { $0.nsSong }
+        songs = newSongs
+        // Use current timestamp to force PlayListView to update
+        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
+        playlistMetadata = PlaylistMetadata.songs(newSongs, timestamp, "Now Playing")
+    }
+}
+
 enum DisplayContentType {
     case userinfo
     case playlist
@@ -381,26 +408,14 @@ struct ContentView: View {
                                         .environmentObject(playlistStatus)
                                 }
                         case .nowPlaying:
-                            let songs = playlistStatus.playlist.compactMap { $0.nsSong }
-                            let metadata = PlaylistMetadata.songs(songs, 0, "Now Playing")
-                            PlayListView(
-                                playlistMetadata: metadata,
-                                onLoadComplete: {
-                                    NotificationCenter.default.post(
-                                        name: .focusCurrentPlayingItem, object: nil)
-                                }
-                            )
-                            .environmentObject(userInfo)
-                            .environmentObject(playlistStatus)
-                            .navigationTitle("Now Playing")
+                            NowPlayingView()
+                                .environmentObject(userInfo)
+                                .environmentObject(playlistStatus)
+                                .navigationTitle("Now Playing")
                             .navigationDestination(for: PlayingDetailPath.self) { _ in
                                 PlayingDetailView()
                                     .environmentObject(playStatus)
                                     .environmentObject(playlistStatus)
-                            }
-                            .onChange(of: playlistStatus.currentPlayingItemIndex, initial: false) {
-                                NotificationCenter.default.post(
-                                    name: .focusCurrentPlayingItem, object: nil)
                             }
                         case .cloudFiles:
                             CloudFilesView()

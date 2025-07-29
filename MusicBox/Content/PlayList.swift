@@ -553,7 +553,7 @@ class SongTitleTableCellView: NSTableCellView {
         ])
     }
 
-    func configure(with song: CloudMusicApi.Song, playlistStatus: PlaylistStatus) {
+    func configure(with song: CloudMusicApi.Song, playlistStatus: PlaylistStatus, playlistMetadata: PlaylistMetadata? = nil) {
         titleLabel.stringValue = song.name
 
         if let alias = song.tns?.first ?? song.alia.first {
@@ -570,13 +570,20 @@ class SongTitleTableCellView: NSTableCellView {
             speakerIcon.contentTintColor = .controlAccentColor
             speakerIcon.isHidden = false
         } else {
-            // Check if song is in play next queue
-            if let queueIndex = playlistStatus.playNextQueue.firstIndex(where: { $0.id == song.id }) {
-                speakerIcon.image = NSImage(
-                    systemSymbolName: "text.badge.plus", accessibilityDescription: nil)
-                speakerIcon.contentTintColor = .systemOrange
-                speakerIcon.isHidden = false
-                speakerIcon.toolTip = "Next in queue: #\(queueIndex + 1)"
+            // Check if song is in play next items (only if we're viewing the Now Playing playlist)
+            if case .songs = playlistMetadata {
+                if let currentIndex = playlistStatus.currentPlayingItemIndex,
+                   let playlistIndex = playlistStatus.playlist.firstIndex(where: { $0.id == song.id }),
+                   playlistIndex > currentIndex && playlistIndex <= currentIndex + playlistStatus.playNextItemsCount {
+                    let queuePosition = playlistIndex - currentIndex
+                    speakerIcon.image = NSImage(
+                        systemSymbolName: "text.badge.plus", accessibilityDescription: nil)
+                    speakerIcon.contentTintColor = .systemOrange
+                    speakerIcon.isHidden = false
+                    speakerIcon.toolTip = "Play next: #\(queuePosition)"
+                } else {
+                    speakerIcon.isHidden = true
+                }
             } else {
                 speakerIcon.isHidden = true
             }
@@ -958,8 +965,8 @@ class SongTableViewController: NSViewController {
 
         // 播放选中的歌曲
         Task { @MainActor in
-            // Clear play next queue when playing immediately
-            playlistStatus?.clearPlayNextQueue()
+            // Clear play next items when playing immediately
+            playlistStatus?.clearPlayNext()
             let newItem = loadItem(song: song)
             let _ = await playlistStatus?.addItemAndSeekTo(newItem, shouldPlay: true)
         }
@@ -996,7 +1003,7 @@ extension SongTableViewController: NSTableViewDelegate {
         case "title":
             let cellView = SongTitleTableCellView()
             if let playlistStatus = playlistStatus {
-                cellView.configure(with: song, playlistStatus: playlistStatus)
+                cellView.configure(with: song, playlistStatus: playlistStatus, playlistMetadata: playlistMetadata)
             }
             return cellView
 
@@ -1213,8 +1220,8 @@ extension SongTableViewController {
     @objc private func playSong(_ sender: NSMenuItem) {
         guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
         Task { @MainActor in
-            // Clear play next queue when playing immediately
-            playlistStatus?.clearPlayNextQueue()
+            // Clear play next items when playing immediately
+            playlistStatus?.clearPlayNext()
             let newItem = loadItem(song: song)
             let _ = await playlistStatus?.addItemAndSeekTo(newItem, shouldPlay: true)
         }
@@ -1224,7 +1231,7 @@ extension SongTableViewController {
         guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
         Task { @MainActor in
             let newItem = loadItem(song: song)
-            playlistStatus?.addToPlayNextQueue(newItem)
+            playlistStatus?.addToPlayNext(newItem)
         }
     }
 
@@ -1232,7 +1239,7 @@ extension SongTableViewController {
         guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
         Task { @MainActor in
             let newItem = loadItem(song: song)
-            let _ = playlistStatus?.addItemToPlaylist(newItem)
+            playlistStatus?.addToPlayNext(newItem)
         }
     }
 
