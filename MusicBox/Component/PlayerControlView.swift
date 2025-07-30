@@ -16,7 +16,7 @@ import SwiftUI
 struct NowPlayingPopoverView: View {
     @EnvironmentObject private var playlistStatus: PlaylistStatus
     @Binding var isPresented: Bool
-    
+
     var body: some View {
         VStack(spacing: 0) {
             if playlistStatus.playlist.isEmpty {
@@ -26,21 +26,26 @@ struct NowPlayingPopoverView: View {
                         Text("Now Playing")
                             .font(.headline)
                         Spacer()
-                        Button("Clear All") {
+                        Button(action: {
                             playlistStatus.clearPlaylist()
+                        }) {
+                            Image(systemName: "trash")
+                                .resizable()
+                                .frame(width: 14, height: 14)
                         }
                         .buttonStyle(.borderless)
                         .foregroundColor(.secondary)
                         .disabled(true)
+                        .help("Clear All")
                     }
-                    
+
                     Text("No songs in playlist")
                         .foregroundColor(.secondary)
                         .padding()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
+                .padding(.top, 12)
+                .padding(.bottom, 12)
             } else {
                 // ScrollView with header inside for proxy access
                 ScrollViewReader { proxy in
@@ -50,92 +55,113 @@ struct NowPlayingPopoverView: View {
                             Text("Now Playing")
                                 .font(.headline)
                             Spacer()
-                            Button("Current") {
+                            Button(action: {
                                 scrollToCurrentSong(proxy: proxy)
+                            }) {
+                                Image(systemName: "dot.circle")
+                                    .resizable()
+                                    .frame(width: 14, height: 14)
                             }
                             .buttonStyle(.borderless)
                             .foregroundColor(.accentColor)
-                            
-                            Button("Clear All") {
+                            .help("Scroll to Current")
+
+                            Button(action: {
                                 playlistStatus.clearPlaylist()
+                            }) {
+                                Image(systemName: "trash")
+                                    .resizable()
+                                    .frame(width: 14, height: 14)
                             }
                             .buttonStyle(.borderless)
                             .foregroundColor(.red)
+                            .help("Clear All")
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
-                        .padding(.bottom, 8)
-                        
+                        .padding(.bottom, 16)
+
                         ScrollView {
-                        LazyVStack(spacing: 8) {
-                            ForEach(Array(playlistStatus.playlist.enumerated()), id: \.element.id) { index, item in
-                            HStack {
-                                // Current playing indicator or position
-                                if index == playlistStatus.currentPlayingItemIndex {
-                                    Image(systemName: "speaker.3.fill")
-                                        .foregroundColor(.accentColor)
-                                        .frame(width: 20)
-                                        .font(.caption)
-                                } else {
-                                    Text("\(index + 1)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .frame(width: 20)
-                                }
-                                
-                                // Song info
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.title)
-                                        .font(.body)
-                                        .lineLimit(1)
-                                        .foregroundColor(index == playlistStatus.currentPlayingItemIndex ? .accentColor : .primary)
-                                    Text(item.artist)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
-                                }
-                                
-                                Spacer()
-                                
-                                // Play next indicator
-                                if let currentIndex = playlistStatus.currentPlayingItemIndex,
-                                   index > currentIndex && index <= currentIndex + playlistStatus.playNextItemsCount {
-                                    Text("Next \(index - currentIndex)")
-                                        .font(.caption2)
-                                        .foregroundColor(.orange)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.orange.opacity(0.1))
-                                        .cornerRadius(4)
-                                }
-                                
-                                // Remove button
-                                Button(action: {
-                                    Task {
-                                        await playlistStatus.deleteBySongId(id: item.id)
+                            LazyVStack(spacing: 8) {
+                                ForEach(
+                                    Array(playlistStatus.playlist.enumerated()), id: \.offset
+                                ) { index, item in
+                                    HStack {
+                                        // Current playing indicator or position
+                                        if index == playlistStatus.currentPlayingItemIndex {
+                                            Image(systemName: "speaker.3.fill")
+                                                .foregroundColor(.accentColor)
+                                                .frame(width: 20)
+                                                .font(.caption)
+                                        } else {
+                                            Text("\(index + 1)")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .frame(width: 20)
+                                        }
+
+                                        // Song info
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(item.title)
+                                                .font(.body)
+                                                .lineLimit(1)
+                                                .foregroundColor(
+                                                    index == playlistStatus.currentPlayingItemIndex
+                                                        ? .accentColor : .primary)
+                                            Text(item.artist)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .lineLimit(1)
+                                        }
+
+                                        Spacer()
+
+                                        // Play next indicator
+                                        if let currentIndex = playlistStatus
+                                            .currentPlayingItemIndex,
+                                            index > currentIndex
+                                                && index <= currentIndex
+                                                    + playlistStatus.playNextItemsCount
+                                        {
+                                            Text("Next \(index - currentIndex)")
+                                                .font(.caption2)
+                                                .foregroundColor(.orange)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(Color.orange.opacity(0.1))
+                                                .cornerRadius(4)
+                                        }
+
+                                        // Remove button
+                                        Button(action: {
+                                            Task {
+                                                await playlistStatus.deleteBySongId(id: item.id)
+                                            }
+                                        }) {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .buttonStyle(.borderless)
                                     }
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.secondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(
+                                                index == playlistStatus.currentPlayingItemIndex
+                                                    ? Color.accentColor.opacity(0.1)
+                                                    : Color.gray.opacity(0.05))
+                                    )
+                                    .onTapGesture {
+                                        Task {
+                                            await playlistStatus.playBySongId(id: item.id)
+                                        }
+                                    }
+                                    .id("song-\(index)")
                                 }
-                                .buttonStyle(.borderless)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(index == playlistStatus.currentPlayingItemIndex ? Color.accentColor.opacity(0.1) : Color.gray.opacity(0.05))
-                            )
-                            .onTapGesture {
-                                Task {
-                                    await playlistStatus.playBySongId(id: item.id)
-                                }
-                            }
-                            .id("song-\(index)")
-                        }
                             }
                             .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.top, 0)
                             .padding(.bottom, 16)
                         }
                         .frame(maxHeight: 400)
@@ -156,7 +182,7 @@ struct NowPlayingPopoverView: View {
         .frame(width: 400)
         .background(Color(NSColor.windowBackgroundColor))
     }
-    
+
     private func scrollToCurrentSong(proxy: ScrollViewProxy) {
         if let currentIndex = playlistStatus.currentPlayingItemIndex {
             proxy.scrollTo("song-\(currentIndex)", anchor: .center)
