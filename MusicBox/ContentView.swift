@@ -148,7 +148,7 @@ struct PlaylistRowView: View {
                 Text(playlist.name)
                     .font(.body)
                     .lineLimit(1)
-                Text("\(playlist.trackCount ?? 0)首歌 • \(playlist.creator.nickname)")
+                Text("\(playlist.trackCount ?? 0)首 • \(playlist.creator.nickname)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

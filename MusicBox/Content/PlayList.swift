@@ -381,7 +381,7 @@ struct PlaylistSelectionRowView: View {
                     Text(playlist.name)
                         .lineLimit(1)
                         .multilineTextAlignment(.leading)
-                    Text("\(playlist.trackCount ?? 0) 首 • \(playlist.creator.nickname)")
+                    Text("\(playlist.trackCount ?? 0)首 • \(playlist.creator.nickname)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
