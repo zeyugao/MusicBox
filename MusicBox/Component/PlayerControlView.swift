@@ -527,7 +527,7 @@ struct PlayerControlView: View {
             }
             .buttonStyle(PlayControlButtonStyle())
             .foregroundColor(.primary)
-            
+
             // Now Playing Button
             Button(action: {
                 showNowPlayingPopover.toggle()
@@ -577,74 +577,93 @@ struct PlayerControlView: View {
         .frame(minWidth: 800)
         .onAppear {
             #if DEBUG
-            print("🎵 PlayerControlView: onAppear triggered")
+                print("🎵 PlayerControlView: onAppear triggered")
             #endif
             Task {
                 if let item = playlistStatus.currentItem {
                     currentItemId = item.id
                     #if DEBUG
-                    print("🎵 PlayerControlView: onAppear - loading artwork for \(item.title) (ID: \(item.id))")
+                        print(
+                            "🎵 PlayerControlView: onAppear - loading artwork for \(item.title) (ID: \(item.id))"
+                        )
                     #endif
                     artworkUrl = await item.getArtworkUrl()
                     #if DEBUG
-                    print("🎵 PlayerControlView: onAppear - artwork URL loaded: \(artworkUrl?.absoluteString ?? "nil")")
+                        print(
+                            "🎵 PlayerControlView: onAppear - artwork URL loaded: \(artworkUrl?.absoluteString ?? "nil")"
+                        )
                     #endif
                 } else {
                     #if DEBUG
-                    print("🎵 PlayerControlView: onAppear - no current item")
+                        print("🎵 PlayerControlView: onAppear - no current item")
                     #endif
                 }
             }
         }
         .onChange(of: playlistStatus.currentItem) { oldItem, newItem in
             #if DEBUG
-            let timestamp = Date().timeIntervalSince1970
-            print("🎵 PlayerControlView: onChange(currentItem) triggered at \(timestamp)")
-            print("🎵 PlayerControlView: oldItem: \(oldItem?.title ?? "nil") (ID: \(oldItem?.id ?? 0))")
-            print("🎵 PlayerControlView: newItem: \(newItem?.title ?? "nil") (ID: \(newItem?.id ?? 0))")
+                let timestamp = Date().timeIntervalSince1970
+                print("🎵 PlayerControlView: onChange(currentItem) triggered at \(timestamp)")
+                print(
+                    "🎵 PlayerControlView: oldItem: \(oldItem?.title ?? "nil") (ID: \(oldItem?.id ?? 0))"
+                )
+                print(
+                    "🎵 PlayerControlView: newItem: \(newItem?.title ?? "nil") (ID: \(newItem?.id ?? 0))"
+                )
             #endif
-            
+
             if let item = newItem {
                 let newItemId = item.id
                 #if DEBUG
-                print("🎵 PlayerControlView: comparing IDs - current: \(currentItemId ?? 0), new: \(newItemId)")
+                    print(
+                        "🎵 PlayerControlView: comparing IDs - current: \(currentItemId ?? 0), new: \(newItemId)"
+                    )
                 #endif
-                
+
                 // Only update if the item actually changed
                 if currentItemId != newItemId {
                     #if DEBUG
-                    print("🎵 PlayerControlView: Item changed! Updating artwork for \(item.title)")
+                        print(
+                            "🎵 PlayerControlView: Item changed! Updating artwork for \(item.title)")
                     #endif
                     currentItemId = newItemId
                     Task {
                         #if DEBUG
-                        print("🎵 PlayerControlView: Starting getArtworkUrl for \(item.title) (ID: \(newItemId))")
+                            print(
+                                "🎵 PlayerControlView: Starting getArtworkUrl for \(item.title) (ID: \(newItemId))"
+                            )
                         #endif
                         let newArtworkUrl = await item.getArtworkUrl()
                         #if DEBUG
-                        print("🎵 PlayerControlView: getArtworkUrl completed: \(newArtworkUrl?.absoluteString ?? "nil")")
+                            print(
+                                "🎵 PlayerControlView: getArtworkUrl completed: \(newArtworkUrl?.absoluteString ?? "nil")"
+                            )
                         #endif
-                        
+
                         // Only update if this is still the current item (avoid race conditions)
                         if currentItemId == newItemId {
                             #if DEBUG
-                            print("🎵 PlayerControlView: Setting artworkUrl to: \(newArtworkUrl?.absoluteString ?? "nil")")
+                                print(
+                                    "🎵 PlayerControlView: Setting artworkUrl to: \(newArtworkUrl?.absoluteString ?? "nil")"
+                                )
                             #endif
                             artworkUrl = newArtworkUrl
                         } else {
                             #if DEBUG
-                            print("🎵 PlayerControlView: Race condition detected! Item changed while loading. Current: \(currentItemId ?? 0), Expected: \(newItemId)")
+                                print(
+                                    "🎵 PlayerControlView: Race condition detected! Item changed while loading. Current: \(currentItemId ?? 0), Expected: \(newItemId)"
+                                )
                             #endif
                         }
                     }
                 } else {
                     #if DEBUG
-                    print("🎵 PlayerControlView: Same item, no update needed")
+                        print("🎵 PlayerControlView: Same item, no update needed")
                     #endif
                 }
             } else {
                 #if DEBUG
-                print("🎵 PlayerControlView: New item is nil, clearing artwork")
+                    print("🎵 PlayerControlView: New item is nil, clearing artwork")
                 #endif
                 currentItemId = nil
                 artworkUrl = nil
@@ -652,41 +671,54 @@ struct PlayerControlView: View {
         }
         .onChange(of: playlistStatus.currentItem?.id) { oldId, newId in
             #if DEBUG
-            print("🎵 PlayerControlView: onChange(currentItem.id) triggered - oldId: \(oldId ?? 0), newId: \(newId ?? 0)")
+                print(
+                    "🎵 PlayerControlView: onChange(currentItem.id) triggered - oldId: \(oldId ?? 0), newId: \(newId ?? 0)"
+                )
             #endif
-            
+
             // Additional trigger when currentItem ID changes (for edge cases)
-            if let item = playlistStatus.currentItem, 
-               let newId = newId,
-               currentItemId != newId {
+            if let item = playlistStatus.currentItem,
+                let newId = newId,
+                currentItemId != newId
+            {
                 #if DEBUG
-                print("🎵 PlayerControlView: ID-based change detected! Updating for \(item.title) (ID: \(newId))")
+                    print(
+                        "🎵 PlayerControlView: ID-based change detected! Updating for \(item.title) (ID: \(newId))"
+                    )
                 #endif
                 currentItemId = newId
                 Task {
                     #if DEBUG
-                    print("🎵 PlayerControlView: ID-based getArtworkUrl starting for \(item.title)")
+                        print(
+                            "🎵 PlayerControlView: ID-based getArtworkUrl starting for \(item.title)"
+                        )
                     #endif
                     let newArtworkUrl = await item.getArtworkUrl()
                     #if DEBUG
-                    print("🎵 PlayerControlView: ID-based getArtworkUrl completed: \(newArtworkUrl?.absoluteString ?? "nil")")
+                        print(
+                            "🎵 PlayerControlView: ID-based getArtworkUrl completed: \(newArtworkUrl?.absoluteString ?? "nil")"
+                        )
                     #endif
-                    
+
                     // Only update if this is still the current item
                     if currentItemId == newId {
                         #if DEBUG
-                        print("🎵 PlayerControlView: ID-based setting artworkUrl to: \(newArtworkUrl?.absoluteString ?? "nil")")
+                            print(
+                                "🎵 PlayerControlView: ID-based setting artworkUrl to: \(newArtworkUrl?.absoluteString ?? "nil")"
+                            )
                         #endif
                         artworkUrl = newArtworkUrl
                     } else {
                         #if DEBUG
-                        print("🎵 PlayerControlView: ID-based race condition! Current: \(currentItemId ?? 0), Expected: \(newId)")
+                            print(
+                                "🎵 PlayerControlView: ID-based race condition! Current: \(currentItemId ?? 0), Expected: \(newId)"
+                            )
                         #endif
                     }
                 }
             } else {
                 #if DEBUG
-                print("🎵 PlayerControlView: ID-based change - no action needed")
+                    print("🎵 PlayerControlView: ID-based change - no action needed")
                 #endif
             }
         }
