@@ -99,17 +99,12 @@
 - 点左下角的歌曲封面会切换到歌词界面
   - 歌词界面右上角 ![timestamp_roma](./Screenshots/timestamp_roma.png) 分别是显示某一句歌词的时间戳和显示罗马音（如果有）
 
-## Installation from GitHub Action
+## Installation
 
-要求 macOS 14 及以上
+没有签名，用这个脚本会自动从 Release 下面下载最新的版本，也可以用这个来进行更新。会自动处理签名的问题。
 
-下载 [Github Action Release](https://github.com/zeyugao/MusicBox/actions/workflows/build.yml) 里面的 Artifacts
-
-解压后执行来签名
-
-```shell
-xattr -dr com.apple.quarantine ./MusicBox.app
-codesign -fs - -f --entitlements ./MusicBox.entitlements ./MusicBox.app
+```bash
+curl -sfL https://raw.githubusercontent.com/zeyugao/MusicBox/refs/heads/main/.github/update.sh | sh
 ```
 
 ## Acknowledgment
