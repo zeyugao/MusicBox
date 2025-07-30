@@ -492,9 +492,24 @@ struct PlayerControlView: View {
             Button(action: {
                 showNowPlayingPopover.toggle()
             }) {
-                Image(systemName: "list.bullet")
-                    .resizable()
-                    .frame(width: 16, height: 16)
+                ZStack {
+                    Image(systemName: "list.bullet")
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                    
+                    // Badge showing play next count
+                    if playlistStatus.playNextItemsCount > 0 {
+                        Text("\(playlistStatus.playNextItemsCount)")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(minWidth: 12, minHeight: 12)
+                            .background(
+                                Circle()
+                                    .fill(Color.primary)
+                            )
+                            .offset(x: 10, y: -10)
+                    }
+                }
             }
             .buttonStyle(PlayControlButtonStyle())
             .foregroundColor(.primary)
