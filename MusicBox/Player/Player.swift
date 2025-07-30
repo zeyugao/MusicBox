@@ -355,7 +355,7 @@ class PlayStatus: ObservableObject {
     func seekToOffset(offset: Double) async {
         // 取消之前的 seek 任务，但允许新的 seek 操作
         seekingTask?.cancel()
-        
+
         let newTime = CMTime(seconds: offset, preferredTimescale: timeScale)
         await seekToOffset(offset: newTime)
     }
@@ -381,13 +381,13 @@ class PlayStatus: ObservableObject {
 
         // Save current volume before replacing player
         let currentVolume = player.volume
-        
+
         player = AVPlayer(playerItem: item)
         player.automaticallyWaitsToMinimizeStalling = false
-        
+
         // Restore volume after creating new player
         player.volume = currentVolume
-        
+
         initPlayerObservers()
     }
 
@@ -447,7 +447,7 @@ class PlayStatus: ObservableObject {
         if playerState == .playing {
             lyricSynchronizer?.restartSynchronization()
         }
-        
+
         await MainActor.run {
             if self.pendingItem?.id == item.id {
                 self.isLoadingNewTrack = false
@@ -669,22 +669,22 @@ class PlayStatus: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: "PlayStatus") {
             do {
                 let status = try JSONDecoder().decode(Storage.self, from: data)
-                
+
                 // 如果有要恢复的播放进度且当前有播放项目
                 if status.playedSecond > 0, let item = currentItem {
                     // 等待当前的切换操作完成
                     while switchingItem {
-                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
+                        try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 秒
                     }
-                    
-                    // 如果播放器已经有了当前项目，直接seek；否则重新加载
+
+                    // 如果播放器已经有了当前项目，直接 seek；否则重新加载
                     if player.currentItem != nil {
                         await seekToOffset(offset: status.playedSecond)
                     } else {
                         await seekToItem(item: item, playedSecond: status.playedSecond)
                     }
                 }
-                
+
                 volume = status.volume
             } catch {
                 print("Failed to load PlayStatus: \(error)")
@@ -914,7 +914,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
 
     func nextTrack() async {
         // doScrobble()
-        
+
         if loopMode == .once && currentItemIndex == playlist.count - 1 {
             pausePlay()
             await seekToItem(offset: nil)
@@ -994,7 +994,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         saveState()
     }
 
-    func seekToItem(offset: Int?, playedSecond: Double? = 0.0, shouldPlay: Bool = false, clearPlayNext: Bool = true) async {
+    func seekToItem(
+        offset: Int?, playedSecond: Double? = 0.0, shouldPlay: Bool = false,
+        clearPlayNext: Bool = true
+    ) async {
         if let offset = offset {
             guard offset < playlist.count else { return }
 
@@ -1047,7 +1050,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                     saveState()
                 }
             }
-            return playlist.count // Return expected index
+            return playlist.count  // Return expected index
         }
         if shouldSaveState {
             Task { @MainActor in
@@ -1069,7 +1072,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             saveState()
         }
     }
-    
+
     func replaceFromCurrentPosition(
         _ items: [PlaylistItem], continuePlaying: Bool = true, shouldSaveState: Bool = true
     ) async {
@@ -1079,13 +1082,13 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 playNextItemsCount = 0
                 return
             }
-            
+
             // Keep items up to current, replace everything after
             let keepItems = Array(playlist[0...currentIndex])
             playlist = keepItems + items
             playNextItemsCount = 0
         }
-        
+
         if continuePlaying {
             startPlay()
         }
@@ -1108,7 +1111,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             saveState()
         }
     }
-    
+
     func addItemsToPlayNext(
         _ items: [PlaylistItem], shouldSaveState: Bool = true
     ) async {
@@ -1121,23 +1124,26 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                     playNextItemsCount += 1
                     return
                 }
-                
+
                 // Check if item already exists in playlist
                 if let existingIndex = playlist.firstIndex(where: { $0.id == item.id }) {
-                    let wasPlayNextItem = existingIndex > currentIndex && existingIndex <= currentIndex + playNextItemsCount
-                    
+                    let wasPlayNextItem =
+                        existingIndex > currentIndex
+                        && existingIndex <= currentIndex + playNextItemsCount
+
                     // If it's already in the play next queue, skip it
                     if wasPlayNextItem {
                         return
                     }
-                    
+
                     // Remove from current position
                     playlist.remove(at: existingIndex)
-                    
+
                     // Adjust currentIndex if we removed an item before it
-                    let adjustedCurrentIndex = existingIndex < currentIndex ? currentIndex - 1 : currentIndex
+                    let adjustedCurrentIndex =
+                        existingIndex < currentIndex ? currentIndex - 1 : currentIndex
                     self.currentItemIndex = adjustedCurrentIndex
-                    
+
                     // Insert at the end of play next queue
                     let insertIndex = adjustedCurrentIndex + playNextItemsCount + 1
                     playlist.insert(item, at: insertIndex)
@@ -1150,7 +1156,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 }
             }.value
         }
-        
+
         if shouldSaveState {
             await MainActor.run {
                 saveState()
@@ -1182,9 +1188,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         playlist = []
         saveState()
     }
-    
+
     // MARK: - Play Next Management
-    
+
     func addToPlayNext(_ item: PlaylistItem) {
         Task { @MainActor in
             guard let currentIndex = currentItemIndex else {
@@ -1194,29 +1200,32 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 saveState()
                 return
             }
-            
+
             // Check if item already exists in playlist
             if let existingIndex = playlist.firstIndex(where: { $0.id == item.id }) {
                 // Check if the existing item is already at the end of the play next queue
                 let playNextEndIndex = currentIndex + playNextItemsCount
                 if existingIndex == playNextEndIndex {
-                    return // Already in the right position
+                    return  // Already in the right position
                 }
-                
+
                 // Remove from current position
                 playlist.remove(at: existingIndex)
-                
+
                 // Adjust currentIndex if we removed an item before it
-                let adjustedCurrentIndex = existingIndex < currentIndex ? currentIndex - 1 : currentIndex
+                let adjustedCurrentIndex =
+                    existingIndex < currentIndex ? currentIndex - 1 : currentIndex
                 self.currentItemIndex = adjustedCurrentIndex
-                
+
                 // Check if the item was in the play next queue
-                let wasPlayNextItem = existingIndex > currentIndex && existingIndex <= currentIndex + playNextItemsCount
-                
+                let wasPlayNextItem =
+                    existingIndex > currentIndex
+                    && existingIndex <= currentIndex + playNextItemsCount
+
                 // Insert at the end of the play next queue
                 let insertIndex = adjustedCurrentIndex + playNextItemsCount + 1
                 playlist.insert(item, at: insertIndex)
-                
+
                 // Update playNextItemsCount
                 if !wasPlayNextItem {
                     playNextItemsCount += 1
@@ -1227,15 +1236,15 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 playlist.insert(item, at: insertIndex)
                 playNextItemsCount += 1
             }
-            
+
             saveState()
         }
     }
-    
+
     func clearPlayNext() {
         Task { @MainActor in
             guard let currentIndex = currentItemIndex, playNextItemsCount > 0 else { return }
-            
+
             // Remove play next items that come after current item
             let endIndex = min(currentIndex + playNextItemsCount + 1, playlist.count)
             let range = (currentIndex + 1)..<endIndex
@@ -1244,7 +1253,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             saveState()
         }
     }
-    
+
     @MainActor
     private func consumePlayNextItem() -> Bool {
         guard playNextItemsCount > 0 else { return false }
