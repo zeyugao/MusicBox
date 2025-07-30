@@ -303,11 +303,9 @@ func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo, appendZero: B
 @MainActor
 func selectAudioFile(forSong songTitle: String? = nil) async -> URL? {
     let openPanel = NSOpenPanel()
+    openPanel.prompt = "Select"
     if let songTitle = songTitle {
-        openPanel.prompt = "Select Audio File for \"\(songTitle)\""
         openPanel.message = "Choose an audio file to upload for \"\(songTitle)\""
-    } else {
-        openPanel.prompt = "Select Audio File"
     }
     openPanel.allowsMultipleSelection = false
     openPanel.canChooseDirectories = false
