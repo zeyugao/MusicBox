@@ -919,7 +919,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             // If we have play next items, consume them sequentially first
             if playNextItemsCount > 0 {
                 let _ = await consumePlayNextItem()
-                offset = 1  // Move to next item sequentially
+                offset = 1  // Move to next item sequentially (preserving play next queue)
             } else {
                 // Resume shuffle behavior for remaining items
                 var nextIdx = Int.random(in: 0..<playlist.count)
@@ -929,13 +929,14 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 offset = nextIdx - (currentItemIndex ?? 0)
             }
         } else {
-            // Sequential mode - just consume play next counter if applicable
+            // Sequential mode - consume play next counter if applicable but don't clear queue
             if playNextItemsCount > 0 {
                 let _ = await consumePlayNextItem()
             }
             offset = 1
         }
-        await seekByItem(offset: offset, shouldPlay: true)
+        // Explicitly preserve the play next queue when moving to next track
+        await seekByItem(offset: offset, shouldPlay: true, clearPlayNext: false)
     }
 
     func previousTrack() async {
@@ -953,12 +954,12 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         startPlay()
     }
 
-    func seekByItem(offset: Int, shouldPlay: Bool = false) async {
+    func seekByItem(offset: Int, shouldPlay: Bool = false, clearPlayNext: Bool = true) async {
         guard playlist.count > 0 else { return }
 
         let currentItemIndex = currentItemIndex ?? 0
         let newItemIndex = (currentItemIndex + offset + playlist.count) % playlist.count
-        await seekToItem(offset: newItemIndex, shouldPlay: shouldPlay)
+        await seekToItem(offset: newItemIndex, shouldPlay: shouldPlay, clearPlayNext: clearPlayNext)
     }
 
     func playBySongId(id: UInt64) async {
@@ -986,7 +987,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         saveState()
     }
 
-    func seekToItem(offset: Int?, playedSecond: Double? = 0.0, shouldPlay: Bool = false) async {
+    func seekToItem(offset: Int?, playedSecond: Double? = 0.0, shouldPlay: Bool = false, clearPlayNext: Bool = true) async {
         if let offset = offset {
             guard offset < playlist.count else { return }
 
@@ -995,7 +996,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             await MainActor.run {
                 currentItemIndex = offset
                 // Clear Play Next queue when manually switching to a different song
-                playNextItemsCount = 0
+                if clearPlayNext {
+                    playNextItemsCount = 0
+                }
             }
 
             await NowPlayingCenter.handleItemChange(
