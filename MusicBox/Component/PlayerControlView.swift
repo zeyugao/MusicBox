@@ -740,22 +740,31 @@ struct NowPlayingRowView: View {
 
             Spacer()
 
-            // Play Next button (only show for non-current items and on hover)
+            // Play Next button (only show for non-current items, on hover, and not already in play next queue)
             if index != playlistStatus.currentPlayingItemIndex && isHovered {
-                Button(action: {
-                    playlistStatus.addToPlayNext(item)
-                }) {
-                    Image(systemName: "text.badge.plus")
-                        .foregroundColor(.orange)
+                let isInPlayNextQueue = {
+                    guard let currentIndex = playlistStatus.currentPlayingItemIndex else { return false }
+                    return index > currentIndex && index <= currentIndex + playlistStatus.playNextItemsCount
+                }()
+                
+                if !isInPlayNextQueue {
+                    Button(action: {
+                        Task { @MainActor in
+                            playlistStatus.addToPlayNext(item)
+                        }
+                    }) {
+                        Image(systemName: "text.badge.plus")
+                            .foregroundColor(.orange)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Play Next")
                 }
-                .buttonStyle(.borderless)
-                .help("Play Next")
             }
 
             // Remove button (only show on hover)
             if isHovered {
                 Button(action: {
-                    Task {
+                    Task { @MainActor in
                         await playlistStatus.deleteBySongId(id: item.id)
                     }
                 }) {

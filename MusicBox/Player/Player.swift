@@ -975,14 +975,47 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     }
 
     func deleteBySongId(id: UInt64) async {
-        guard let index = playlist.firstIndex(where: { $0.id == id }) else { return }
-        playlist.remove(at: index)
-
-        if let currentItemIndex = currentItemIndex {
-            if index == currentItemIndex {
-                await seekToItem(offset: index)
-            } else if index < currentItemIndex {
-                self.currentItemIndex = currentItemIndex - 1
+        let wasCurrentItem = await MainActor.run { () -> Bool in
+            guard let index = playlist.firstIndex(where: { $0.id == id }) else { return false }
+            let isCurrentlyPlaying = index == currentItemIndex
+            
+            playlist.remove(at: index)
+            
+            if let currentItemIndex = currentItemIndex {
+                if index < currentItemIndex {
+                    self.currentItemIndex = currentItemIndex - 1
+                } else if index == currentItemIndex {
+                    // Don't update currentItemIndex here, handle it below
+                }
+            }
+            
+            return isCurrentlyPlaying
+        }
+        
+        if wasCurrentItem {
+            // Handle deletion of current playing item
+            if playlist.isEmpty {
+                // No more songs, stop playback
+                await MainActor.run {
+                    self.currentItemIndex = nil
+                }
+                pausePlay()
+            } else {
+                // Choose next song intelligently
+                let nextIndex = await MainActor.run { () -> Int in
+                    guard let oldCurrentIndex = self.currentItemIndex else { return 0 }
+                    
+                    // If we deleted the last song, go to the previous one
+                    if oldCurrentIndex >= playlist.count {
+                        return playlist.count - 1
+                    }
+                    
+                    // Otherwise, stay at the same index (which now has the next song)
+                    return oldCurrentIndex
+                }
+                
+                // Switch to the next song and continue playing
+                await seekToItem(offset: nextIndex, shouldPlay: true)
             }
         }
 
@@ -991,7 +1024,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             index: currentItemIndex ?? 0,
             count: playlist.count)
 
-        saveState()
+        await MainActor.run {
+            saveState()
+        }
     }
 
     func seekToItem(
@@ -1200,9 +1235,20 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 saveState()
                 return
             }
+            
+            // Check if the item is the currently playing item
+            if currentIndex < playlist.count && playlist[currentIndex].id == item.id {
+                return  // Don't add the currently playing item to play next
+            }
 
             // Check if item already exists in playlist
             if let existingIndex = playlist.firstIndex(where: { $0.id == item.id }) {
+                // Check if the existing item is already in the play next queue
+                let isInPlayNextQueue = existingIndex > currentIndex && existingIndex <= currentIndex + playNextItemsCount
+                if isInPlayNextQueue {
+                    return  // Item is already in the play next queue, don't move it
+                }
+                
                 // Check if the existing item is already at the end of the play next queue
                 let playNextEndIndex = currentIndex + playNextItemsCount
                 if existingIndex == playNextEndIndex {
