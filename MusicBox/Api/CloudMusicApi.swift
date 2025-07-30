@@ -185,6 +185,7 @@ class CloudMusicApi {
         let privacy: Int
         let description: String?
         let creator: Profile
+        let trackCount: UInt64?
     }
 
     struct RecommandPlaylistItem: Codable, Identifiable, Equatable {
