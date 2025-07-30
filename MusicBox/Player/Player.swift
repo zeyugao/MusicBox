@@ -379,8 +379,15 @@ class PlayStatus: ObservableObject {
             currentItem.delegate = nil
         }
 
+        // Save current volume before replacing player
+        let currentVolume = player.volume
+        
         player = AVPlayer(playerItem: item)
         player.automaticallyWaitsToMinimizeStalling = false
+        
+        // Restore volume after creating new player
+        player.volume = currentVolume
+        
         initPlayerObservers()
     }
 
