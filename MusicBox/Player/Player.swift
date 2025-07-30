@@ -974,13 +974,14 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         await seekToItem(offset: index, shouldPlay: true)
     }
 
+    @MainActor
     func deleteBySongId(id: UInt64) async {
         let wasCurrentItem = await MainActor.run { () -> Bool in
             guard let index = playlist.firstIndex(where: { $0.id == id }) else { return false }
             let isCurrentlyPlaying = index == currentItemIndex
-            
+
             playlist.remove(at: index)
-            
+
             if let currentItemIndex = currentItemIndex {
                 if index < currentItemIndex {
                     self.currentItemIndex = currentItemIndex - 1
@@ -988,10 +989,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                     // Don't update currentItemIndex here, handle it below
                 }
             }
-            
+
             return isCurrentlyPlaying
         }
-        
+
         if wasCurrentItem {
             // Handle deletion of current playing item
             if playlist.isEmpty {
@@ -1004,27 +1005,27 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 // Choose next song intelligently
                 let nextIndex = await MainActor.run { () -> Int in
                     guard let oldCurrentIndex = self.currentItemIndex else { return 0 }
-                    
+
                     // If we deleted the last song, go to the previous one
                     if oldCurrentIndex >= playlist.count {
                         return playlist.count - 1
                     }
-                    
+
                     // Otherwise, stay at the same index (which now has the next song)
                     return oldCurrentIndex
                 }
-                
+
                 // Switch to the next song and continue playing
                 await seekToItem(offset: nextIndex, shouldPlay: true)
             }
         }
 
-        await NowPlayingCenter.handleItemChange(
-            item: currentItem,
-            index: currentItemIndex ?? 0,
-            count: playlist.count)
+        Task {
+            await NowPlayingCenter.handleItemChange(
+                item: currentItem,
+                index: currentItemIndex ?? 0,
+                count: playlist.count)
 
-        await MainActor.run {
             saveState()
         }
     }
@@ -1226,65 +1227,65 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
 
     // MARK: - Play Next Management
 
-    func addToPlayNext(_ item: PlaylistItem) {
-        Task { @MainActor in
-            guard let currentIndex = currentItemIndex else {
-                // If no current item, add to beginning
-                playlist.insert(item, at: 0)
-                playNextItemsCount += 1
-                saveState()
-                return
-            }
-            
-            // Check if the item is the currently playing item
-            if currentIndex < playlist.count && playlist[currentIndex].id == item.id {
-                return  // Don't add the currently playing item to play next
-            }
-
-            // Check if item already exists in playlist
-            if let existingIndex = playlist.firstIndex(where: { $0.id == item.id }) {
-                // Check if the existing item is already in the play next queue
-                let isInPlayNextQueue = existingIndex > currentIndex && existingIndex <= currentIndex + playNextItemsCount
-                if isInPlayNextQueue {
-                    return  // Item is already in the play next queue, don't move it
-                }
-                
-                // Check if the existing item is already at the end of the play next queue
-                let playNextEndIndex = currentIndex + playNextItemsCount
-                if existingIndex == playNextEndIndex {
-                    return  // Already in the right position
-                }
-
-                // Remove from current position
-                playlist.remove(at: existingIndex)
-
-                // Adjust currentIndex if we removed an item before it
-                let adjustedCurrentIndex =
-                    existingIndex < currentIndex ? currentIndex - 1 : currentIndex
-                self.currentItemIndex = adjustedCurrentIndex
-
-                // Check if the item was in the play next queue
-                let wasPlayNextItem =
-                    existingIndex > currentIndex
-                    && existingIndex <= currentIndex + playNextItemsCount
-
-                // Insert at the end of the play next queue
-                let insertIndex = adjustedCurrentIndex + playNextItemsCount + 1
-                playlist.insert(item, at: insertIndex)
-
-                // Update playNextItemsCount
-                if !wasPlayNextItem {
-                    playNextItemsCount += 1
-                }
-            } else {
-                // Insert new item at the end of the play next queue
-                let insertIndex = currentIndex + playNextItemsCount + 1
-                playlist.insert(item, at: insertIndex)
-                playNextItemsCount += 1
-            }
-
+    @MainActor
+    func addToPlayNext(_ item: PlaylistItem) async {
+        guard let currentIndex = currentItemIndex else {
+            // If no current item, add to beginning
+            playlist.insert(item, at: 0)
+            playNextItemsCount += 1
             saveState()
+            return
         }
+
+        // Check if the item is the currently playing item
+        if currentIndex < playlist.count && playlist[currentIndex].id == item.id {
+            return  // Don't add the currently playing item to play next
+        }
+
+        // Check if item already exists in playlist
+        if let existingIndex = playlist.firstIndex(where: { $0.id == item.id }) {
+            // Check if the existing item is already in the play next queue
+            let isInPlayNextQueue =
+                existingIndex > currentIndex && existingIndex <= currentIndex + playNextItemsCount
+            if isInPlayNextQueue {
+                return  // Item is already in the play next queue, don't move it
+            }
+
+            // Check if the existing item is already at the end of the play next queue
+            let playNextEndIndex = currentIndex + playNextItemsCount
+            if existingIndex == playNextEndIndex {
+                return  // Already in the right position
+            }
+
+            // Remove from current position
+            playlist.remove(at: existingIndex)
+
+            // Adjust currentIndex if we removed an item before it
+            let adjustedCurrentIndex =
+                existingIndex < currentIndex ? currentIndex - 1 : currentIndex
+            self.currentItemIndex = adjustedCurrentIndex
+
+            // Check if the item was in the play next queue
+            let wasPlayNextItem =
+                existingIndex > currentIndex
+                && existingIndex <= currentIndex + playNextItemsCount
+
+            // Insert at the end of the play next queue
+            let insertIndex = adjustedCurrentIndex + playNextItemsCount + 1
+            playlist.insert(item, at: insertIndex)
+
+            // Update playNextItemsCount
+            if !wasPlayNextItem {
+                playNextItemsCount += 1
+            }
+        } else {
+            // Insert new item at the end of the play next queue
+            let insertIndex = currentIndex + playNextItemsCount + 1
+            playlist.insert(item, at: insertIndex)
+            playNextItemsCount += 1
+        }
+
+        saveState()
     }
 
     func clearPlayNext() {

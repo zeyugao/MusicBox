@@ -1229,17 +1229,17 @@ extension SongTableViewController {
     
     @objc private func playNext(_ sender: NSMenuItem) {
         guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
-        Task { @MainActor in
+        Task {
             let newItem = loadItem(song: song)
-            playlistStatus?.addToPlayNext(newItem)
+            await playlistStatus?.addToPlayNext(newItem)
         }
     }
 
     @objc private func addToNowPlaying(_ sender: NSMenuItem) {
         guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
-        Task { @MainActor in
+        Task {
             let newItem = loadItem(song: song)
-            playlistStatus?.addToPlayNext(newItem)
+            await playlistStatus?.addToPlayNext(newItem)
         }
     }
 

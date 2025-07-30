@@ -749,8 +749,8 @@ struct NowPlayingRowView: View {
                 
                 if !isInPlayNextQueue {
                     Button(action: {
-                        Task { @MainActor in
-                            playlistStatus.addToPlayNext(item)
+                        Task {
+                            await playlistStatus.addToPlayNext(item)
                         }
                     }) {
                         Image(systemName: "text.badge.plus")
@@ -764,7 +764,7 @@ struct NowPlayingRowView: View {
             // Remove button (only show on hover)
             if isHovered {
                 Button(action: {
-                    Task { @MainActor in
+                    Task {
                         await playlistStatus.deleteBySongId(id: item.id)
                     }
                 }) {
