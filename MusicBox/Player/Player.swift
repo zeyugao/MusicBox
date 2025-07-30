@@ -1187,8 +1187,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             
             // Check if item already exists in playlist
             if let existingIndex = playlist.firstIndex(where: { $0.id == item.id }) {
-                // Check if the existing item is already the immediate next song
-                if existingIndex == currentIndex + 1 {
+                // Check if the existing item is already at the end of the play next queue
+                let playNextEndIndex = currentIndex + playNextItemsCount
+                if existingIndex == playNextEndIndex {
                     return // Already in the right position
                 }
                 
@@ -1202,16 +1203,18 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 // Check if the item was in the play next queue
                 let wasPlayNextItem = existingIndex > currentIndex && existingIndex <= currentIndex + playNextItemsCount
                 
-                // Insert as the immediate next song (right after current)
-                playlist.insert(item, at: adjustedCurrentIndex + 1)
+                // Insert at the end of the play next queue
+                let insertIndex = adjustedCurrentIndex + playNextItemsCount + 1
+                playlist.insert(item, at: insertIndex)
                 
                 // Update playNextItemsCount
                 if !wasPlayNextItem {
                     playNextItemsCount += 1
                 }
             } else {
-                // Insert new item as the immediate next song
-                playlist.insert(item, at: currentIndex + 1)
+                // Insert new item at the end of the play next queue
+                let insertIndex = currentIndex + playNextItemsCount + 1
+                playlist.insert(item, at: insertIndex)
                 playNextItemsCount += 1
             }
             
