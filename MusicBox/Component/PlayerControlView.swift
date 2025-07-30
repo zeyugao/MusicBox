@@ -132,6 +132,18 @@ struct NowPlayingPopoverView: View {
                                                 .cornerRadius(4)
                                         }
 
+                                        // Play Next button (only show for non-current items)
+                                        if index != playlistStatus.currentPlayingItemIndex {
+                                            Button(action: {
+                                                playlistStatus.addToPlayNext(item)
+                                            }) {
+                                                Image(systemName: "text.badge.plus")
+                                                    .foregroundColor(.orange)
+                                            }
+                                            .buttonStyle(.borderless)
+                                            .help("Play Next")
+                                        }
+
                                         // Remove button
                                         Button(action: {
                                             Task {
