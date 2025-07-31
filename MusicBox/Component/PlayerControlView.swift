@@ -743,7 +743,7 @@ struct NowPlayingRowView: View {
                             .font(.caption2)
                             .foregroundColor(.orange)
                             .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .padding(.vertical, 1)
                             .background(Color.orange.opacity(0.1))
                             .cornerRadius(4)
                     }
