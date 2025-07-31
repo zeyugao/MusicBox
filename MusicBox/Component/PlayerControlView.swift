@@ -89,6 +89,7 @@ struct NowPlayingPopoverView: View {
                                     NowPlayingRowView(
                                         index: index,
                                         item: item,
+                                        currentItemIndex: playlistStatus.currentItemIndex,
                                         playlistStatus: playlistStatus
                                     )
                                     .id("song-\(index)")
@@ -118,7 +119,7 @@ struct NowPlayingPopoverView: View {
     }
 
     private func scrollToCurrentSong(proxy: ScrollViewProxy) {
-        if let currentIndex = playlistStatus.currentPlayingItemIndex {
+        if let currentIndex = playlistStatus.currentItemIndex {
             proxy.scrollTo("song-\(currentIndex)", anchor: .center)
         }
     }
@@ -703,13 +704,14 @@ struct PlayerControlView: View {
 struct NowPlayingRowView: View {
     let index: Int
     let item: PlaylistItem
+    let currentItemIndex: Int?
     let playlistStatus: PlaylistStatus
     @State private var isHovered: Bool = false
     
     var body: some View {
         HStack {
             // Current playing indicator or position
-            if index == playlistStatus.currentPlayingItemIndex {
+            if index == currentItemIndex {
                 Image(systemName: "speaker.3.fill")
                     .foregroundColor(.accentColor)
                     .frame(width: 20)
@@ -728,12 +730,11 @@ struct NowPlayingRowView: View {
                         .font(.body)
                         .lineLimit(1)
                         .foregroundColor(
-                            index == playlistStatus.currentPlayingItemIndex
+                            index == currentItemIndex
                                 ? .accentColor : .primary)
                     
                     // Play next indicator
-                    if let currentIndex = playlistStatus
-                        .currentPlayingItemIndex,
+                    if let currentIndex = currentItemIndex,
                         index > currentIndex
                             && index <= currentIndex
                                 + playlistStatus.playNextItemsCount
@@ -756,9 +757,9 @@ struct NowPlayingRowView: View {
             Spacer()
 
             // Play Next button (only show for non-current items, on hover, and not already in play next queue)
-            if index != playlistStatus.currentPlayingItemIndex && isHovered {
+            if index != currentItemIndex && isHovered {
                 let isInPlayNextQueue = {
-                    guard let currentIndex = playlistStatus.currentPlayingItemIndex else { return false }
+                    guard let currentIndex = currentItemIndex else { return false }
                     return index > currentIndex && index <= currentIndex + playlistStatus.playNextItemsCount
                 }()
                 
@@ -795,7 +796,7 @@ struct NowPlayingRowView: View {
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(
-                    index == playlistStatus.currentPlayingItemIndex
+                    index == currentItemIndex
                         ? Color.accentColor.opacity(0.1)
                         : Color.gray.opacity(0.05))
         )

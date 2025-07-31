@@ -576,7 +576,7 @@ class SongTitleTableCellView: NSTableCellView {
         } else {
             // Check if song is in play next items (only if we're viewing the Now Playing playlist)
             if case .songs = playlistMetadata {
-                if let currentIndex = playlistStatus.currentPlayingItemIndex,
+                if let currentIndex = playlistStatus.currentItemIndex,
                    let playlistIndex = playlistStatus.playlist.firstIndex(where: { $0.id == song.id }),
                    playlistIndex > currentIndex && playlistIndex <= currentIndex + playlistStatus.playNextItemsCount {
                     let queuePosition = playlistIndex - currentIndex
