@@ -705,8 +705,13 @@ struct NowPlayingRowView: View {
     let index: Int
     let item: PlaylistItem
     let currentItemIndex: Int?
-    let playlistStatus: PlaylistStatus
+    @ObservedObject var playlistStatus: PlaylistStatus
     @State private var isHovered: Bool = false
+    
+    private var isInPlayNextQueue: Bool {
+        guard let currentIndex = currentItemIndex else { return false }
+        return index > currentIndex && index <= currentIndex + playlistStatus.playNextItemsCount
+    }
     
     var body: some View {
         HStack {
@@ -734,11 +739,7 @@ struct NowPlayingRowView: View {
                                 ? .accentColor : .primary)
                     
                     // Play next indicator
-                    if let currentIndex = currentItemIndex,
-                        index > currentIndex
-                            && index <= currentIndex
-                                + playlistStatus.playNextItemsCount
-                    {
+                    if isInPlayNextQueue, let currentIndex = currentItemIndex {
                         Text("Next \(index - currentIndex)")
                             .font(.caption2)
                             .foregroundColor(.orange)
@@ -757,24 +758,17 @@ struct NowPlayingRowView: View {
             Spacer()
 
             // Play Next button (only show for non-current items, on hover, and not already in play next queue)
-            if index != currentItemIndex && isHovered {
-                let isInPlayNextQueue = {
-                    guard let currentIndex = currentItemIndex else { return false }
-                    return index > currentIndex && index <= currentIndex + playlistStatus.playNextItemsCount
-                }()
-                
-                if !isInPlayNextQueue {
-                    Button(action: {
-                        Task {
-                            await playlistStatus.addToPlayNext(item)
-                        }
-                    }) {
-                        Image(systemName: "text.badge.plus")
-                            .foregroundColor(.orange)
+            if index != currentItemIndex && isHovered && !isInPlayNextQueue {
+                Button(action: {
+                    Task {
+                        await playlistStatus.addToPlayNext(item)
                     }
-                    .buttonStyle(.borderless)
-                    .help("Play Next")
+                }) {
+                    Image(systemName: "text.badge.plus")
+                        .foregroundColor(.orange)
                 }
+                .buttonStyle(.borderless)
+                .help("Play Next")
             }
 
             // Remove button (only show on hover)
