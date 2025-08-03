@@ -869,7 +869,10 @@ class CloudMusicApi {
             }
             
             if appendZero {
-                fileData.append(0)
+                let randomByte1 = UInt8.random(in: 0...255)
+                let randomByte2 = UInt8.random(in: 0...255)
+                fileData.append(randomByte1)
+                fileData.append(randomByte2)
             }
             
             return fileData.base64EncodedString()
