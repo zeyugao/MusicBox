@@ -285,6 +285,7 @@ struct LoginView: View {
 
 struct AccountView: View {
     @EnvironmentObject private var userInfo: UserInfo
+    @EnvironmentObject private var playlistStatus: PlaylistStatus
     @StateObject private var appSettings = AppSettings.shared
 
     var body: some View {
@@ -292,6 +293,7 @@ struct AccountView: View {
             SettingsView()
                 .environmentObject(userInfo)
                 .environmentObject(appSettings)
+                .environmentObject(playlistStatus)
         } else {
             LoginView()
         }
@@ -301,6 +303,7 @@ struct AccountView: View {
 struct SettingsView: View {
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject private var appSettings: AppSettings
+    @EnvironmentObject private var playlistStatus: PlaylistStatus
 
     var body: some View {
         ScrollView {
@@ -328,6 +331,7 @@ struct SettingsView: View {
                     // Account Actions Section
                     AccountActionsSection()
                         .environmentObject(userInfo)
+                        .environmentObject(playlistStatus)
 
                     Divider()
 
@@ -500,6 +504,7 @@ struct StorageCacheSection: View {
 
 struct AccountActionsSection: View {
     @EnvironmentObject private var userInfo: UserInfo
+    @EnvironmentObject private var playlistStatus: PlaylistStatus
 
     var body: some View {
         VStack(spacing: 16) {
@@ -548,6 +553,10 @@ struct AccountActionsSection: View {
         userInfo.playlists = []
 
         saveEncodableState(forKey: "profile", data: userInfo.profile)
+        
+        // Clear playlist and pause current playback
+        playlistStatus.pausePlay()
+        playlistStatus.clearPlaylist()
     }
 }
 
