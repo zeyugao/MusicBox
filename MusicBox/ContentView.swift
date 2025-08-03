@@ -381,16 +381,21 @@ struct ContentView: View {
                     NavigationStack(path: $navigationPath) {
                         switch currentSelection {
                         case .account:
-                            AccountView()
-                                .environmentObject(userInfo)
-                                .environmentObject(playlistStatus)
-                                .environmentObject(appSettings)
-                                .navigationTitle("Settings")
-                                .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                    PlayingDetailView()
-                                        .environmentObject(playStatus)
-                                        .environmentObject(playlistStatus)
-                                }
+                            if isInitialized {
+                                AccountView()
+                                    .environmentObject(userInfo)
+                                    .environmentObject(playlistStatus)
+                                    .environmentObject(appSettings)
+                                    .navigationTitle("Settings")
+                                    .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                        PlayingDetailView()
+                                            .environmentObject(playStatus)
+                                            .environmentObject(playlistStatus)
+                                    }
+                            } else {
+                                Color.clear
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
                         case .cloudFiles:
                             CloudFilesView()
                                 .environmentObject(userInfo)
