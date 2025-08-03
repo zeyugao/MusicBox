@@ -9,7 +9,6 @@ import Combine
 import Foundation
 import SwiftUI
 
-
 enum DisplayContentType {
     case userinfo
     case playlist
@@ -319,12 +318,28 @@ struct ContentView: View {
     @State private var navigationPath = NavigationPath()
     @State private var isInitialized = false
 
+    private var currentSelection: NavigationScreen {
+        userInfo.profile == nil ? .account : selection
+    }
+
+    private var selectionBinding: Binding<NavigationScreen> {
+        Binding(
+            get: { currentSelection },
+            set: { newValue in
+                // Only update selection if user is not logged in
+                if userInfo.profile != nil {
+                    selection = newValue
+                }
+            }
+        )
+    }
+
     var body: some View {
         ZStack(
             alignment: Alignment(horizontal: .trailing, vertical: .bottom),
             content: {
                 NavigationSplitView {
-                    List(selection: $selection) {
+                    List(selection: selectionBinding) {
                         Section(header: Text("General")) {
                             if userInfo.profile != nil {
                                 TextWithImage("Explore", image: "music.house")
@@ -364,7 +379,7 @@ struct ContentView: View {
                     .frame(minWidth: 200, idealWidth: 250)
                 } detail: {
                     NavigationStack(path: $navigationPath) {
-                        switch selection {
+                        switch currentSelection {
                         case .account:
                             AccountView()
                                 .environmentObject(userInfo)
