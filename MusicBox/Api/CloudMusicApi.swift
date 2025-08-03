@@ -161,7 +161,7 @@ class CloudMusicApi {
 
     static let RecommandSongPlaylistId: UInt64 = 0
 
-    struct Profile: Codable {
+    struct Profile: Codable, Equatable {
         let avatarUrl: String
         let nickname: String
         let userId: UInt64
