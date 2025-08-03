@@ -144,9 +144,16 @@ struct PlaylistRowView: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
 
             VStack(alignment: .leading) {
-                Text(playlist.name)
-                    .font(.body)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    if playlist.privacy != 0 {
+                        Image(systemName: "lock.fill")
+                            .foregroundColor(.secondary)
+                            .font(.body)
+                    }
+                    Text(playlist.name)
+                        .font(.body)
+                        .lineLimit(1)
+                }
                 Text("\(playlist.trackCount ?? 0)首 • \(playlist.creator.nickname)")
                     .font(.caption)
                     .foregroundColor(.secondary)

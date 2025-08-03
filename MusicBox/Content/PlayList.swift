@@ -376,9 +376,15 @@ struct PlaylistSelectionRowView: View {
                 }
                 .padding(.trailing, 8)
                 VStack(alignment: .leading) {
-                    Text(playlist.name)
-                        .lineLimit(1)
-                        .multilineTextAlignment(.leading)
+                    HStack(spacing: 4) {
+                        if playlist.privacy != 0 {
+                            Image(systemName: "lock.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        Text(playlist.name)
+                            .lineLimit(1)
+                            .multilineTextAlignment(.leading)
+                    }
                     Text("\(playlist.trackCount ?? 0)首 • \(playlist.creator.nickname)")
                         .font(.caption)
                         .foregroundColor(.secondary)
