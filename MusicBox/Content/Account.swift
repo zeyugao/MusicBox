@@ -90,7 +90,10 @@ class WebViewLoginViewModel: ObservableObject {
 struct WebViewLogin: NSViewRepresentable {
     @ObservedObject var viewModel: WebViewLoginViewModel
     let onLoginSuccess: () -> Void
-    
+    @Binding var refreshTrigger: Bool
+
+    static let loginUrl = URL(string: "https://music.163.com/login")!
+
     func makeNSView(context: Context) -> WKWebView {
         viewModel.updateDebugInfo("Creating WebView...")
         
@@ -101,16 +104,25 @@ struct WebViewLogin: NSViewRepresentable {
         webView.navigationDelegate = context.coordinator
         
         // 直接加载网易云音乐登录页面
-        let loginURL = URL(string: "https://music.163.com/#/login")!
-        let request = URLRequest(url: loginURL)
+        let request = URLRequest(url: WebViewLogin.loginUrl)
         
-        viewModel.updateDebugInfo("Loading: \(loginURL.absoluteString)")
+        viewModel.updateDebugInfo("Loading: \(WebViewLogin.loginUrl.absoluteString)")
         webView.load(request)
         
         return webView
     }
     
-    func updateNSView(_ nsView: WKWebView, context: Context) {}
+    func updateNSView(_ nsView: WKWebView, context: Context) {
+        // Handle refresh action
+        if refreshTrigger {
+            DispatchQueue.main.async {
+                self.refreshTrigger = false
+            }
+            let request = URLRequest(url: WebViewLogin.loginUrl)
+            viewModel.updateDebugInfo("🔄 Refreshing page...")
+            nsView.load(request)
+        }
+    }
     
     static func dismantleNSView(_ nsView: WKWebView, coordinator: Coordinator) {
         // 清理WebView，减少RBS assertion错误
@@ -209,16 +221,33 @@ struct WebViewLoginSheet: View {
     @StateObject private var webViewLoginVM = WebViewLoginViewModel()
     @EnvironmentObject private var userInfo: UserInfo
     @Binding var isPresented: Bool
+    @State private var refreshTrigger = false
 
     var body: some View {
         VStack {
-            // Header with close button
+            // Header with refresh and close buttons
             HStack {
-                Text("Login to NetEase Music")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Login to NetEase Music")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    
+                    Text(webViewLoginVM.debugInfo)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 
                 Spacer()
+                
+                Button(action: {
+                    refreshTrigger = true
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help("Refresh page")
                 
                 Button(action: {
                     isPresented = false
@@ -228,8 +257,11 @@ struct WebViewLoginSheet: View {
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .help("Close")
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom, 4)
             
             if webViewLoginVM.hasError {
                 VStack(spacing: 16) {
@@ -254,38 +286,33 @@ struct WebViewLoginSheet: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
             } else {
-                VStack {
-                    // Debug info bar
-                    Text(webViewLoginVM.debugInfo)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    ZStack {
-                        if webViewLoginVM.isLoading {
-                            VStack(spacing: 16) {
-                                ProgressView()
-                                    .scaleEffect(1.5)
-                                Text("Loading NetEase Music login page...")
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(Color.clear)
+                ZStack {
+                    if webViewLoginVM.isLoading {
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                            Text("Loading NetEase Music login page...")
+                                .foregroundColor(.secondary)
                         }
-                        
-                        WebViewLogin(viewModel: webViewLoginVM) {
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.clear)
+                    }
+                    
+                    WebViewLogin(
+                        viewModel: webViewLoginVM,
+                        onLoginSuccess: {
                             Task {
                                 await initUserData(userInfo: userInfo)
-                                isPresented = false // 登录成功后关闭弹窗
+                                isPresented = false
                             }
-                        }
-                        .opacity(webViewLoginVM.isLoading ? 0 : 1)
-                    }
+                        },
+                        refreshTrigger: $refreshTrigger
+                    )
+                    .opacity(webViewLoginVM.isLoading ? 0 : 1)
                 }
             }
         }
-        .frame(width: 1000, height: 800)
+        .frame(width: 1100, height: 800)
         .background(Color(NSColor.windowBackgroundColor))
         .cornerRadius(12)
         .shadow(radius: 20)
