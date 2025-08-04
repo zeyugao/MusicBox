@@ -929,7 +929,7 @@ class CloudMusicApi {
         }
 
         if let parsed = res.asType(ErrorResult.self, silent: true) {
-            throw RequestError.errorCode((parsed.code, parsed.msg))
+            throw RequestError.errorCode((parsed.code, "cloud failed: \(parsed.msg)"))
         }
 
         throw RequestError.Request("\(res.asAny() ?? "Unknown error")")
@@ -959,7 +959,7 @@ class CloudMusicApi {
             }
 
             throw RequestError.errorCode(
-                (parsed.code, parsed.message?.stringValue ?? "Unknown error"))
+                (parsed.code, "cloud_match failed: \(parsed.message?.stringValue ?? "Unknown error")"))
         }
 
         throw RequestError.Request(
