@@ -475,6 +475,14 @@ struct ContentView: View {
                 await group.waitForAll()
             }
 
+            // Initialize Now Playing Center after everything is loaded
+            // This ensures system media controls work from app startup
+            playStatus.nowPlayingInit()
+            
+            // Re-register remote commands to ensure they work reliably from startup
+            // This helps ensure media keys work immediately when the app launches
+            playlistStatus.reinitializeRemoteCommands()
+            
             isInitialized = true
         }
         .alert(

@@ -1422,6 +1422,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         }
     }
 
+    func reinitializeRemoteCommands() {
+        RemoteCommandCenter.handleRemoteCommands(using: self)
+    }
+
     private var playerShouldNextObserver: NSObjectProtocol?
 
     init() {
