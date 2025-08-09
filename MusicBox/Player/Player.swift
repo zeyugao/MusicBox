@@ -939,6 +939,11 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             }
             offset = 1
         }
+        
+        // Re-register remote commands to ensure they work reliably
+        // This helps recover from any system-level remote command center resets
+        RemoteCommandCenter.handleRemoteCommands(using: self)
+        
         // Explicitly preserve the play next queue when moving to next track
         await seekByItem(offset: offset, shouldPlay: true, clearPlayNext: false)
     }
@@ -1448,6 +1453,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         }
 
         deinitNotificationObservers()
+        
+        // Clean up remote command center
+        RemoteCommandCenter.cleanup()
 
         saveState()
     }

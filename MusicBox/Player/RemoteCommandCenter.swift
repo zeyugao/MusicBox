@@ -21,38 +21,46 @@ protocol RemoteCommandHandler: AnyObject {
 }
 
 class RemoteCommandCenter {
+    private static var currentHandler: RemoteCommandHandler?
     
     /// Registers callbacks for various remote commands.
+    /// This method clears any existing targets before registering new ones.
     static func handleRemoteCommands(using handler: RemoteCommandHandler) {
         
         let commandCenter = MPRemoteCommandCenter.shared()
         
-        commandCenter.pauseCommand.addTarget { [weak handler] _ in
-            guard let handler = handler else { return .noActionableNowPlayingItem }
+        // Clear existing targets before registering new ones
+        clearRemoteCommands()
+        
+        // Store the current handler
+        currentHandler = handler
+        
+        commandCenter.pauseCommand.addTarget { _ in
+            guard let handler = currentHandler else { return .noActionableNowPlayingItem }
             handler.performRemoteCommand(.pause)
             return .success
         }
         
-        commandCenter.playCommand.addTarget { [weak handler] _ in
-            guard let handler = handler else { return .noActionableNowPlayingItem }
+        commandCenter.playCommand.addTarget { _ in
+            guard let handler = currentHandler else { return .noActionableNowPlayingItem }
             handler.performRemoteCommand(.play)
             return .success
         }
         
-        commandCenter.togglePlayPauseCommand.addTarget { [weak handler] _ in
-            guard let handler = handler else { return .noActionableNowPlayingItem }
+        commandCenter.togglePlayPauseCommand.addTarget { _ in
+            guard let handler = currentHandler else { return .noActionableNowPlayingItem }
             handler.performRemoteCommand(.togglePlayPause)
             return .success
         }
         
-        commandCenter.nextTrackCommand.addTarget { [weak handler] _ in
-            guard let handler = handler else { return .noActionableNowPlayingItem }
+        commandCenter.nextTrackCommand.addTarget { _ in
+            guard let handler = currentHandler else { return .noActionableNowPlayingItem }
             handler.performRemoteCommand(.nextTrack)
             return .success
         }
         
-        commandCenter.previousTrackCommand.addTarget { [weak handler] _ in
-            guard let handler = handler else { return .noActionableNowPlayingItem }
+        commandCenter.previousTrackCommand.addTarget { _ in
+            guard let handler = currentHandler else { return .noActionableNowPlayingItem }
             handler.performRemoteCommand(.previousTrack)
             return .success
         }
@@ -77,13 +85,31 @@ class RemoteCommandCenter {
         //     return .success
         // }
         
-        commandCenter.changePlaybackPositionCommand.addTarget { [weak handler] event in
-            guard let handler = handler,
+        commandCenter.changePlaybackPositionCommand.addTarget { event in
+            guard let handler = currentHandler,
                 let event = event as? MPChangePlaybackPositionCommandEvent
                 else { return .noActionableNowPlayingItem }
             
             handler.performRemoteCommand(.changePlaybackPosition(event.positionTime))
             return .success
         }
+    }
+    
+    /// Clears all remote command targets to prevent duplicate registrations
+    private static func clearRemoteCommands() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        
+        commandCenter.pauseCommand.removeTarget(nil)
+        commandCenter.playCommand.removeTarget(nil)
+        commandCenter.togglePlayPauseCommand.removeTarget(nil)
+        commandCenter.nextTrackCommand.removeTarget(nil)
+        commandCenter.previousTrackCommand.removeTarget(nil)
+        commandCenter.changePlaybackPositionCommand.removeTarget(nil)
+    }
+    
+    /// Call this when the app is about to be terminated or when changing handlers
+    static func cleanup() {
+        clearRemoteCommands()
+        currentHandler = nil
     }
 }
