@@ -707,6 +707,8 @@ struct NowPlayingRowView: View {
     let currentItemIndex: Int?
     @ObservedObject var playlistStatus: PlaylistStatus
     @State private var isHovered: Bool = false
+    @State private var showButtons: Bool = false
+    @State private var hoverTask: Task<Void, Never>?
     
     private var isInPlayNextQueue: Bool {
         guard let currentIndex = currentItemIndex else { return false }
@@ -758,7 +760,7 @@ struct NowPlayingRowView: View {
             Spacer()
 
             // Play Next button (only show for non-current items, on hover, and not already in play next queue)
-            if index != currentItemIndex && isHovered && !isInPlayNextQueue {
+            if index != currentItemIndex && showButtons && !isInPlayNextQueue {
                 Button(action: {
                     Task {
                         await playlistStatus.addToPlayNext(item)
@@ -772,7 +774,7 @@ struct NowPlayingRowView: View {
             }
 
             // Remove button (only show on hover)
-            if isHovered {
+            if showButtons {
                 Button(action: {
                     Task {
                         await playlistStatus.deleteBySongId(id: item.id)
@@ -796,11 +798,32 @@ struct NowPlayingRowView: View {
         )
         .onHover { hovering in
             isHovered = hovering
+            
+            // 取消之前的任务
+            hoverTask?.cancel()
+            
+            if hovering {
+                // 鼠标进入，设置100ms延迟显示按钮
+                hoverTask = Task {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                    if !Task.isCancelled && isHovered {
+                        await MainActor.run {
+                            showButtons = true
+                        }
+                    }
+                }
+            } else {
+                // 鼠标离开，立即隐藏按钮
+                showButtons = false
+            }
         }
         .onTapGesture {
             Task {
                 await playlistStatus.playBySongId(id: item.id)
             }
+        }
+        .onDisappear {
+            hoverTask?.cancel()
         }
     }
 }
