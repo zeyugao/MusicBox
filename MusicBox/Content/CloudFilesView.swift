@@ -45,7 +45,6 @@ struct CloudFilesView: View {
 
     var body: some View {
         Group {
-
             VStack {
                 CloudFileTableView(
                     cloudFiles: filteredCloudFiles,

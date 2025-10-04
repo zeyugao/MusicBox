@@ -382,76 +382,74 @@ struct ContentView: View {
             .listStyle(SidebarListStyle())
             .frame(minWidth: 200, idealWidth: 250)
         } detail: {
-            VStack(spacing: 0) {
-                NavigationStack(path: $navigationPath) {
-                    switch currentSelection {
-                    case .account:
-                        if isInitialized {
-                            AccountView()
+            ZStack(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    NavigationStack(path: $navigationPath) {
+                        switch currentSelection {
+                        case .account:
+                            if isInitialized {
+                                AccountView()
+                                    .environmentObject(userInfo)
+                                    .environmentObject(playlistStatus)
+                                    .environmentObject(appSettings)
+                                    .navigationTitle("Settings")
+                                    .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                        PlayingDetailView()
+                                            .environmentObject(playStatus)
+                                            .environmentObject(playlistStatus)
+                                    }
+                            } else {
+                                Color.clear
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
+                        case .cloudFiles:
+                            CloudFilesView()
                                 .environmentObject(userInfo)
-                                .environmentObject(playlistStatus)
-                                .environmentObject(appSettings)
-                                .navigationTitle("Settings")
+                                .navigationTitle("My Cloud Files")
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
                                         .environmentObject(playStatus)
                                         .environmentObject(playlistStatus)
                                 }
-                        } else {
-                            Color.clear
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }
-                    case .cloudFiles:
-                        CloudFilesView()
-                            .environmentObject(userInfo)
-                            .navigationTitle("My Cloud Files")
-                            .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                PlayingDetailView()
-                                    .environmentObject(playStatus)
-                                    .environmentObject(playlistStatus)
-                            }
-                    case .explore:
-                        ExploreView(
-                            navigationPath: $navigationPath, isInitialized: isInitialized
-                        )
-                        .environmentObject(userInfo)
-                        .environmentObject(playlistStatus)
-                        .navigationTitle("Explore")
-                        .navigationDestination(for: PlayingDetailPath.self) { _ in
-                            PlayingDetailView()
-                                .environmentObject(playStatus)
-                                .environmentObject(playlistStatus)
-                        }
-                    case let .playlist(playlist):
-                        let metadata = PlaylistMetadata.netease(
-                            playlist.id, playlist.name)
-                        PlayListView(playlistMetadata: metadata)
+                        case .explore:
+                            ExploreView(
+                                navigationPath: $navigationPath, isInitialized: isInitialized
+                            )
                             .environmentObject(userInfo)
                             .environmentObject(playlistStatus)
-                            .navigationTitle(playlist.name)
+                            .navigationTitle("Explore")
                             .navigationDestination(for: PlayingDetailPath.self) { _ in
                                 PlayingDetailView()
                                     .environmentObject(playStatus)
                                     .environmentObject(playlistStatus)
                             }
+                        case let .playlist(playlist):
+                            let metadata = PlaylistMetadata.netease(
+                                playlist.id, playlist.name)
+                            PlayListView(playlistMetadata: metadata)
+                                .environmentObject(userInfo)
+                                .environmentObject(playlistStatus)
+                                .navigationTitle(playlist.name)
+                                .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                    PlayingDetailView()
+                                        .environmentObject(playStatus)
+                                        .environmentObject(playlistStatus)
+                                }
+                        }
+                    }
+                    .onChange(of: navigationPath) { _, newValue in
+                        playingDetailModel.checkIsDetailFront(navigationPath: newValue)
                     }
                 }
-                .onChange(of: navigationPath) { _, newValue in
-                    playingDetailModel.checkIsDetailFront(navigationPath: newValue)
-                }
 
-                VStack(spacing: 0) {
-                    Spacer()
-                        .frame(height: 0)
-                    PlayerControlView(navigationPath: $navigationPath)
-                        .environmentObject(playlistStatus)
-                        .environmentObject(playStatus)
-                        .environmentObject(userInfo)
-                        .environmentObject(playingDetailModel)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
-                        .padding(.top, 8)
-                }
+                // Floating PlayerControlView
+                PlayerControlView(navigationPath: $navigationPath)
+                    .environmentObject(playlistStatus)
+                    .environmentObject(playStatus)
+                    .environmentObject(userInfo)
+                    .environmentObject(playingDetailModel)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
             }
         }
         .task {
