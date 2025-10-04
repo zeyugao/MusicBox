@@ -274,55 +274,62 @@ struct AVRoutePickerViewWrapper: NSViewRepresentable {
 struct PlaySliderView: View {
     @EnvironmentObject var playStatus: PlayStatus
     @ObservedObject var playbackProgress: PlaybackProgress
-    @State private var isHovering: Bool = false
+    @State private var isEditing: Bool = false
+    @State private var targetValue: Double = 0.0
+    @State private var lastSeekTime: Date = Date.distantPast
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                // Background track
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(height: 4)
-                    .cornerRadius(2)
+        Slider(
+            value: Binding(
+                get: {
+                    guard !self.playStatus.isLoading else {
+                        return self.playbackProgress.playedSecond
+                    }
 
-                // Progress track
-                Rectangle()
-                    .fill(Color.primary)
-                    .frame(
-                        width: max(
-                            0,
-                            min(
-                                geometry.size.width,
-                                geometry.size.width
-                                    * (playbackProgress.playedSecond
-                                        / max(playbackProgress.duration, 0.01)))),
-                        height: 4
-                    )
-                    .cornerRadius(2)
-            }
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                isHovering = hovering
-            }
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        guard !playStatus.isLoading else { return }
-                        isHovering = true
+                    if self.isEditing || self.playStatus.isSeeking {
+                        return targetValue
+                    } else {
+                        return self.playbackProgress.playedSecond
                     }
-                    .onEnded { value in
-                        guard !playStatus.isLoading else { return }
-                        let progress = min(
-                            max(value.location.x / geometry.size.width, 0), 1)
-                        let targetTime = progress * playbackProgress.duration
+                },
+                set: {
+                    newValue in
+                    guard !self.playStatus.isLoading else { return }
+
+                    if isEditing {
+                        targetValue = newValue
+                    }
+                    // 移除这里的 seek 调用，只在 onEditingChanged 中处理
+                    // 避免重复调用 seekToOffset
+                }
+            ),
+            in: 0...self.playbackProgress.duration
+        ) {
+            editing in
+            guard !self.playStatus.isLoading else { return }
+
+            // 避免重复回调：只在状态真正改变时处理
+            if self.isEditing != editing {
+                if !editing {
+                    // 防止重复调用：检查距离上次 seek 的时间间隔
+                    let now = Date()
+                    if now.timeIntervalSince(lastSeekTime) > 0.1 {
+                        lastSeekTime = now
                         Task {
-                            await playStatus.seekToOffset(offset: targetTime)
+                            await self.playStatus.seekToOffset(offset: targetValue)
                         }
-                        isHovering = false
                     }
-            )
+                } else {
+                    // 开始编辑时，确保 targetValue 是当前值
+                    targetValue = self.playbackProgress.playedSecond
+                }
+                self.isEditing = editing
+            }
         }
-        .frame(height: 4)
+        .disabled(self.playStatus.isLoading)
+        .controlSize(.mini)
+        .tint(.secondary)
+        .sliderThumbVisibility(.hidden)
     }
 }
 
