@@ -172,7 +172,6 @@ struct VolumePopoverButton: View {
         }) {
             Image(systemName: volumeIconName)
                 .resizable()
-                .foregroundColor(.secondary)
                 .frame(width: 16, height: 14)
         }
         .buttonStyle(PlayControlButtonStyle())
@@ -196,7 +195,6 @@ struct VolumePopoverButton: View {
                     } maximumValueLabel: {
                         Image(systemName: "speaker.3.fill")
                     }
-                    .tint(.secondary)
                     .controlSize(.mini)
 
                     // Image(systemName: "speaker.fill")
@@ -249,7 +247,7 @@ struct AVRoutePickerViewWrapper: NSViewRepresentable {
         if #available(macOS 10.15, *) {
             routePickerView.setRoutePickerButtonColor(NSColor.labelColor, for: .normal)
             routePickerView.setRoutePickerButtonColor(
-                NSColor.secondaryLabelColor, for: .normalHighlighted)
+                NSColor.labelColor, for: .normalHighlighted)
         }
 
         return routePickerView
@@ -389,22 +387,20 @@ struct PlayerControlView: View {
     var body: some View {
         HStack(spacing: 20) {
             // Left: Playback controls
-            HStack(spacing: 24) {
+            HStack(spacing: 16) {
                 Button(action: {
                     Task { await playlistStatus.previousTrack() }
                 }) {
                     Image(systemName: "backward.fill")
                         .resizable()
-                        .frame(width: 16, height: 16)
+                        .frame(width: 14, height: 14)
                 }
                 .buttonStyle(PlayControlButtonStyle())
-                .foregroundColor(.secondary)
 
                 if !playStatus.readyToPlay {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle())
-                        .frame(width: 20, height: 20)
-                        .foregroundColor(.secondary)
+                        .frame(width: 14, height: 14)
                 } else {
                     Button(action: {
                         Task {
@@ -416,7 +412,7 @@ struct PlayerControlView: View {
                                 ? "pause.fill" : "play.fill"
                         )
                         .resizable()
-                        .frame(width: 20, height: 20)
+                        .frame(width: 16, height: 16)
                     }
                     .keyboardShortcut(.space, modifiers: [])
                     .buttonStyle(PlayControlButtonStyle())
@@ -427,7 +423,6 @@ struct PlayerControlView: View {
                             await playStatus.togglePlayPause()
                         }
                     }
-                    .foregroundColor(.secondary)
                 }
 
                 Button(action: {
@@ -435,10 +430,9 @@ struct PlayerControlView: View {
                 }) {
                     Image(systemName: "forward.fill")
                         .resizable()
-                        .frame(width: 16, height: 16)
+                        .frame(width: 14, height: 14)
                 }
                 .buttonStyle(PlayControlButtonStyle())
-                .foregroundColor(.secondary)
             }
 
             // Left-aligned: Album art with track info, and progress below
@@ -559,7 +553,6 @@ struct PlayerControlView: View {
                     }
                 }
                 .buttonStyle(PlayControlButtonStyle())
-                .foregroundColor(.secondary)
                 .help("Now Playing")
                 .popover(isPresented: $showNowPlayingPopover) {
                     NowPlayingPopoverView(isPresented: $showNowPlayingPopover)
@@ -586,7 +579,6 @@ struct PlayerControlView: View {
                         .help(favored ? "Unfavor" : "Favor")
                 }
                 .buttonStyle(PlayControlButtonStyle())
-                .foregroundColor(.secondary)
 
                 // Volume popover button
                 VolumePopoverButton(playStatus: playStatus)
