@@ -483,7 +483,7 @@ class MetadataLoader {
             return cached
         }
 
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         do {
             // Load all needed properties in parallel
             async let metadataItems = asset.load(.commonMetadata)
