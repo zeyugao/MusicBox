@@ -860,21 +860,14 @@ class CloudMusicApi {
         }
     }
 
-    func cloud(filePath: URL, songName: String?, artist: String?, album: String?, appendZero: Bool = false) async throws
+    func cloud(filePath: URL, songName: String?, artist: String?, album: String?) async throws
         -> UInt64?
     {
         let data: String = {
-            guard var fileData = try? Data(contentsOf: filePath) else {
+            guard let fileData = try? Data(contentsOf: filePath) else {
                 return ""
             }
-            
-            if appendZero {
-                let randomByte1 = UInt8.random(in: 0...255)
-                let randomByte2 = UInt8.random(in: 0...255)
-                fileData.append(randomByte1)
-                fileData.append(randomByte2)
-            }
-            
+
             return fileData.base64EncodedString()
         }()
         
