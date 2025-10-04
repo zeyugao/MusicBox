@@ -16,7 +16,7 @@ jobs:
     env:
       BUILD_TYPE: Release
       BUILD_PATH: build
-      QT_VERSION: 6.7.0
+      QT_VERSION: 6.9.3
       archiveName: MusicBox
     steps:
       - name: Checkout
