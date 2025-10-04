@@ -90,22 +90,6 @@ enum NavigationScreen: Hashable, Equatable, Encodable {
     }
 }
 
-enum PlayingDetailPath: Hashable, Codable {
-    case playing
-
-    enum CodingKeys: String, CodingKey {
-        case playing
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case .playing:
-            try container.encode("playing", forKey: .playing)
-        }
-    }
-}
-
 struct TextWithImage: View {
     var text: String
     var image: String?
@@ -190,44 +174,19 @@ struct PlaylistRowView: View {
 class PlayingDetailModel: ObservableObject {
     @Published var isPresented = false
 
-    private static let targetName = String(reflecting: PlayingDetailPath.self)
-    private static let encoder = JSONEncoder()
-
     @MainActor
-    func checkIsDetailFront(navigationPath: NavigationPath) {
-        guard let data = try? navigationPath.codable.map(Self.encoder.encode),
-            let items = data.asType([String].self)
-        else { return }
-
-        let newIsPresented = items.first == Self.targetName
-
-        // Only update if the value actually changed to prevent multiple updates per frame
-        if self.isPresented != newIsPresented {
-            self.isPresented = newIsPresented
-        }
+    func togglePlayingDetail() {
+        isPresented.toggle()
     }
 
     @MainActor
-    func togglePlayingDetail(navigationPath: inout NavigationPath) {
-        if isPresented {
-            navigationPath.removeLast()
-        } else {
-            navigationPath.append(PlayingDetailPath.playing)
-        }
+    func openPlayingDetail() {
+        isPresented = true
     }
 
     @MainActor
-    func openPlayingDetail(navigationPath: inout NavigationPath) {
-        if !isPresented {
-            navigationPath.append(PlayingDetailPath.playing)
-        }
-    }
-
-    @MainActor
-    func closePlayingDetail(navigationPath: inout NavigationPath) {
-        if isPresented {
-            navigationPath.removeLast()
-        }
+    func closePlayingDetail() {
+        isPresented = false
     }
 }
 
@@ -322,7 +281,6 @@ struct ContentView: View {
 
     @StateObject private var alertModel = AlertModal()
 
-    @State private var navigationPath = NavigationPath()
     @State private var isInitialized = false
 
     private var currentSelection: NavigationScreen {
@@ -381,69 +339,42 @@ struct ContentView: View {
             }
             .listStyle(SidebarListStyle())
             .frame(minWidth: 200, idealWidth: 250)
-        } detail: {
+        } content: {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
-                    NavigationStack(path: $navigationPath) {
-                        switch currentSelection {
-                        case .account:
-                            if isInitialized {
-                                AccountView()
-                                    .environmentObject(userInfo)
-                                    .environmentObject(playlistStatus)
-                                    .environmentObject(appSettings)
-                                    .navigationTitle("Settings")
-                                    .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                        PlayingDetailView()
-                                            .environmentObject(playStatus)
-                                            .environmentObject(playlistStatus)
-                                    }
-                            } else {
-                                Color.clear
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            }
-                        case .cloudFiles:
-                            CloudFilesView()
+                    switch currentSelection {
+                    case .account:
+                        if isInitialized {
+                            AccountView()
                                 .environmentObject(userInfo)
-                                .navigationTitle("My Cloud Files")
-                                .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                    PlayingDetailView()
-                                        .environmentObject(playStatus)
-                                        .environmentObject(playlistStatus)
-                                }
-                        case .explore:
-                            ExploreView(
-                                navigationPath: $navigationPath, isInitialized: isInitialized
-                            )
+                                .environmentObject(playlistStatus)
+                                .environmentObject(appSettings)
+                                .navigationTitle("Settings")
+                        } else {
+                            Color.clear
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    case .cloudFiles:
+                        CloudFilesView()
+                            .environmentObject(userInfo)
+                            .navigationTitle("My Cloud Files")
+                    case .explore:
+                        ExploreView(isInitialized: isInitialized)
                             .environmentObject(userInfo)
                             .environmentObject(playlistStatus)
                             .navigationTitle("Explore")
-                            .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                PlayingDetailView()
-                                    .environmentObject(playStatus)
-                                    .environmentObject(playlistStatus)
-                            }
-                        case let .playlist(playlist):
-                            let metadata = PlaylistMetadata.netease(
-                                playlist.id, playlist.name)
-                            PlayListView(playlistMetadata: metadata)
-                                .environmentObject(userInfo)
-                                .environmentObject(playlistStatus)
-                                .navigationTitle(playlist.name)
-                                .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                    PlayingDetailView()
-                                        .environmentObject(playStatus)
-                                        .environmentObject(playlistStatus)
-                                }
-                        }
-                    }
-                    .onChange(of: navigationPath) { _, newValue in
-                        playingDetailModel.checkIsDetailFront(navigationPath: newValue)
+                    case let .playlist(playlist):
+                        let metadata = PlaylistMetadata.netease(
+                            playlist.id, playlist.name)
+                        PlayListView(playlistMetadata: metadata)
+                            .environmentObject(userInfo)
+                            .environmentObject(playlistStatus)
+                            .navigationTitle(playlist.name)
                     }
                 }
 
                 // Floating PlayerControlView
-                PlayerControlView(navigationPath: $navigationPath)
+                PlayerControlView()
                     .environmentObject(playlistStatus)
                     .environmentObject(playStatus)
                     .environmentObject(userInfo)
@@ -451,7 +382,13 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
             }
+        } detail: {
+            PlayingDetailView()
+                .environmentObject(playStatus)
+                .environmentObject(playlistStatus)
+                .navigationSplitViewColumnWidth(ideal: 400, max: 600)
         }
+        .navigationSplitViewStyle(.balanced)
         .task {
             // Connect PlayStatus with PlayingDetailModel before loading state
             playStatus.setPlayingDetailModel(playingDetailModel)
@@ -473,11 +410,11 @@ struct ContentView: View {
             // Initialize Now Playing Center after everything is loaded
             // This ensures system media controls work from app startup
             playStatus.nowPlayingInit()
-            
+
             // Re-register remote commands to ensure they work reliably from startup
             // This helps ensure media keys work immediately when the app launches
             playlistStatus.reinitializeRemoteCommands()
-            
+
             isInitialized = true
         }
         .alert(

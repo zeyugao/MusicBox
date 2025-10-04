@@ -375,14 +375,8 @@ struct PlayerControlView: View {
     @State private var currentItemId: UInt64?
     @State private var showNowPlayingPopover: Bool = false
 
-    @Binding private var navigationPath: NavigationPath
-
     let height = 60.0
     let albumImageSize = 36.0
-
-    init(navigationPath: Binding<NavigationPath>) {
-        _navigationPath = navigationPath
-    }
 
     func secondsToMinutesAndSeconds(seconds: Double) -> String {
         let seconds_int = Int(seconds)
@@ -490,7 +484,7 @@ struct PlayerControlView: View {
                             isHovered = hovering
                         }
                         .onTapGesture {
-                            playingDetailModel.togglePlayingDetail(navigationPath: &navigationPath)
+                            playingDetailModel.togglePlayingDetail()
                         }
                     } else {
                         ZStack {

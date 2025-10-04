@@ -118,7 +118,6 @@ struct PlayingDetailView: View {
     @EnvironmentObject var playlistStatus: PlaylistStatus
     @State var hasRoma: Bool = false
     @State private var showNoLyricMessage: Bool = false
-    @State private var artworkUrl: URL?
 
     func updateLyric() async {
         showNoLyricMessage = false
@@ -156,82 +155,31 @@ struct PlayingDetailView: View {
         }
     }
 
-    func updateArtwork() async {
-        if let item = playStatus.currentItem {
-            artworkUrl = await item.getArtworkUrl()
-        } else {
-            artworkUrl = nil
-        }
-    }
-
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                if let item = playStatus.currentItem {
-                    HStack(alignment: .center) {
-                        VStack {
-                            if let artworkUrl = artworkUrl {
-                                AsyncImageWithCache(url: artworkUrl) { image in
-                                    image.resizable()
-                                        .interpolation(.high)
-                                        .scaledToFit()
-                                } placeholder: {
-                                    Image(systemName: "music.note")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 60, height: 60)
-                                        .foregroundColor(.gray)
-                                        .background(Color.gray.opacity(0.2))
-                                }
-                                .frame(width: 200, height: 200)
-                                .cornerRadius(5)
-                            } else {
-                                Image(systemName: "music.note")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 60, height: 60)
-                                    .foregroundColor(.gray)
-                                    .frame(width: 200, height: 200)
-                                    .background(Color.gray.opacity(0.2))
-                                    .cornerRadius(5)
-                            }
-                            Text(item.title)
-                                .font(.title)
-                                .padding()
-                            Text(item.artist)
-                                .font(.title2)
-                        }
-                        .frame(width: geometry.size.width * 0.33, height: geometry.size.height)
-
-                        Spacer()
-
-                        VStack {
-                            if let lyric = lyric {
-                                LyricView(
-                                    lyric: lyric,
-                                    lyricStatus: playStatus.lyricStatus,
-                                    hasRoma: $hasRoma
-                                )
-                            } else if showNoLyricMessage {
-                                Text("还没有歌词")
-                            }
-                        }
-                        .frame(width: geometry.size.width * 0.66, height: geometry.size.height)
+        ZStack {
+            if playStatus.currentItem != nil {
+                VStack {
+                    if let lyric = lyric {
+                        LyricView(
+                            lyric: lyric,
+                            lyricStatus: playStatus.lyricStatus,
+                            hasRoma: $hasRoma
+                        )
+                    } else if showNoLyricMessage {
+                        Text("还没有歌词")
                     }
-                    .padding()
                 }
-            }.task {
-                await updateLyric()
-                await updateArtwork()
+                .padding()
             }
-            .onChange(of: playStatus.currentItem) {
-                artworkUrl = nil  // Clear immediately for visual feedback
-                Task {
-                    await updateLyric()
-                    await updateArtwork()
-                }
-            }
-            .navigationTitle(playStatus.currentItem?.title ?? "Playing")
         }
+        .task {
+            await updateLyric()
+        }
+        .onChange(of: playStatus.currentItem) {
+            Task {
+                await updateLyric()
+            }
+        }
+        .navigationTitle(playStatus.currentItem?.title ?? "Playing")
     }
 }

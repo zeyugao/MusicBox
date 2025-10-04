@@ -99,15 +99,14 @@ struct ExploreView: View {
     @State private var searchSuggestions = [CloudMusicApi.Song]()
     @State private var task: Task<Void, Never>?
     @State private var isLoading = false
+    @State private var navigationPath = NavigationPath()
 
-    @Binding private var navigationPath: NavigationPath
     private let isInitialized: Bool
 
     @EnvironmentObject var playController: PlaylistStatus
     @EnvironmentObject private var userInfo: UserInfo
 
-    init(navigationPath: Binding<NavigationPath>, isInitialized: Bool) {
-        _navigationPath = navigationPath
+    init(isInitialized: Bool) {
         self.isInitialized = isInitialized
     }
 
@@ -120,104 +119,106 @@ struct ExploreView: View {
     }
 
     var body: some View {
-        ZStack {
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))]) {
-                    ForEach(recommendResource) { res in
-                        RecommendResourceIcon(res: res)
-                            .padding()
-                            .onTapGesture {
-                                gotoPlaylist(id: res.id, name: res.name)
+        NavigationStack(path: $navigationPath) {
+            ZStack {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))]) {
+                        ForEach(recommendResource) { res in
+                            RecommendResourceIcon(res: res)
+                                .padding()
+                                .onTapGesture {
+                                    gotoPlaylist(id: res.id, name: res.name)
+                                }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+                .task(id: isInitialized) {
+                    guard isInitialized else { return }
+
+                    // Only attempt to get recommendations if the user is logged in
+                    if userInfo.profile != nil {
+                        if let res = await CloudMusicApi(cacheTtl: 5 * 60).recommend_resource() {
+                            recommendResource.append(contentsOf: res)
+                        }
+                    }
+                }
+                .searchable(
+                    text: $searchText,
+                    suggestions: {
+                        ForEach(searchSuggestions, id: \.self) { suggestion in
+                            Text(suggestion.name + " - " + suggestion.al.name)
+                                .lineLimit(1)
+                                .searchCompletion(
+                                    "##%%ID" + String(suggestion.id))
+                        }
+                    }
+                )
+                .onSubmit(of: .search) {
+                    Task {
+                        isLoading = true
+                        defer { isLoading = false }
+
+                        if searchText.starts(with: "##%%ID") {
+                            let data = searchText.dropFirst(6)
+                            let id = UInt64(data) ?? 0
+
+                            if let res = await CloudMusicApi(cacheTtl: 5 * 60).song_detail(ids: [id]) {
+                                displaySearchResult(res)
                             }
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-            .task(id: isInitialized) {
-                guard isInitialized else { return }
 
-                // Only attempt to get recommendations if the user is logged in
-                if userInfo.profile != nil {
-                    if let res = await CloudMusicApi(cacheTtl: 5 * 60).recommend_resource() {
-                        recommendResource.append(contentsOf: res)
-                    }
-                }
-            }
-            .searchable(
-                text: $searchText,
-                suggestions: {
-                    ForEach(searchSuggestions, id: \.self) { suggestion in
-                        Text(suggestion.name + " - " + suggestion.al.name)
-                            .lineLimit(1)
-                            .searchCompletion(
-                                "##%%ID" + String(suggestion.id))
-                    }
-                }
-            )
-            .onSubmit(of: .search) {
-                Task {
-                    isLoading = true
-                    defer { isLoading = false }
+                            defer { searchText = "" }
+                            return
+                        }
 
-                    if searchText.starts(with: "##%%ID") {
-                        let data = searchText.dropFirst(6)
-                        let id = UInt64(data) ?? 0
-
-                        if let res = await CloudMusicApi(cacheTtl: 5 * 60).song_detail(ids: [id]) {
+                        if let res = await CloudMusicApi(cacheTtl: 5 * 60).search(keyword: searchText) {
+                            let res = res.map { $0.convertToSong() }
                             displaySearchResult(res)
                         }
+                    }
+                }
+                .navigationDestination(
+                    for: ExploreNavigationPath.self
+                ) { path in
+                    let metadata =
+                        switch path {
+                        case let .playlist(id, name):
+                            PlaylistMetadata.netease(id, name)
+                        case let .searchResult(result):
+                            PlaylistMetadata.songs(result, path.id, "搜索结果")
+                        }
 
-                        defer { searchText = "" }
+                    PlayListView(playlistMetadata: metadata)
+                        .environmentObject(userInfo)
+                        .environmentObject(playController)
+                }
+                .onChange(of: searchText) { _, text in
+                    task?.cancel()
+
+                    guard !searchText.isEmpty else {
                         return
                     }
 
-                    if let res = await CloudMusicApi(cacheTtl: 5 * 60).search(keyword: searchText) {
-                        let res = res.map { $0.convertToSong() }
-                        displaySearchResult(res)
-                    }
-                }
-            }
-            .navigationDestination(
-                for: ExploreNavigationPath.self
-            ) { path in
-                let metadata =
-                    switch path {
-                    case let .playlist(id, name):
-                        PlaylistMetadata.netease(id, name)
-                    case let .searchResult(result):
-                        PlaylistMetadata.songs(result, path.id, "搜索结果")
-                    }
+                    task = Task {
+                        do {
+                            try await Task.sleep(nanoseconds: UInt64(0.3 * 1_000_000_000))
+                        } catch {
+                            return
+                        }
 
-                PlayListView(playlistMetadata: metadata)
-                    .environmentObject(userInfo)
-                    .environmentObject(playController)
-            }
-            .onChange(of: searchText) { _, text in
-                task?.cancel()
-
-                guard !searchText.isEmpty else {
-                    return
-                }
-
-                task = Task {
-                    do {
-                        try await Task.sleep(nanoseconds: UInt64(0.3 * 1_000_000_000))
-                    } catch {
-                        return
-                    }
-
-                    if let res = await CloudMusicApi(cacheTtl: 1 * 60).search_suggest(
-                        keyword: text)
-                    {
-                        DispatchQueue.main.async {
-                            self.searchSuggestions = res.map { $0.convertToSong() }
+                        if let res = await CloudMusicApi(cacheTtl: 1 * 60).search_suggest(
+                            keyword: text)
+                        {
+                            DispatchQueue.main.async {
+                                self.searchSuggestions = res.map { $0.convertToSong() }
+                            }
                         }
                     }
                 }
-            }
 
-            if isLoading {
-                LoadingIndicatorView()
+                if isLoading {
+                    LoadingIndicatorView()
+                }
             }
         }
     }
