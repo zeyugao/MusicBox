@@ -1434,27 +1434,24 @@ struct UploadProgressRow: View {
             } else if item.isFailed {
                 HStack(spacing: 8) {
                     Text(truncatedErrorMessage)
-                        .foregroundColor(item.retryCount < 2 ? .orange : .red)
+                        .foregroundColor(.red)
                         .font(.caption)
                         .lineLimit(1)
-                        .frame(maxWidth: item.retryCount >= 2 ? 220 : 260, alignment: .trailing)
+                        .frame(maxWidth: 220, alignment: .trailing)
                         .help(item.errorMessage ?? "Upload failed")
 
-                    Image(systemName: item.retryCount < 2 ? "arrow.clockwise" : "xmark.circle.fill")
-                        .foregroundColor(item.retryCount < 2 ? .orange : .red)
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red)
                         .help(item.errorMessage ?? "Upload failed")
                     
-                    // Only show retry button after second failure
-                    if item.retryCount >= 2 {
-                        Button(action: {
-                            onRetry?()
-                        }) {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundColor(.blue)
-                        }
-                        .buttonStyle(.borderless)
-                        .help("Retry upload")
+                    Button(action: {
+                        onRetry?()
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(.blue)
                     }
+                    .buttonStyle(.borderless)
+                    .help("Retry upload")
                 }
             } else if item.isUploading {
                 ProgressView()
@@ -1600,8 +1597,7 @@ class UploadManager: ObservableObject {
             // Find the next item that needs to be processed
             guard let nextIndex = await MainActor.run(body: {
                 uploadQueue.firstIndex { item in
-                    !item.isCompleted && !item.isUploading && 
-                    (!item.isFailed || (item.isFailed && item.retryCount < 2))
+                    !item.isCompleted && !item.isUploading && !item.isFailed
                 }
             }) else {
                 // No more items to process
