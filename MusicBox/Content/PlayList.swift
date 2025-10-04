@@ -756,7 +756,7 @@ class SongTableViewController: NSViewController {
 
     private func setupTableView() {
         scrollView.documentView = tableView
-        scrollView.hasVerticalScroller = false
+        scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
 

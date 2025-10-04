@@ -365,6 +365,9 @@ class CloudFileTableViewController: NSViewController {
     var onMatchWith: ((CloudMusicApi.CloudFile) -> Void)?
     var onUnmatch: ((CloudMusicApi.CloudFile) -> Void)?
 
+    // Bottom padding configuration - number of blank rows to add at the bottom
+    private let bottomPaddingRows = 3
+
     override func loadView() {
         view = NSView()
         setupTableView()
@@ -377,7 +380,7 @@ class CloudFileTableViewController: NSViewController {
 
     private func setupTableView() {
         scrollView.documentView = tableView
-        scrollView.hasVerticalScroller = false
+        scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
 
@@ -406,10 +409,6 @@ class CloudFileTableViewController: NSViewController {
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
-
-        DispatchQueue.main.async { [weak self] in
-            self?.scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 82, right: 0)
-        }
     }
 
     private func setupColumns() {
@@ -477,7 +476,9 @@ class CloudFileTableViewController: NSViewController {
 
 extension CloudFileTableViewController: NSTableViewDataSource {
     func numberOfRows(in tableView: NSTableView) -> Int {
-        return cloudFiles.count
+        // 如果有文件，添加额外的空白行用于底部填充
+        let fileCount = cloudFiles.count
+        return fileCount > 0 ? fileCount + bottomPaddingRows : 0
     }
 }
 
@@ -487,9 +488,14 @@ extension CloudFileTableViewController: NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int)
         -> NSView?
     {
-        guard row < cloudFiles.count else { return nil }
-        let cloudFile = cloudFiles[row]
+        guard !cloudFiles.isEmpty else { return nil }
 
+        // 判断是否为空白填充行
+        if row >= cloudFiles.count {
+            return NSView()
+        }
+
+        let cloudFile = cloudFiles[row]
         guard let identifier = tableColumn?.identifier else { return nil }
 
         switch identifier.rawValue {
@@ -523,7 +529,8 @@ extension CloudFileTableViewController: NSTableViewDelegate {
     }
 
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
-        return true
+        // 只允许选中文件行，不允许选中空白填充行
+        return row < cloudFiles.count
     }
 
     override func rightMouseDown(with event: NSEvent) {

@@ -449,7 +449,7 @@ struct ContentView: View {
                     .environmentObject(userInfo)
                     .environmentObject(playingDetailModel)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 8)
             }
         }
         .task {
