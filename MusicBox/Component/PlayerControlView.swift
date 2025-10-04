@@ -398,31 +398,26 @@ struct PlayerControlView: View {
                 }
                 .buttonStyle(PlayControlButtonStyle())
 
-                if !playStatus.readyToPlay {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .frame(width: 14, height: 14)
-                } else {
-                    Button(action: {
-                        Task {
-                            await playStatus.togglePlayPause()
-                        }
-                    }) {
-                        Image(
-                            systemName: playStatus.playerState == .playing
-                                ? "pause.fill" : "play.fill"
-                        )
-                        .resizable()
-                        .frame(width: 16, height: 16)
+                Button(action: {
+                    Task {
+                        await playStatus.togglePlayPause()
                     }
-                    .keyboardShortcut(.space, modifiers: [])
-                    .buttonStyle(PlayControlButtonStyle())
-                    .frame(width: 20, height: 20)
-                    .onReceive(NotificationCenter.default.publisher(for: .spaceKeyPressed)) {
-                        _ in
-                        Task {
-                            await playStatus.togglePlayPause()
-                        }
+                }) {
+                    Image(
+                        systemName: playStatus.playerState == .playing
+                            ? "pause.fill" : "play.fill"
+                    )
+                    .resizable()
+                    .frame(width: 16, height: 16)
+                }
+                .disabled(!playStatus.readyToPlay)
+                .keyboardShortcut(.space, modifiers: [])
+                .buttonStyle(PlayControlButtonStyle())
+                .frame(width: 20, height: 20)
+                .onReceive(NotificationCenter.default.publisher(for: .spaceKeyPressed)) {
+                    _ in
+                    Task {
+                        await playStatus.togglePlayPause()
                     }
                 }
 
@@ -506,7 +501,7 @@ struct PlayerControlView: View {
                                 .font(.system(size: 13, weight: .medium))
                                 .lineLimit(1)
 
-                            if playStatus.isLoadingNewTrack {
+                            if playStatus.isLoadingNewTrack || !playStatus.readyToPlay {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle())
                                     .scaleEffect(0.5)
@@ -592,7 +587,7 @@ struct PlayerControlView: View {
         .background(Color.gray.opacity(0.005))
         .clipShape(RoundedRectangle(cornerRadius: height / 2))
         // .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: -2)
-        .frame(width: 600)
+        .frame(minWidth: 200)
         .glassEffect()
         .onAppear {
             #if DEBUG

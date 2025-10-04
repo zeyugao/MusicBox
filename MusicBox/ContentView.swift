@@ -339,7 +339,7 @@ struct ContentView: View {
             }
             .listStyle(SidebarListStyle())
             .frame(minWidth: 200, idealWidth: 250)
-        } content: {
+        } detail: {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
                     switch currentSelection {
@@ -380,15 +380,14 @@ struct ContentView: View {
                     .environmentObject(userInfo)
                     .environmentObject(playingDetailModel)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 20)
             }
-        } detail: {
-            PlayingDetailView()
-                .environmentObject(playStatus)
-                .environmentObject(playlistStatus)
-                .navigationSplitViewColumnWidth(ideal: 400, max: 600)
+            .inspector(isPresented: $playingDetailModel.isPresented) {
+                PlayingDetailView()
+                    .environmentObject(playStatus)
+                    .environmentObject(playlistStatus)
+            }
         }
-        .navigationSplitViewStyle(.balanced)
         .task {
             // Connect PlayStatus with PlayingDetailModel before loading state
             playStatus.setPlayingDetailModel(playingDetailModel)

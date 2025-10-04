@@ -366,7 +366,7 @@ class CloudFileTableViewController: NSViewController {
     var onUnmatch: ((CloudMusicApi.CloudFile) -> Void)?
 
     // Bottom padding configuration - number of blank rows to add at the bottom
-    private let bottomPaddingRows = 3
+    private let bottomPaddingRows = 4
 
     override func loadView() {
         view = NSView()

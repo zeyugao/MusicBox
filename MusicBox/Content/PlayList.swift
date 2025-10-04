@@ -738,7 +738,7 @@ class SongTableViewController: NSViewController {
     private let pageSize = 100
 
     // Bottom padding configuration - number of blank rows to add at the bottom
-    private let bottomPaddingRows = 3
+    private let bottomPaddingRows = 4
 
     private var focusCurrentPlayingItemObserver: NSObjectProtocol?
 
@@ -804,8 +804,8 @@ class SongTableViewController: NSViewController {
         // Title column - primary expanding column with manual resize capability
         let titleColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("title"))
         titleColumn.title = "Title"
-        titleColumn.width = 400
-        titleColumn.minWidth = 250
+        titleColumn.width = 200
+        titleColumn.minWidth = 150
         titleColumn.resizingMask = [.autoresizingMask, .userResizingMask]
         tableView.addTableColumn(titleColumn)
 
