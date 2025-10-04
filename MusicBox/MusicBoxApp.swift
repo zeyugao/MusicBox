@@ -143,6 +143,7 @@ struct MusicBoxApp: App {
                         }
                     }
                 }
+                .frame(minWidth: 1000, minHeight: 700)
         }
         .handlesExternalEvents(matching: Set(arrayLiteral: "main"))
         .defaultSize(width: 1000, height: 700)
