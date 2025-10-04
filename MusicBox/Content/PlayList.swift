@@ -753,7 +753,7 @@ class SongTableViewController: NSViewController {
 
     private func setupTableView() {
         scrollView.documentView = tableView
-        scrollView.hasVerticalScroller = true
+        scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
 
@@ -787,6 +787,10 @@ class SongTableViewController: NSViewController {
         // Enable drag and drop
         tableView.registerForDraggedTypes([.fileURL])
         tableView.setDraggingSourceOperationMask(.copy, forLocal: false)
+
+        DispatchQueue.main.async { [weak self] in
+            self?.scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 82, right: 0)
+        }
     }
 
     private func setupColumns() {

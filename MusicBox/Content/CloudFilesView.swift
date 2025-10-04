@@ -377,7 +377,7 @@ class CloudFileTableViewController: NSViewController {
 
     private func setupTableView() {
         scrollView.documentView = tableView
-        scrollView.hasVerticalScroller = true
+        scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
 
@@ -406,6 +406,10 @@ class CloudFileTableViewController: NSViewController {
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+
+        DispatchQueue.main.async { [weak self] in
+            self?.scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 82, right: 0)
+        }
     }
 
     private func setupColumns() {
