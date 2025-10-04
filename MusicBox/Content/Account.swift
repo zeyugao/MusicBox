@@ -417,11 +417,12 @@ struct SettingsView: View {
                     // About Section
                     AboutSection()
 
-                    Spacer(minLength: 20)
+                    // Extra space for floating player control
+                    Color.clear.frame(height: 72)
                 }
                 .frame(maxWidth: 500)
                 .padding(.horizontal, 24)
-                .padding(.vertical, 20)
+                .padding(.top, 20)
 
                 Spacer()
             }
