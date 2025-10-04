@@ -115,7 +115,7 @@ struct NowPlayingPopoverView: View {
             }
         }
         .frame(width: 400)
-        .background(Color(NSColor.windowBackgroundColor))
+        // .background(Color(NSColor.windowBackgroundColor))
     }
 
     private func scrollToCurrentSong(proxy: ScrollViewProxy) {
@@ -147,6 +147,81 @@ struct PlayControlButton: View {
                 .frame(width: 16, height: 16)
         }
         .buttonStyle(PlayControlButtonStyle())
+    }
+}
+
+struct VolumePopoverButton: View {
+    @ObservedObject var playStatus: PlayStatus
+    @State private var showVolumePopover = false
+
+    var volumeIconName: String {
+        if playStatus.volume == 0 {
+            return "speaker.slash.fill"
+        } else if playStatus.volume < 0.33 {
+            return "speaker.wave.1.fill"
+        } else if playStatus.volume < 0.66 {
+            return "speaker.wave.2.fill"
+        } else {
+            return "speaker.wave.3.fill"
+        }
+    }
+
+    var body: some View {
+        Button(action: {
+            showVolumePopover.toggle()
+        }) {
+            Image(systemName: volumeIconName)
+                .resizable()
+                .foregroundColor(.secondary)
+                .frame(width: 16, height: 14)
+        }
+        .buttonStyle(PlayControlButtonStyle())
+        .help("Volume")
+        .popover(isPresented: $showVolumePopover) {
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    Slider(
+                        value: Binding(
+                            get: {
+                                playStatus.volume
+                            },
+                            set: {
+                                playStatus.volume = $0
+                            }
+                        ),
+                        in: 0...1
+                    ) {
+                    } minimumValueLabel: {
+                        Image(systemName: "speaker.fill")
+                    } maximumValueLabel: {
+                        Image(systemName: "speaker.3.fill")
+                    }
+                    .tint(.secondary)
+                    .controlSize(.mini)
+
+                    // Image(systemName: "speaker.fill")
+                    //     .foregroundColor(.secondary)
+                    //     .frame(width: 16)
+
+                    // Slider(
+                    //     value: Binding(
+                    //         get: { playStatus.volume },
+                    //         set: { playStatus.volume = $0 }
+                    //     ),
+                    //     in: 0...1
+                    // )
+                    // .tint(.primary)
+                    // .controlSize(.mini)
+                    // // .frame(width: 80)
+
+                    // Image(systemName: "speaker.wave.3.fill")
+                    //     .foregroundColor(.secondary)
+                    //     .frame(width: 16)
+                }
+            }
+            .padding(12)
+            .frame(width: 160)
+        }
     }
 }
 
@@ -201,61 +276,55 @@ struct AVRoutePickerViewWrapper: NSViewRepresentable {
 struct PlaySliderView: View {
     @EnvironmentObject var playStatus: PlayStatus
     @ObservedObject var playbackProgress: PlaybackProgress
-    @State private var isEditing: Bool = false
-    @State private var targetValue: Double = 0.0
-    @State private var lastSeekTime: Date = Date.distantPast
+    @State private var isHovering: Bool = false
 
     var body: some View {
-        Slider(
-            value: Binding(
-                get: {
-                    guard !self.playStatus.isLoading else {
-                        return self.playbackProgress.playedSecond
-                    }
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Background track
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(height: 4)
+                    .cornerRadius(2)
 
-                    if self.isEditing || self.playStatus.isSeeking {
-                        return targetValue
-                    } else {
-                        return self.playbackProgress.playedSecond
-                    }
-                },
-                set: {
-                    newValue in
-                    guard !self.playStatus.isLoading else { return }
-
-                    if isEditing {
-                        targetValue = newValue
-                    }
-                    // 移除这里的 seek 调用，只在 onEditingChanged 中处理
-                    // 避免重复调用 seekToOffset
-                }
-            ),
-            in: 0...self.playbackProgress.duration
-        ) {
-            editing in
-            guard !self.playStatus.isLoading else { return }
-
-            // 避免重复回调：只在状态真正改变时处理
-            if self.isEditing != editing {
-                if !editing {
-                    // 防止重复调用：检查距离上次 seek 的时间间隔
-                    let now = Date()
-                    if now.timeIntervalSince(lastSeekTime) > 0.1 {
-                        lastSeekTime = now
-                        Task {
-                            await self.playStatus.seekToOffset(offset: targetValue)
-                        }
-                    }
-                } else {
-                    // 开始编辑时，确保 targetValue 是当前值
-                    targetValue = self.playbackProgress.playedSecond
-                }
-                self.isEditing = editing
+                // Progress track
+                Rectangle()
+                    .fill(Color.primary)
+                    .frame(
+                        width: max(
+                            0,
+                            min(
+                                geometry.size.width,
+                                geometry.size.width
+                                    * (playbackProgress.playedSecond
+                                        / max(playbackProgress.duration, 0.01)))),
+                        height: 4
+                    )
+                    .cornerRadius(2)
             }
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                isHovering = hovering
+            }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        guard !playStatus.isLoading else { return }
+                        isHovering = true
+                    }
+                    .onEnded { value in
+                        guard !playStatus.isLoading else { return }
+                        let progress = min(
+                            max(value.location.x / geometry.size.width, 0), 1)
+                        let targetTime = progress * playbackProgress.duration
+                        Task {
+                            await playStatus.seekToOffset(offset: targetTime)
+                        }
+                        isHovering = false
+                    }
+            )
         }
-        .disabled(self.playStatus.isLoading)
-        .controlSize(.mini)
-        .tint(.primary)
+        .frame(height: 4)
     }
 }
 
@@ -270,20 +339,22 @@ struct PlaybackProgressView: View {
     }
 
     var body: some View {
-        HStack {
-            Text(secondsToMinutesAndSeconds(seconds: playbackProgress.playedSecond))
-                .font(.system(size: 12))
-                .lineLimit(1)
-                .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
-                .frame(width: 40)
-
+        VStack(spacing: 4) {
             PlaySliderView(playbackProgress: playbackProgress)
 
-            Text(secondsToMinutesAndSeconds(seconds: playbackProgress.duration))
-                .font(.system(size: 12))
-                .lineLimit(1)
-                .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
-                .frame(width: 40)
+            HStack {
+                Text(secondsToMinutesAndSeconds(seconds: playbackProgress.playedSecond))
+                    .font(.system(size: 10))
+                    .lineLimit(1)
+                    .foregroundStyle(Color(nsColor: NSColor.secondaryLabelColor))
+
+                Spacer()
+
+                Text(secondsToMinutesAndSeconds(seconds: playbackProgress.duration))
+                    .font(.system(size: 10))
+                    .lineLimit(1)
+                    .foregroundStyle(Color(nsColor: NSColor.secondaryLabelColor))
+            }
         }
     }
 }
@@ -301,7 +372,8 @@ struct PlayerControlView: View {
 
     @Binding private var navigationPath: NavigationPath
 
-    let height = 80.0
+    let height = 60.0
+    let albumImageSize = 36.0
 
     init(navigationPath: Binding<NavigationPath>) {
         _navigationPath = navigationPath
@@ -315,242 +387,220 @@ struct PlayerControlView: View {
     }
 
     var body: some View {
-        HStack(spacing: 16) {
-            if let url = artworkUrl {
-                AsyncImageWithCache(url: url) { image in
-                    image.resizable()
-                        .scaledToFit()
-                        .frame(width: height, height: height)
-                } placeholder: {
-                    ZStack {
-                        Color.gray.opacity(0.2)
-                        Image(systemName: "music.note")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 30, height: 30)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(width: height, height: height)
-                }
-                .overlay(
-                    Group {
-                        if isHovered {
-                            Color.gray.opacity(0.4)
-                                .transition(.opacity)
-                                .animation(.easeInOut, value: isHovered)
-                        }
-                    }
-                )
-                .overlay(
-                    Image(
-                        systemName: playingDetailModel.isPresented
-                            ? "rectangle.compress.vertical" : "rectangle.expand.vertical"
-                    )
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 40, height: 40)
-                    .foregroundColor(Color.white.opacity(isHovered ? 1.0 : 0)),
-                    alignment: .center
-                )
-                .onHover { hovering in
-                    isHovered = hovering
-                }
-                .onTapGesture {
-                    playingDetailModel.togglePlayingDetail(navigationPath: &navigationPath)
-                }
-            } else {
-                ZStack {
-                    Color.gray.opacity(0.2)
-                    Image(systemName: "music.note")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 30, height: 30)
-                        .foregroundColor(.secondary)
-                }
-                .frame(width: height, height: height)
-            }
-
-            HStack(spacing: 32) {
-
-                HStack(spacing: 24) {
-                    Button(action: {
-                        Task { await playlistStatus.previousTrack() }
-                    }) {
-                        Image(systemName: "backward.fill")
-                            .resizable()
-                            .frame(width: 16, height: 16)
-                    }
-                    .buttonStyle(PlayControlButtonStyle())
-
-                    if !playStatus.readyToPlay {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .frame(width: 20, height: 20)
-                    } else {
-                        Button(action: {
-                            Task {
-                                await playStatus.togglePlayPause()
-                            }
-                        }) {
-                            Image(
-                                systemName: playStatus.playerState == .playing
-                                    ? "pause.fill" : "play.fill"
-                            )
-                            .resizable()
-                            .frame(width: 20, height: 20)
-                        }
-                        .keyboardShortcut(.space, modifiers: [])
-                        .buttonStyle(PlayControlButtonStyle())
-                        .frame(width: 20, height: 20)
-                        .onReceive(NotificationCenter.default.publisher(for: .spaceKeyPressed)) {
-                            _ in
-                            Task {
-                                await playStatus.togglePlayPause()
-                            }
-                        }
-                    }
-
-                    Button(action: {
-                        Task { await playlistStatus.nextTrack() }
-                    }) {
-                        Image(systemName: "forward.fill")
-                            .resizable()
-                            .frame(width: 16, height: 16)
-                    }
-                    .buttonStyle(PlayControlButtonStyle())
-                }
-            }
-            .padding(.leading, 16)
-
-            Spacer()
-
-            VStack {
-                HStack(spacing: 8) {
-                    Text("\(playlistStatus.currentItem?.title ?? "Title")")
-                        .font(.system(size: 12))
-                        .lineLimit(1)
-
-                    if playStatus.isLoadingNewTrack {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .scaleEffect(0.6)
-                            .frame(width: 12, height: 12)
-                    }
-                }
-                .padding(.bottom, 1)
-
-                Text("\(playlistStatus.currentItem?.artist ?? "Artists")")
-                    .font(.system(size: 12))
-                    .lineLimit(1)
-                    .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
-                    .padding(.bottom, -2)
-                PlaybackProgressView(playbackProgress: playStatus.playbackProgress)
-                    .environmentObject(playStatus)
-                    .frame(maxWidth: 600)
-            }
-            .layoutPriority(1)
-            .frame(minWidth: 240)
-
-            Spacer()
-
-            let currentId = playlistStatus.currentItem?.id ?? 0
-            let favored = (userInfo.likelist.contains(currentId))
-            Button(action: {
-                guard currentId != 0 else { return }
-                Task {
-                    var likelist = userInfo.likelist
-                    await likeSong(
-                        likelist: &likelist,
-                        songId: currentId,
-                        favored: favored
-                    )
-                    userInfo.likelist = likelist
-                }
-            }) {
-                Image(systemName: favored ? "heart.fill" : "heart")
-                    .resizable()
-                    .frame(width: 16, height: 14)
-                    .help(favored ? "Unfavor" : "Favor")
-                    .padding(.trailing, 4)
-            }
-            .buttonStyle(PlayControlButtonStyle())
-
-            Button(action: {
-                playlistStatus.switchToNextLoopMode()
-            }) {
-                Image(
-                    systemName: playlistStatus.loopMode == .once
-                        ? "repeat.1"
-                        : (playlistStatus.loopMode == .sequence ? "repeat" : "shuffle")
-                )
-                .resizable()
-                .frame(width: 16, height: 16)
-            }
-            .buttonStyle(PlayControlButtonStyle())
-            .foregroundColor(.primary)
-
-            // Now Playing Button
-            Button(action: {
-                showNowPlayingPopover.toggle()
-            }) {
-                ZStack {
-                    Image(systemName: "list.bullet")
+        HStack(spacing: 20) {
+            // Left: Playback controls
+            HStack(spacing: 24) {
+                Button(action: {
+                    Task { await playlistStatus.previousTrack() }
+                }) {
+                    Image(systemName: "backward.fill")
                         .resizable()
                         .frame(width: 16, height: 16)
-                    
-                    // Badge showing play next count
-                    if playlistStatus.playNextItemsCount > 0 {
-                        Text("\(playlistStatus.playNextItemsCount)")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(minWidth: 12, minHeight: 12)
-                            .background(
-                                Circle()
-                                    .fill(Color.primary)
-                            )
-                            .offset(x: 10, y: -10)
-                    }
                 }
-            }
-            .buttonStyle(PlayControlButtonStyle())
-            .foregroundColor(.primary)
-            .help("Now Playing")
-            .popover(isPresented: $showNowPlayingPopover) {
-                NowPlayingPopoverView(isPresented: $showNowPlayingPopover)
-                    .environmentObject(playlistStatus)
+                .buttonStyle(PlayControlButtonStyle())
+                .foregroundColor(.secondary)
+
+                if !playStatus.readyToPlay {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                        .frame(width: 20, height: 20)
+                        .foregroundColor(.secondary)
+                } else {
+                    Button(action: {
+                        Task {
+                            await playStatus.togglePlayPause()
+                        }
+                    }) {
+                        Image(
+                            systemName: playStatus.playerState == .playing
+                                ? "pause.fill" : "play.fill"
+                        )
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                    }
+                    .keyboardShortcut(.space, modifiers: [])
+                    .buttonStyle(PlayControlButtonStyle())
+                    .frame(width: 20, height: 20)
+                    .onReceive(NotificationCenter.default.publisher(for: .spaceKeyPressed)) {
+                        _ in
+                        Task {
+                            await playStatus.togglePlayPause()
+                        }
+                    }
+                    .foregroundColor(.secondary)
+                }
+
+                Button(action: {
+                    Task { await playlistStatus.nextTrack() }
+                }) {
+                    Image(systemName: "forward.fill")
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                }
+                .buttonStyle(PlayControlButtonStyle())
+                .foregroundColor(.secondary)
             }
 
-            HStack(spacing: 32) {
-                HStack {
-                    Slider(
-                        value: Binding(
-                            get: {
-                                playStatus.volume
-                            },
-                            set: {
-                                playStatus.volume = $0
+            // Left-aligned: Album art with track info, and progress below
+            VStack(alignment: .leading, spacing: 6) {
+                // Top row: Album art and track info
+                HStack(spacing: 4) {
+                    // Album artwork
+                    if let url = artworkUrl {
+                        AsyncImageWithCache(url: url) { image in
+                            image.resizable()
+                                .scaledToFill()
+                                .frame(width: albumImageSize, height: albumImageSize)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        } placeholder: {
+                            ZStack {
+                                Color.gray.opacity(0.2)
+                                Image(systemName: "music.note")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 20, height: 20)
+                                    .foregroundColor(.secondary)
                             }
-                        ),
-                        in: 0...1
-                    ) {
-                    } minimumValueLabel: {
-                        Image(systemName: "speaker.fill")
-                    } maximumValueLabel: {
-                        Image(systemName: "speaker.3.fill")
+                            .frame(width: albumImageSize, height: albumImageSize)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .overlay(
+                            Group {
+                                if isHovered {
+                                    Color.gray.opacity(0.4)
+                                        .transition(.opacity)
+                                        .animation(.easeInOut, value: isHovered)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
+                            }
+                        )
+                        .overlay(
+                            Image(
+                                systemName: playingDetailModel.isPresented
+                                    ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right"
+                            )
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
+                            .foregroundColor(Color.white.opacity(isHovered ? 1.0 : 0)),
+                            alignment: .center
+                        )
+                        .onHover { hovering in
+                            isHovered = hovering
+                        }
+                        .onTapGesture {
+                            playingDetailModel.togglePlayingDetail(navigationPath: &navigationPath)
+                        }
+                    } else {
+                        ZStack {
+                            Color.gray.opacity(0.2)
+                            Image(systemName: "music.note")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(width: albumImageSize, height: albumImageSize)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .tint(.primary)
-                    .frame(width: 100)
-                    .controlSize(.mini)
 
-                    AudioOutputDeviceButton()
-                        .padding(.leading, 8)
+                    // Track info (title and artist stacked vertically)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text("\(playlistStatus.currentItem?.title ?? "Title")")
+                                .font(.system(size: 13, weight: .medium))
+                                .lineLimit(1)
+
+                            if playStatus.isLoadingNewTrack {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                                    .scaleEffect(0.5)
+                                    .frame(width: 10, height: 10)
+                            }
+                        }
+
+                        Text("\(playlistStatus.currentItem?.artist ?? "Artists")")
+                            .font(.system(size: 13))
+                            .lineLimit(1)
+                            .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
+                    }
                 }
-            }
-            .padding(.trailing, 32)
 
+                // Bottom: Progress bar
+                // PlaybackProgressView(playbackProgress: playStatus.playbackProgress)
+                //     .environmentObject(playStatus)
+                //     .frame(width: 300)
+                PlaySliderView(playbackProgress: playStatus.playbackProgress)
+            }
+
+            // Right: Action buttons
+            HStack(spacing: 16) {
+                // Now Playing Button
+                Button(action: {
+                    showNowPlayingPopover.toggle()
+                }) {
+                    ZStack {
+                        Image(systemName: "list.bullet")
+                            .resizable()
+                            .frame(width: 14, height: 14)
+
+                        // Badge showing play next count
+                        if playlistStatus.playNextItemsCount > 0 {
+                            Text("\(playlistStatus.playNextItemsCount)")
+                                .font(.system(size: 8, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(minWidth: 12, minHeight: 12)
+                                .background(
+                                    Circle()
+                                        .fill(Color.primary)
+                                )
+                                .offset(x: 10, y: -10)
+                        }
+                    }
+                }
+                .buttonStyle(PlayControlButtonStyle())
+                .foregroundColor(.secondary)
+                .help("Now Playing")
+                .popover(isPresented: $showNowPlayingPopover) {
+                    NowPlayingPopoverView(isPresented: $showNowPlayingPopover)
+                        .environmentObject(playlistStatus)
+                }
+
+                let currentId = playlistStatus.currentItem?.id ?? 0
+                let favored = (userInfo.likelist.contains(currentId))
+                Button(action: {
+                    guard currentId != 0 else { return }
+                    Task {
+                        var likelist = userInfo.likelist
+                        await likeSong(
+                            likelist: &likelist,
+                            songId: currentId,
+                            favored: favored
+                        )
+                        userInfo.likelist = likelist
+                    }
+                }) {
+                    Image(systemName: favored ? "heart.fill" : "heart")
+                        .resizable()
+                        .frame(width: 16, height: 14)
+                        .help(favored ? "Unfavor" : "Favor")
+                }
+                .buttonStyle(PlayControlButtonStyle())
+                .foregroundColor(.secondary)
+
+                // Volume popover button
+                VolumePopoverButton(playStatus: playStatus)
+                AudioOutputDeviceButton()
+            }
         }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 6)
         .frame(height: height)
-        .frame(minWidth: 800)
+        .background(Color.gray.opacity(0.005))
+        .clipShape(RoundedRectangle(cornerRadius: height / 2))
+        // .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: -2)
+        .frame(width: 600)
+        .glassEffect()
         .onAppear {
             #if DEBUG
                 print("🎵 PlayerControlView: onAppear triggered")

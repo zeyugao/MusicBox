@@ -342,121 +342,118 @@ struct ContentView: View {
     }
 
     var body: some View {
-        ZStack(
-            alignment: Alignment(horizontal: .trailing, vertical: .bottom),
-            content: {
-                NavigationSplitView {
-                    List(selection: selectionBinding) {
-                        Section(header: Text("General")) {
-                            if userInfo.profile != nil {
-                                TextWithImage("Explore", image: "music.house")
-                                    .tag(NavigationScreen.explore)
-                            }
-                            TextWithImage("Settings", image: "gearshape.fill")
-                                .tag(NavigationScreen.account)
-                            if userInfo.profile != nil {
-                                TextWithImage("My Cloud Files", image: "icloud")
-                                    .tag(NavigationScreen.cloudFiles)
-                            }
-                        }
+        NavigationSplitView {
+            List(selection: selectionBinding) {
+                Section(header: Text("General")) {
+                    if userInfo.profile != nil {
+                        TextWithImage("Explore", image: "music.house")
+                            .tag(NavigationScreen.explore)
+                    }
+                    TextWithImage("Settings", image: "gearshape.fill")
+                        .tag(NavigationScreen.account)
+                    if userInfo.profile != nil {
+                        TextWithImage("My Cloud Files", image: "icloud")
+                            .tag(NavigationScreen.cloudFiles)
+                    }
+                }
 
-                        if userInfo.profile != nil {
-                            Section(header: Text("Created Playlists")) {
-                                ForEach(userInfo.playlists.filter { !$0.subscribed }) {
-                                    playlist in
-                                    let metadata = PlaylistMetadata.netease(
-                                        playlist.id, playlist.name)
-                                    PlaylistRowView(playlist: playlist)
-                                        .tag(NavigationScreen.playlist(playlist: metadata))
-                                }
-                            }
-
-                            Section(header: Text("Favored Playlists")) {
-                                ForEach(userInfo.playlists.filter { $0.subscribed }) {
-                                    playlist in
-                                    let metadata = PlaylistMetadata.netease(
-                                        playlist.id, playlist.name)
-                                    PlaylistRowView(playlist: playlist)
-                                        .tag(NavigationScreen.playlist(playlist: metadata))
-                                }
-                            }
+                if userInfo.profile != nil {
+                    Section(header: Text("Created Playlists")) {
+                        ForEach(userInfo.playlists.filter { !$0.subscribed }) {
+                            playlist in
+                            let metadata = PlaylistMetadata.netease(
+                                playlist.id, playlist.name)
+                            PlaylistRowView(playlist: playlist)
+                                .tag(NavigationScreen.playlist(playlist: metadata))
                         }
                     }
-                    .listStyle(SidebarListStyle())
-                    .frame(minWidth: 200, idealWidth: 250)
-                } detail: {
-                    NavigationStack(path: $navigationPath) {
-                        switch currentSelection {
-                        case .account:
-                            if isInitialized {
-                                AccountView()
-                                    .environmentObject(userInfo)
-                                    .environmentObject(playlistStatus)
-                                    .environmentObject(appSettings)
-                                    .navigationTitle("Settings")
-                                    .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                        PlayingDetailView()
-                                            .environmentObject(playStatus)
-                                            .environmentObject(playlistStatus)
-                                    }
-                            } else {
-                                Color.clear
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            }
-                        case .cloudFiles:
-                            CloudFilesView()
+
+                    Section(header: Text("Favored Playlists")) {
+                        ForEach(userInfo.playlists.filter { $0.subscribed }) {
+                            playlist in
+                            let metadata = PlaylistMetadata.netease(
+                                playlist.id, playlist.name)
+                            PlaylistRowView(playlist: playlist)
+                                .tag(NavigationScreen.playlist(playlist: metadata))
+                        }
+                    }
+                }
+            }
+            .listStyle(SidebarListStyle())
+            .frame(minWidth: 200, idealWidth: 250)
+        } detail: {
+            VStack(spacing: 0) {
+                NavigationStack(path: $navigationPath) {
+                    switch currentSelection {
+                    case .account:
+                        if isInitialized {
+                            AccountView()
                                 .environmentObject(userInfo)
-                                .navigationTitle("My Cloud Files")
+                                .environmentObject(playlistStatus)
+                                .environmentObject(appSettings)
+                                .navigationTitle("Settings")
                                 .navigationDestination(for: PlayingDetailPath.self) { _ in
                                     PlayingDetailView()
                                         .environmentObject(playStatus)
                                         .environmentObject(playlistStatus)
                                 }
-                        case .explore:
-                            ExploreView(
-                                navigationPath: $navigationPath, isInitialized: isInitialized
-                            )
+                        } else {
+                            Color.clear
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    case .cloudFiles:
+                        CloudFilesView()
                             .environmentObject(userInfo)
-                            .environmentObject(playlistStatus)
-                            .navigationTitle("Explore")
+                            .navigationTitle("My Cloud Files")
                             .navigationDestination(for: PlayingDetailPath.self) { _ in
                                 PlayingDetailView()
                                     .environmentObject(playStatus)
                                     .environmentObject(playlistStatus)
                             }
-                        case let .playlist(playlist):
-                            let metadata = PlaylistMetadata.netease(
-                                playlist.id, playlist.name)
-                            PlayListView(playlistMetadata: metadata)
-                                .environmentObject(userInfo)
+                    case .explore:
+                        ExploreView(
+                            navigationPath: $navigationPath, isInitialized: isInitialized
+                        )
+                        .environmentObject(userInfo)
+                        .environmentObject(playlistStatus)
+                        .navigationTitle("Explore")
+                        .navigationDestination(for: PlayingDetailPath.self) { _ in
+                            PlayingDetailView()
+                                .environmentObject(playStatus)
                                 .environmentObject(playlistStatus)
-                                .navigationTitle(playlist.name)
-                                .navigationDestination(for: PlayingDetailPath.self) { _ in
-                                    PlayingDetailView()
-                                        .environmentObject(playStatus)
-                                        .environmentObject(playlistStatus)
-                                }
                         }
+                    case let .playlist(playlist):
+                        let metadata = PlaylistMetadata.netease(
+                            playlist.id, playlist.name)
+                        PlayListView(playlistMetadata: metadata)
+                            .environmentObject(userInfo)
+                            .environmentObject(playlistStatus)
+                            .navigationTitle(playlist.name)
+                            .navigationDestination(for: PlayingDetailPath.self) { _ in
+                                PlayingDetailView()
+                                    .environmentObject(playStatus)
+                                    .environmentObject(playlistStatus)
+                            }
                     }
                 }
                 .onChange(of: navigationPath) { _, newValue in
                     playingDetailModel.checkIsDetailFront(navigationPath: newValue)
                 }
-                .padding(.bottom, 80)
 
                 VStack(spacing: 0) {
-                    Rectangle()
-                        .fill(Color(nsColor: NSColor.separatorColor).opacity(0.5))
-                        .frame(height: 1)
+                    Spacer()
+                        .frame(height: 0)
                     PlayerControlView(navigationPath: $navigationPath)
                         .environmentObject(playlistStatus)
                         .environmentObject(playStatus)
                         .environmentObject(userInfo)
                         .environmentObject(playingDetailModel)
-                        .background(Color(nsColor: NSColor.textBackgroundColor))
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                        .padding(.top, 8)
                 }
             }
-        )
+        }
         .task {
             // Connect PlayStatus with PlayingDetailModel before loading state
             playStatus.setPlayingDetailModel(playingDetailModel)
