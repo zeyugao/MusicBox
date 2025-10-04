@@ -587,7 +587,7 @@ struct PlayerControlView: View {
         .background(Color.gray.opacity(0.005))
         .clipShape(RoundedRectangle(cornerRadius: height / 2))
         // .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: -2)
-        .frame(minWidth: 200)
+        .frame(minWidth: 200, maxWidth: 600)
         .glassEffect()
         .onAppear {
             #if DEBUG
