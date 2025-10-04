@@ -738,6 +738,9 @@ class SongTableViewController: NSViewController {
     var hasMoreSongs: Bool = false
     private let pageSize = 100
 
+    // Bottom padding configuration - number of blank rows to add at the bottom
+    private let bottomPaddingRows = 3
+
     private var focusCurrentPlayingItemObserver: NSObjectProtocol?
 
     override func loadView() {
@@ -787,10 +790,6 @@ class SongTableViewController: NSViewController {
         // Enable drag and drop
         tableView.registerForDraggedTypes([.fileURL])
         tableView.setDraggingSourceOperationMask(.copy, forLocal: false)
-
-        DispatchQueue.main.async { [weak self] in
-            self?.scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 82, right: 0)
-        }
     }
 
     private func setupColumns() {
@@ -991,7 +990,9 @@ class SongTableViewController: NSViewController {
 
 extension SongTableViewController: NSTableViewDataSource {
     func numberOfRows(in tableView: NSTableView) -> Int {
-        return songs?.count ?? 0
+        // 如果有歌曲，添加额外的空白行用于底部填充
+        let songCount = songs?.count ?? 0
+        return songCount > 0 ? songCount + bottomPaddingRows : 0
     }
 }
 
@@ -1001,9 +1002,15 @@ extension SongTableViewController: NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int)
         -> NSView?
     {
-        guard let songs = songs, row < songs.count else { return nil }
-        let song = songs[row]
+        guard let songs = songs, !songs.isEmpty else { return nil }
 
+        // 判断是否为最后一行（我们的空白填充行）
+        if row >= songs.count {
+            // 如果是，为所有列返回一个空的视图即可
+            return NSView()
+        }
+
+        let song = songs[row]
         guard let identifier = tableColumn?.identifier else { return nil }
 
         switch identifier.rawValue {
@@ -1142,6 +1149,11 @@ extension SongTableViewController: NSTableViewDelegate {
         default:
             return []
         }
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        // 只允许选中歌曲行，不允许选中最后的空白行
+        return row < (songs?.count ?? 0)
     }
 
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
