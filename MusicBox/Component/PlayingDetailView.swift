@@ -80,6 +80,9 @@ struct LyricView: View {
                     }
                 }
                 .onChange(of: lyricStatus.currentLyricIndex) { _, newIndex in
+                    #if DEBUG
+                        print("LyricView: currentLyricIndex changed to \(String(describing: newIndex))")
+                    #endif
                     if let index = newIndex {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             scrollToIdx(index)
@@ -153,7 +156,10 @@ struct PlayingDetailView: View {
         .task {
             await updateLyric()
         }
-        .onChange(of: playStatus.currentItem) {
+        .onChange(of: playStatus.currentItem) { oldItem, newItem in
+            #if DEBUG
+                print("PlayingDetailView: currentItem changed from \(oldItem?.title ?? "nil") to \(newItem?.title ?? "nil")")
+            #endif
             Task {
                 await updateLyric()
             }

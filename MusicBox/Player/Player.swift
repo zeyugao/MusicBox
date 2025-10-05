@@ -1079,10 +1079,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
 
     func addItemToPlaylist(
         _ item: PlaylistItem, continuePlaying: Bool = true, shouldSaveState: Bool = false
-    ) -> Int {
+    ) async -> Int {
         let idIdx = findIdIndex(item.id)
         if idIdx == -1 {
-            Task { @MainActor in
+            await MainActor.run {
                 playlist.append(item)
                 if shouldSaveState {
                     saveState()
@@ -1091,7 +1091,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             return playlist.count - 1 // Return expected index
         }
         if shouldSaveState {
-            Task { @MainActor in
+            await MainActor.run {
                 saveState()
             }
         }
@@ -1139,7 +1139,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         _ items: [PlaylistItem], continuePlaying: Bool = true, shouldSaveState: Bool = true
     ) async {
         for item in items {
-            let _ = addItemToPlaylist(
+            let _ = await addItemToPlaylist(
                 item, continuePlaying: continuePlaying, shouldSaveState: false)
         }
         if continuePlaying {
@@ -1311,7 +1311,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     }
 
     func addItemAndSeekTo(_ item: PlaylistItem, shouldPlay: Bool = false) async -> Int {
-        let idIdx = addItemToPlaylist(item, continuePlaying: false)
+        let idIdx = await addItemToPlaylist(item, continuePlaying: false)
         await seekToItem(offset: idIdx, shouldPlay: shouldPlay)
 
         savePlaylist()
