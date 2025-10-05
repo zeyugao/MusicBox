@@ -15,9 +15,6 @@ struct LyricView: View {
     @ObservedObject var lyricStatus: LyricStatus
     @Binding var hasRoma: Bool
 
-    @AppStorage("showRoma") var showRoma: Bool = false
-    @AppStorage("showTimestamp") var showTimestamp: Bool = false
-
     var body: some View {
         ScrollViewReader { proxy in
             let scrollToIdx: (Int) -> Void = { idx in
@@ -34,14 +31,12 @@ struct LyricView: View {
                         let currentPlaying = lyricStatus.currentLyricIndex == index
 
                         VStack(alignment: .leading) {
-                            if showTimestamp {
-                                Text(String(format: "%.2f", line.time))
-                                    .lineLimit(1)
-                                    .font(.footnote)
-                                    .foregroundColor(.gray)
-                            }
+                            Text(String(format: "%.2f", line.time))
+                                .lineLimit(1)
+                                .font(.footnote)
+                                .foregroundColor(.gray)
 
-                            if showRoma, let romalrc = line.romalrc {
+                            if let romalrc = line.romalrc {
                                 Text(romalrc)
                                     .font(.body)
                                     .foregroundStyle(
@@ -85,24 +80,6 @@ struct LyricView: View {
                     if let index = newIndex {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             scrollToIdx(index)
-                        }
-                    }
-                }
-            }
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Toggle(isOn: $showTimestamp) {
-                        Image(systemName: "clock")
-                    }
-                    .onChange(of: showTimestamp) {
-                        scrollToIdx(lyricStatus.currentLyricIndex ?? 0)
-                    }
-                    if hasRoma {
-                        Toggle(isOn: $showRoma) {
-                            Image(systemName: "quote.bubble")
-                        }
-                        .onChange(of: showRoma) {
-                            scrollToIdx(lyricStatus.currentLyricIndex ?? 0)
                         }
                     }
                 }
