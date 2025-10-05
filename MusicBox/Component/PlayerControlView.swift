@@ -128,10 +128,29 @@ struct NowPlayingPopoverView: View {
 struct NowPlayingTrackView: View {
     let artworkUrl: URL?
     let albumImageSize: Double
+    @ObservedObject var playbackProgress: PlaybackProgress
     @EnvironmentObject var playlistStatus: PlaylistStatus
     @EnvironmentObject var playStatus: PlayStatus
 
     let cornerRadius: CGFloat = 6
+
+    private func secondsToMinutesAndSeconds(seconds: Double) -> String {
+        let secondsInt = max(Int(seconds), 0)
+        let minutes = (secondsInt % 3600) / 60
+        let seconds = (secondsInt % 3600) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    private var playbackTimeLabel: String {
+        let elapsed = secondsToMinutesAndSeconds(seconds: playbackProgress.playedSecond)
+        let duration = playbackProgress.duration
+
+        if duration > 0 {
+            return "\(elapsed) / \(secondsToMinutesAndSeconds(seconds: duration))"
+        }
+
+        return elapsed
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -184,15 +203,25 @@ struct NowPlayingTrackView: View {
                         }
                     }
 
-                    Text("\(playlistStatus.currentItem?.artist ?? "Artists")")
-                        .font(.system(size: 13))
-                        .lineLimit(1)
-                        .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
+                    HStack(spacing: 6) {
+                        Text("\(playlistStatus.currentItem?.artist ?? "Artists")")
+                            .font(.system(size: 13))
+                            .lineLimit(1)
+                            .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
+
+                        Spacer(minLength: 4)
+
+                        Text(playbackTimeLabel)
+                            .font(.system(size: 12, weight: .regular))
+                            .lineLimit(1)
+                            .foregroundStyle(Color(nsColor: NSColor.secondaryLabelColor))
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             // Bottom: Progress bar
-            PlaySliderView(playbackProgress: playStatus.playbackProgress)
+            PlaySliderView(playbackProgress: playbackProgress)
         }
     }
 }
@@ -513,7 +542,11 @@ struct PlayerControlView: View {
             .foregroundColor(.primary)
 
             // Left-aligned: Album art with track info, and progress below
-            NowPlayingTrackView(artworkUrl: artworkUrl, albumImageSize: albumImageSize)
+            NowPlayingTrackView(
+                artworkUrl: artworkUrl,
+                albumImageSize: albumImageSize,
+                playbackProgress: playStatus.playbackProgress
+            )
                 .environmentObject(playlistStatus)
                 .environmentObject(playStatus)
 
