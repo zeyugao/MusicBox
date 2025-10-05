@@ -1088,7 +1088,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                     saveState()
                 }
             }
-            return playlist.count  // Return expected index
+            return playlist.count - 1 // Return expected index
         }
         if shouldSaveState {
             Task { @MainActor in

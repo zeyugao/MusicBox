@@ -785,10 +785,6 @@ class SongTableViewController: NSViewController {
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
-
-        // Enable drag and drop
-        tableView.registerForDraggedTypes([.fileURL])
-        tableView.setDraggingSourceOperationMask(.copy, forLocal: false)
     }
 
     private func setupColumns() {
