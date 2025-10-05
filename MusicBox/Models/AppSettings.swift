@@ -15,14 +15,28 @@ class AppSettings: ObservableObject {
             updateSleepAssertion()
         }
     }
-    
+
+    @Published var showTimestamp: Bool = false {
+        didSet {
+            UserDefaults.standard.set(showTimestamp, forKey: "showTimestamp")
+        }
+    }
+
+    @Published var showRoma: Bool = false {
+        didSet {
+            UserDefaults.standard.set(showRoma, forKey: "showRoma")
+        }
+    }
+
     private var sleepAssertionID: IOPMAssertionID = IOPMAssertionID(0)
     private var isPlayingMusic: Bool = false
-    
+
     static let shared = AppSettings()
-    
+
     private init() {
         preventSleepWhenPlaying = UserDefaults.standard.bool(forKey: "preventSleepWhenPlaying")
+        showTimestamp = UserDefaults.standard.bool(forKey: "showTimestamp")
+        showRoma = UserDefaults.standard.bool(forKey: "showRoma")
         setupPlaybackObserver()
     }
     

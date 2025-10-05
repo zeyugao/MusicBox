@@ -386,6 +386,7 @@ struct ContentView: View {
                 PlayingDetailView()
                     .environmentObject(playStatus)
                     .environmentObject(playlistStatus)
+                    .environmentObject(appSettings)
             }
         }
         .task {

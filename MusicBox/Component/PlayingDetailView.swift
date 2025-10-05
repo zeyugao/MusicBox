@@ -12,6 +12,7 @@ import SwiftUI
 struct LyricView: View {
     var lyric: [CloudMusicApi.LyricLine]
     @EnvironmentObject var playStatus: PlayStatus
+    @EnvironmentObject var appSettings: AppSettings
     @ObservedObject var lyricStatus: LyricStatus
     @Binding var hasRoma: Bool
 
@@ -31,12 +32,14 @@ struct LyricView: View {
                         let currentPlaying = lyricStatus.currentLyricIndex == index
 
                         VStack(alignment: .leading) {
-                            Text(String(format: "%.2f", line.time))
-                                .lineLimit(1)
-                                .font(.footnote)
-                                .foregroundColor(.gray)
+                            if appSettings.showTimestamp {
+                                Text(String(format: "%.2f", line.time))
+                                    .lineLimit(1)
+                                    .font(.footnote)
+                                    .foregroundColor(.gray)
+                            }
 
-                            if let romalrc = line.romalrc {
+                            if appSettings.showRoma, let romalrc = line.romalrc {
                                 Text(romalrc)
                                     .font(.body)
                                     .foregroundStyle(

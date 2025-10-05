@@ -513,6 +513,26 @@ struct GeneralSettingsSection: View {
                             .toggleStyle(SwitchToggleStyle())
                     )
                 )
+
+                SettingRow(
+                    icon: "clock",
+                    title: "Show Lyric Timestamps",
+                    description: "Display timestamps for each lyric line",
+                    control: AnyView(
+                        Toggle("", isOn: $appSettings.showTimestamp)
+                            .toggleStyle(SwitchToggleStyle())
+                    )
+                )
+
+                SettingRow(
+                    icon: "quote.bubble",
+                    title: "Show Romanized Lyrics",
+                    description: "Display romanized lyrics when available",
+                    control: AnyView(
+                        Toggle("", isOn: $appSettings.showRoma)
+                            .toggleStyle(SwitchToggleStyle())
+                    )
+                )
             }
             .padding(16)
             .background(Color(NSColor.controlBackgroundColor))
