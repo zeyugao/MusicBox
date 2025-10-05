@@ -1,6 +1,6 @@
 # MusicBox
 
-用 SwiftUI 实现的网易云播放器
+用 SwiftUI 实现的网易云播放器，为 macOS 26 的 Liquid Glass 提供了专门的支持，在旧版本的系统上面的显示可能会出问题。
 
 ## 功能特性
 
