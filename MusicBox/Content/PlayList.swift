@@ -562,7 +562,12 @@ class SongTitleTableCellView: NSTableCellView {
         ])
     }
 
-    func configure(with song: CloudMusicApi.Song, playlistStatus: PlaylistStatus, playlistMetadata: PlaylistMetadata? = nil) {
+    func configure(
+        with song: CloudMusicApi.Song,
+        playlistStatus: PlaylistStatus,
+        playlistMetadata: PlaylistMetadata? = nil,
+        playNextPosition: Int? = nil
+    ) {
         titleLabel.stringValue = song.name
 
         if let alias = song.tns?.first ?? song.alia.first {
@@ -580,21 +585,15 @@ class SongTitleTableCellView: NSTableCellView {
             speakerIcon.isHidden = false
         } else {
             // Check if song is in play next items (only if we're viewing the Now Playing playlist)
-            if case .songs = playlistMetadata {
-                if let currentIndex = playlistStatus.currentItemIndex,
-                   let playlistIndex = playlistStatus.playlist.firstIndex(where: { $0.id == song.id }),
-                   playlistIndex > currentIndex && playlistIndex <= currentIndex + playlistStatus.playNextItemsCount {
-                    let queuePosition = playlistIndex - currentIndex
-                    speakerIcon.image = NSImage(
-                        systemSymbolName: "text.badge.plus", accessibilityDescription: nil)
-                    speakerIcon.contentTintColor = .systemOrange
-                    speakerIcon.isHidden = false
-                    speakerIcon.toolTip = "Play next: #\(queuePosition)"
-                } else {
-                    speakerIcon.isHidden = true
-                }
+            if case .songs = playlistMetadata, let playNextPosition {
+                speakerIcon.image = NSImage(
+                    systemSymbolName: "text.badge.plus", accessibilityDescription: nil)
+                speakerIcon.contentTintColor = .systemOrange
+                speakerIcon.isHidden = false
+                speakerIcon.toolTip = "Play next: #\(playNextPosition)"
             } else {
                 speakerIcon.isHidden = true
+                speakerIcon.toolTip = nil
             }
         }
 
@@ -662,6 +661,41 @@ class SongArtistTableCellView: NSTableCellView {
     }
 }
 
+class SongAlbumTableCellView: NSTableCellView {
+    private let albumLabel = NSTextField()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupView()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupView()
+    }
+
+    private func setupView() {
+        albumLabel.isBezeled = false
+        albumLabel.drawsBackground = false
+        albumLabel.isEditable = false
+        albumLabel.isSelectable = false
+        albumLabel.lineBreakMode = .byTruncatingTail
+        albumLabel.maximumNumberOfLines = 1
+
+        addSubview(albumLabel)
+        albumLabel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            albumLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
+            albumLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
+            albumLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    func configure(with song: CloudMusicApi.Song) {
+        albumLabel.stringValue = song.al.name
+    }
+}
+
 class SongDurationTableCellView: NSTableCellView {
     private let durationLabel = NSTextField()
 
@@ -705,9 +739,27 @@ class SongTableViewController: NSViewController {
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
 
+    private enum CellIdentifier {
+        static let favorite = NSUserInterfaceItemIdentifier("SongFavoriteCell")
+        static let title = NSUserInterfaceItemIdentifier("SongTitleCell")
+        static let artist = NSUserInterfaceItemIdentifier("SongArtistCell")
+        static let album = NSUserInterfaceItemIdentifier("SongAlbumCell")
+        static let duration = NSUserInterfaceItemIdentifier("SongDurationCell")
+    }
+
+    private struct PlayNextCacheKey: Equatable {
+        let currentIndex: Int?
+        let playNextCount: Int
+        let ids: [UInt64]
+    }
+
+    private var playNextCacheKey: PlayNextCacheKey?
+    private var playNextPositionLookup: [UInt64: Int] = [:]
+
     var songs: [CloudMusicApi.Song]? {
         didSet {
             tableView.reloadData()
+            playNextCacheKey = nil
         }
     }
 
@@ -861,6 +913,55 @@ class SongTableViewController: NSViewController {
         }
     }
 
+    private func updatePlayNextLookupIfNeeded() {
+        guard case .songs = playlistMetadata else {
+            if !playNextPositionLookup.isEmpty {
+                playNextPositionLookup.removeAll(keepingCapacity: false)
+                playNextCacheKey = nil
+            }
+            return
+        }
+
+        guard let playlistStatus = playlistStatus else {
+            playNextPositionLookup.removeAll(keepingCapacity: false)
+            playNextCacheKey = nil
+            return
+        }
+
+        let currentIndex = playlistStatus.currentItemIndex
+        let playNextCount = playlistStatus.playNextItemsCount
+
+        guard let currentIndex, playNextCount > 0 else {
+            if !playNextPositionLookup.isEmpty {
+                playNextPositionLookup.removeAll(keepingCapacity: false)
+            }
+            playNextCacheKey = PlayNextCacheKey(currentIndex: playlistStatus.currentItemIndex, playNextCount: playNextCount, ids: [])
+            return
+        }
+
+        let playlist = playlistStatus.playlist
+        let start = currentIndex + 1
+        guard start < playlist.count else {
+            playNextPositionLookup.removeAll(keepingCapacity: false)
+            playNextCacheKey = PlayNextCacheKey(currentIndex: currentIndex, playNextCount: playNextCount, ids: [])
+            return
+        }
+
+        let end = min(start + playNextCount - 1, playlist.count - 1)
+        let ids = playlist[start...end].map { $0.id }
+        let newKey = PlayNextCacheKey(currentIndex: currentIndex, playNextCount: playNextCount, ids: ids)
+
+        if newKey == playNextCacheKey {
+            return
+        }
+
+        playNextCacheKey = newKey
+        playNextPositionLookup.removeAll(keepingCapacity: true)
+        for (offset, id) in ids.enumerated() {
+            playNextPositionLookup[id] = offset + 1
+        }
+    }
+
     private func setupNotificationObservers() {
         focusCurrentPlayingItemObserver = NotificationCenter.default.addObserver(
             forName: .focusCurrentPlayingItem,
@@ -1008,47 +1109,78 @@ extension SongTableViewController: NSTableViewDelegate {
         let song = songs[row]
         guard let identifier = tableColumn?.identifier else { return nil }
 
+        updatePlayNextLookupIfNeeded()
+
         switch identifier.rawValue {
         case "favorite":
-            let cellView = SongFavoriteTableCellView()
+            let cellView: SongFavoriteTableCellView
+            if let reused = tableView.makeView(withIdentifier: CellIdentifier.favorite, owner: self) as? SongFavoriteTableCellView {
+                cellView = reused
+            } else {
+                let newView = SongFavoriteTableCellView()
+                newView.identifier = CellIdentifier.favorite
+                cellView = newView
+            }
+
             if let userInfo = userInfo {
                 cellView.configure(with: song, userInfo: userInfo)
             }
             return cellView
 
         case "title":
-            let cellView = SongTitleTableCellView()
-            if let playlistStatus = playlistStatus {
-                cellView.configure(with: song, playlistStatus: playlistStatus, playlistMetadata: playlistMetadata)
+            guard let playlistStatus else { return nil }
+
+            let cellView: SongTitleTableCellView
+            if let reused = tableView.makeView(withIdentifier: CellIdentifier.title, owner: self) as? SongTitleTableCellView {
+                cellView = reused
+            } else {
+                let newView = SongTitleTableCellView()
+                newView.identifier = CellIdentifier.title
+                cellView = newView
             }
+
+            let playNextPosition = playNextPositionLookup[song.id]
+            cellView.configure(
+                with: song,
+                playlistStatus: playlistStatus,
+                playlistMetadata: playlistMetadata,
+                playNextPosition: playNextPosition
+            )
             return cellView
 
         case "artist":
-            let cellView = SongArtistTableCellView()
+            let cellView: SongArtistTableCellView
+            if let reused = tableView.makeView(withIdentifier: CellIdentifier.artist, owner: self) as? SongArtistTableCellView {
+                cellView = reused
+            } else {
+                let newView = SongArtistTableCellView()
+                newView.identifier = CellIdentifier.artist
+                cellView = newView
+            }
             cellView.configure(with: song)
             return cellView
 
         case "album":
-            let cellView = NSTableCellView()
-            let textField = NSTextField()
-            textField.isBezeled = false
-            textField.drawsBackground = false
-            textField.isEditable = false
-            textField.isSelectable = false
-            textField.lineBreakMode = .byTruncatingTail
-            textField.maximumNumberOfLines = 1
-            textField.stringValue = song.al.name
-            cellView.addSubview(textField)
-            textField.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor),
-                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor),
-                textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
-            ])
+            let cellView: SongAlbumTableCellView
+            if let reused = tableView.makeView(withIdentifier: CellIdentifier.album, owner: self) as? SongAlbumTableCellView {
+                cellView = reused
+            } else {
+                let newView = SongAlbumTableCellView()
+                newView.identifier = CellIdentifier.album
+                cellView = newView
+            }
+            cellView.configure(with: song)
             return cellView
 
         case "duration":
-            let cellView = SongDurationTableCellView()
+            let cellView: SongDurationTableCellView
+            if let reused = tableView.makeView(withIdentifier: CellIdentifier.duration, owner: self) as? SongDurationTableCellView {
+                cellView = reused
+            } else {
+                let newView = SongDurationTableCellView()
+                newView.identifier = CellIdentifier.duration
+                cellView = newView
+            }
             cellView.configure(with: song)
             return cellView
 
