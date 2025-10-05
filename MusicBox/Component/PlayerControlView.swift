@@ -276,7 +276,6 @@ struct PlaySliderView: View {
     @ObservedObject var playbackProgress: PlaybackProgress
     @State private var isEditing: Bool = false
     @State private var targetValue: Double = 0.0
-    @State private var lastSeekTime: Date = Date.distantPast
 
     var body: some View {
         Slider(
@@ -311,17 +310,11 @@ struct PlaySliderView: View {
             // 避免重复回调：只在状态真正改变时处理
             if self.isEditing != editing {
                 if !editing {
-                    // 防止重复调用：检查距离上次 seek 的时间间隔
-                    let now = Date()
-                    if now.timeIntervalSince(lastSeekTime) > 0.1 {
-                        lastSeekTime = now
-                        Task {
-                            await self.playStatus.seekToOffset(offset: targetValue)
-                        }
-                    }
+                    let seekTarget = targetValue
+                    playStatus.isSeeking = true
+                    Task { await playStatus.seekToOffset(offset: seekTarget) }
                 } else {
-                    // 开始编辑时，确保 targetValue 是当前值
-                    targetValue = self.playbackProgress.playedSecond
+                    targetValue = playbackProgress.playedSecond
                 }
                 self.isEditing = editing
             }
