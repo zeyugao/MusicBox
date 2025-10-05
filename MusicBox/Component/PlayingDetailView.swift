@@ -37,7 +37,7 @@ struct LyricView: View {
                             if showTimestamp {
                                 Text(String(format: "%.2f", line.time))
                                     .lineLimit(1)
-                                    .font(.body)
+                                    .font(.footnote)
                                     .foregroundColor(.gray)
                             }
 
@@ -51,7 +51,7 @@ struct LyricView: View {
                             }
 
                             Text(line.lyric)
-                                .font(.title2)
+                                .font(.title3)
                                 .foregroundStyle(
                                     Color(
                                         nsColor: currentPlaying
@@ -61,7 +61,7 @@ struct LyricView: View {
 
                             if let tlyric = line.tlyric {
                                 Text(tlyric)
-                                    .font(.title2)
+                                    .font(.title3)
                                     .foregroundStyle(
                                         Color(
                                             nsColor: currentPlaying
@@ -69,12 +69,11 @@ struct LyricView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-
-                        Spacer()
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 16)
                     }
                 }
-                .padding(.vertical)
+                .padding(.bottom, 12)
                 .onAppear {
                     if let currentIndex = lyricStatus.currentLyricIndex {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -169,7 +168,6 @@ struct PlayingDetailView: View {
                         Text("还没有歌词")
                     }
                 }
-                .padding()
             }
         }
         .task {
