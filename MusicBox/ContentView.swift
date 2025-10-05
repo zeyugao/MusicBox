@@ -361,6 +361,8 @@ struct ContentView: View {
                     ExploreView(isInitialized: isInitialized)
                         .environmentObject(userInfo)
                         .environmentObject(playlistStatus)
+                        .environmentObject(playStatus)
+                        .environmentObject(playingDetailModel)
                         .navigationTitle("Explore")
                 case let .playlist(playlist):
                     let metadata = PlaylistMetadata.netease(

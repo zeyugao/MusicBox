@@ -103,8 +103,10 @@ struct ExploreView: View {
 
     private let isInitialized: Bool
 
-    @EnvironmentObject var playController: PlaylistStatus
+    @EnvironmentObject var playlistStatus: PlaylistStatus
     @EnvironmentObject private var userInfo: UserInfo
+    @EnvironmentObject var playStatus: PlayStatus
+    @EnvironmentObject var playingDetailModel: PlayingDetailModel
 
     init(isInitialized: Bool) {
         self.isInitialized = isInitialized
@@ -187,10 +189,20 @@ struct ExploreView: View {
                         case let .searchResult(result):
                             PlaylistMetadata.songs(result, path.id, "搜索结果")
                         }
-
-                    PlayListView(playlistMetadata: metadata)
-                        .environmentObject(userInfo)
-                        .environmentObject(playController)
+                        
+                    ZStack(alignment: .bottom) {
+                        PlayListView(playlistMetadata: metadata)
+                            .environmentObject(userInfo)
+                            .environmentObject(playlistStatus)
+                        
+                        PlayerControlView()
+                            .environmentObject(userInfo)
+                            .environmentObject(playlistStatus)
+                            .environmentObject(playStatus)
+                            .environmentObject(playingDetailModel)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 20)
+                    }
                 }
                 .onChange(of: searchText) { _, text in
                     task?.cancel()
