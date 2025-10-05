@@ -131,17 +131,19 @@ struct NowPlayingTrackView: View {
     @EnvironmentObject var playlistStatus: PlaylistStatus
     @EnvironmentObject var playStatus: PlayStatus
 
+    let cornerRadius: CGFloat = 6
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             // Top row: Album art and track info
-            HStack(spacing: 4) {
+            HStack(spacing: 8) {
                 // Album artwork
                 if let url = artworkUrl {
                     AsyncImageWithCache(url: url) { image in
                         image.resizable()
                             .scaledToFill()
                             .frame(width: albumImageSize, height: albumImageSize)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                     } placeholder: {
                         ZStack {
                             Color.gray.opacity(0.2)
@@ -152,7 +154,7 @@ struct NowPlayingTrackView: View {
                                 .foregroundColor(.secondary)
                         }
                         .frame(width: albumImageSize, height: albumImageSize)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                     }
                 } else {
                     ZStack {
@@ -164,7 +166,7 @@ struct NowPlayingTrackView: View {
                             .foregroundColor(.secondary)
                     }
                     .frame(width: albumImageSize, height: albumImageSize)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                 }
 
                 // Track info (title and artist stacked vertically)
@@ -440,8 +442,8 @@ struct PlayerControlView: View {
     @State private var currentItemId: UInt64?
     @State private var showNowPlayingPopover: Bool = false
 
-    let height = 60.0
-    let albumImageSize = 36.0
+    let height = 52.0
+    let albumImageSize = 32.0
 
     func secondsToMinutesAndSeconds(seconds: Double) -> String {
         let seconds_int = Int(seconds)
@@ -451,7 +453,7 @@ struct PlayerControlView: View {
     }
 
     var body: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 16) {
             // Left: Playback controls
             HStack(spacing: 16) {
                 Button(action: {
@@ -496,6 +498,20 @@ struct PlayerControlView: View {
                 .buttonStyle(PlayControlButtonStyle())
             }
 
+            Button(action: {
+                playlistStatus.switchToNextLoopMode()
+            }) {
+                Image(
+                    systemName: playlistStatus.loopMode == .once
+                        ? "repeat.1"
+                        : (playlistStatus.loopMode == .sequence ? "repeat" : "shuffle")
+                )
+                .resizable()
+                .frame(width: 16, height: 16)
+            }
+            .buttonStyle(PlayControlButtonStyle())
+            .foregroundColor(.primary)
+
             // Left-aligned: Album art with track info, and progress below
             NowPlayingTrackView(artworkUrl: artworkUrl, albumImageSize: albumImageSize)
                 .environmentObject(playlistStatus)
@@ -523,7 +539,7 @@ struct PlayerControlView: View {
                     ZStack {
                         Image(systemName: "list.bullet")
                             .resizable()
-                            .frame(width: 14, height: 14)
+                            .frame(width: 16, height: 14)
 
                         // Badge showing play next count
                         if playlistStatus.playNextItemsCount > 0 {
@@ -546,26 +562,26 @@ struct PlayerControlView: View {
                         .environmentObject(playlistStatus)
                 }
 
-                let currentId = playlistStatus.currentItem?.id ?? 0
-                let favored = (userInfo.likelist.contains(currentId))
-                Button(action: {
-                    guard currentId != 0 else { return }
-                    Task {
-                        var likelist = userInfo.likelist
-                        await likeSong(
-                            likelist: &likelist,
-                            songId: currentId,
-                            favored: favored
-                        )
-                        userInfo.likelist = likelist
-                    }
-                }) {
-                    Image(systemName: favored ? "heart.fill" : "heart")
-                        .resizable()
-                        .frame(width: 16, height: 14)
-                        .help(favored ? "Unfavor" : "Favor")
-                }
-                .buttonStyle(PlayControlButtonStyle())
+                // let currentId = playlistStatus.currentItem?.id ?? 0
+                // let favored = (userInfo.likelist.contains(currentId))
+                // Button(action: {
+                //     guard currentId != 0 else { return }
+                //     Task {
+                //         var likelist = userInfo.likelist
+                //         await likeSong(
+                //             likelist: &likelist,
+                //             songId: currentId,
+                //             favored: favored
+                //         )
+                //         userInfo.likelist = likelist
+                //     }
+                // }) {
+                //     Image(systemName: favored ? "heart.fill" : "heart")
+                //         .resizable()
+                //         .frame(width: 16, height: 14)
+                //         .help(favored ? "Unfavor" : "Favor")
+                // }
+                // .buttonStyle(PlayControlButtonStyle())
 
                 // Volume popover button
                 VolumePopoverButton(playStatus: playStatus)
@@ -573,11 +589,11 @@ struct PlayerControlView: View {
             }
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
         .frame(height: height)
         .background(Color.gray.opacity(0.005))
         .clipShape(RoundedRectangle(cornerRadius: height / 2))
-        .frame(minWidth: 200, maxWidth: 500)
+        .frame(minWidth: 100, maxWidth: 600)
         .glassEffect()
         .onAppear {
             #if DEBUG

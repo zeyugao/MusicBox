@@ -738,7 +738,7 @@ class SongTableViewController: NSViewController {
     private let pageSize = 100
 
     // Bottom padding configuration - number of blank rows to add at the bottom
-    private let bottomPaddingRows = 4
+    private let bottomPaddingRows = 3
 
     private var focusCurrentPlayingItemObserver: NSObjectProtocol?
 

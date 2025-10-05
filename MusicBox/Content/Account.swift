@@ -418,7 +418,7 @@ struct SettingsView: View {
                     AboutSection()
 
                     // Extra space for floating player control
-                    Color.clear.frame(height: 72)
+                    Color.clear.frame(height: 64)
                 }
                 .frame(maxWidth: 500)
                 .padding(.horizontal, 24)
