@@ -758,7 +758,28 @@ class SongTableViewController: NSViewController {
 
     var songs: [CloudMusicApi.Song]? {
         didSet {
-            tableView.reloadData()
+            let previousCount = oldValue?.count ?? 0
+            let newCount = songs?.count ?? 0
+
+            let isAppending: Bool
+            if let oldSongs = oldValue, let newSongs = songs, newCount > previousCount, previousCount > 0 {
+                let prefixMatches = newSongs.prefix(previousCount).enumerated().allSatisfy { index, element in
+                    return element.id == oldSongs[index].id
+                }
+                isAppending = prefixMatches
+            } else {
+                isAppending = false
+            }
+
+            if isAppending && newCount > previousCount {
+                let newRows = IndexSet(integersIn: previousCount..<newCount)
+                tableView.beginUpdates()
+                tableView.insertRows(at: newRows, withAnimation: [])
+                tableView.endUpdates()
+            } else {
+                tableView.reloadData()
+            }
+
             playNextCacheKey = nil
         }
     }
@@ -1968,6 +1989,7 @@ struct PlayListView: View {
     @State private var currentLoadingTaskId = UUID()
 
     @State private var searchText = ""
+    @State private var searchDebounceTask: Task<Void, Never>? = nil
     @State private var selectedSongToAdd: CloudMusicApi.Song?
 
     var playlistMetadata: PlaylistMetadata?
@@ -2030,13 +2052,19 @@ struct PlayListView: View {
                 isLoadingMore: model.isLoadingMore,
                 hasMoreSongs: model.hasMoreSongs
             )
-            .onChange(of: searchText) { prevSearchText, searchText in
-                model.applySearch(by: searchText)
-                model.update()
+            .onChange(of: searchText) { _, newValue in
+                searchDebounceTask?.cancel()
+                let query = newValue
+                searchDebounceTask = Task {
+                    try? await Task.sleep(nanoseconds: 220_000_000)
+                    if Task.isCancelled { return }
 
-                // If searching and not all songs loaded, load all songs in background
-                if !searchText.isEmpty && !model.allSongsLoaded {
-                    Task {
+                    await MainActor.run {
+                        model.applySearch(by: query)
+                        model.update()
+                    }
+
+                    if !query.isEmpty && !model.allSongsLoaded {
                         await model.loadAllSongsInBackground()
                     }
                 }
@@ -2087,6 +2115,7 @@ struct PlayListView: View {
             }
             .onDisappear {
                 loadingTask?.cancel()
+                searchDebounceTask?.cancel()
             }
             .onReceive(NotificationCenter.default.publisher(for: .refreshPlaylist)) { _ in
                 Task {
@@ -2113,6 +2142,7 @@ struct PlayListView: View {
 
         searchText = ""
         sortOrder = []
+        searchDebounceTask?.cancel()
     }
 
     private func updatePlaylist(force: Bool = false) {
