@@ -120,6 +120,9 @@ struct MusicBoxApp: App {
     @State private var windowDelegate = WindowDelegate()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    let windowWidth: CGFloat = 980
+    let windowHeight: CGFloat = 600
+
     init() {
         // If you want to start the updater manually, pass false to startingUpdater and call .startUpdater() later
         // This is where you can also pass an updater delegate if you need one
@@ -137,16 +140,16 @@ struct MusicBoxApp: App {
                             AppDelegate.mainWindow = window
                             window.delegate = windowDelegate
                             // Set the window size manually since defaultSize might not work with our setup
-                            window.setContentSize(NSSize(width: 1000, height: 700))
+                            window.setContentSize(NSSize(width: windowWidth, height: windowHeight))
                             // Ensure the app doesn't terminate when the last window is closed
                             NSApplication.shared.setActivationPolicy(.regular)
                         }
                     }
                 }
-                .frame(minWidth: 1000, minHeight: 700)
+                .frame(minWidth: windowWidth, minHeight: windowHeight)
         }
         .handlesExternalEvents(matching: Set(arrayLiteral: "main"))
-        .defaultSize(width: 1000, height: 700)
+        .defaultSize(width: windowWidth, height: windowHeight)
         .commands {
             SidebarCommands()
             CommandGroup(after: .appInfo) {
