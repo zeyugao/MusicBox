@@ -125,10 +125,83 @@ struct NowPlayingPopoverView: View {
     }
 }
 
+struct NowPlayingTrackView: View {
+    let artworkUrl: URL?
+    let albumImageSize: Double
+    @EnvironmentObject var playlistStatus: PlaylistStatus
+    @EnvironmentObject var playStatus: PlayStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Top row: Album art and track info
+            HStack(spacing: 4) {
+                // Album artwork
+                if let url = artworkUrl {
+                    AsyncImageWithCache(url: url) { image in
+                        image.resizable()
+                            .scaledToFill()
+                            .frame(width: albumImageSize, height: albumImageSize)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } placeholder: {
+                        ZStack {
+                            Color.gray.opacity(0.2)
+                            Image(systemName: "music.note")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(width: albumImageSize, height: albumImageSize)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                } else {
+                    ZStack {
+                        Color.gray.opacity(0.2)
+                        Image(systemName: "music.note")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(width: albumImageSize, height: albumImageSize)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                // Track info (title and artist stacked vertically)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("\(playlistStatus.currentItem?.title ?? "Title")")
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
+
+                        if playStatus.isLoadingNewTrack || !playStatus.readyToPlay {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .scaleEffect(0.5)
+                                .frame(width: 10, height: 10)
+                        }
+                    }
+
+                    Text("\(playlistStatus.currentItem?.artist ?? "Artists")")
+                        .font(.system(size: 13))
+                        .lineLimit(1)
+                        .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
+                }
+            }
+
+            // Bottom: Progress bar
+            PlaySliderView(playbackProgress: playStatus.playbackProgress)
+        }
+    }
+}
+
 struct PlayControlButtonStyle: ButtonStyle {
+    var colorProvider: ((Bool) -> Color)?
+
     @ViewBuilder
     func makeBody(configuration: Configuration) -> some View {
-        let color: Color = configuration.isPressed ? .secondary : .primary
+        let color: Color =
+            colorProvider?(configuration.isPressed) ?? (configuration.isPressed ? .secondary : .primary)
 
         configuration.label
             .foregroundStyle(color)
@@ -362,7 +435,6 @@ struct PlayerControlView: View {
     @EnvironmentObject var playlistStatus: PlaylistStatus
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject private var playingDetailModel: PlayingDetailModel
-    @State var isHovered: Bool = false
 
     @State var artworkUrl: URL?
     @State private var currentItemId: UInt64?
@@ -425,99 +497,25 @@ struct PlayerControlView: View {
             }
 
             // Left-aligned: Album art with track info, and progress below
-            VStack(alignment: .leading, spacing: 6) {
-                // Top row: Album art and track info
-                HStack(spacing: 4) {
-                    // Album artwork
-                    if let url = artworkUrl {
-                        AsyncImageWithCache(url: url) { image in
-                            image.resizable()
-                                .scaledToFill()
-                                .frame(width: albumImageSize, height: albumImageSize)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        } placeholder: {
-                            ZStack {
-                                Color.gray.opacity(0.2)
-                                Image(systemName: "music.note")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 20, height: 20)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(width: albumImageSize, height: albumImageSize)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .overlay(
-                            Group {
-                                if isHovered {
-                                    Color.gray.opacity(0.4)
-                                        .transition(.opacity)
-                                        .animation(.easeInOut, value: isHovered)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                            }
-                        )
-                        .overlay(
-                            Image(
-                                systemName: playingDetailModel.isPresented
-                                    ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right"
-                            )
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 20, height: 20)
-                            .foregroundColor(Color.white.opacity(isHovered ? 1.0 : 0)),
-                            alignment: .center
-                        )
-                        .onHover { hovering in
-                            isHovered = hovering
-                        }
-                        .onTapGesture {
-                            playingDetailModel.togglePlayingDetail()
-                        }
-                    } else {
-                        ZStack {
-                            Color.gray.opacity(0.2)
-                            Image(systemName: "music.note")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 20, height: 20)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(width: albumImageSize, height: albumImageSize)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-
-                    // Track info (title and artist stacked vertically)
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text("\(playlistStatus.currentItem?.title ?? "Title")")
-                                .font(.system(size: 13, weight: .medium))
-                                .lineLimit(1)
-
-                            if playStatus.isLoadingNewTrack || !playStatus.readyToPlay {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle())
-                                    .scaleEffect(0.5)
-                                    .frame(width: 10, height: 10)
-                            }
-                        }
-
-                        Text("\(playlistStatus.currentItem?.artist ?? "Artists")")
-                            .font(.system(size: 13))
-                            .lineLimit(1)
-                            .foregroundStyle(Color(nsColor: NSColor.placeholderTextColor))
-                    }
-                }
-
-                // Bottom: Progress bar
-                // PlaybackProgressView(playbackProgress: playStatus.playbackProgress)
-                //     .environmentObject(playStatus)
-                //     .frame(width: 300)
-                PlaySliderView(playbackProgress: playStatus.playbackProgress)
-            }
+            NowPlayingTrackView(artworkUrl: artworkUrl, albumImageSize: albumImageSize)
+                .environmentObject(playlistStatus)
+                .environmentObject(playStatus)
 
             // Right: Action buttons
             HStack(spacing: 16) {
+                // Lyrics/Detail View Button
+                Button(action: {
+                    playingDetailModel.togglePlayingDetail()
+                }) {
+                    Image(systemName: "quote.bubble")
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                }
+                .buttonStyle(PlayControlButtonStyle(colorProvider: { isPressed in
+                    playingDetailModel.isPresented ? .accentColor : (isPressed ? .secondary : .primary)
+                }))
+                .help(playingDetailModel.isPresented ? "Hide Lyrics" : "Show Lyrics")
+
                 // Now Playing Button
                 Button(action: {
                     showNowPlayingPopover.toggle()
