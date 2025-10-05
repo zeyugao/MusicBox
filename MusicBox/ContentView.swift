@@ -380,12 +380,12 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
             }
-            .inspector(isPresented: $playingDetailModel.isPresented) {
-                PlayingDetailView()
-                    .environmentObject(playStatus)
-                    .environmentObject(playlistStatus)
-                    .environmentObject(appSettings)
-            }
+        }
+        .inspector(isPresented: $playingDetailModel.isPresented) {
+            PlayingDetailView()
+                .environmentObject(playStatus)
+                .environmentObject(playlistStatus)
+                .environmentObject(appSettings)
         }
         .task {
             // Connect PlayStatus with PlayingDetailModel before loading state
