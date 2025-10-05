@@ -131,6 +131,9 @@ struct NowPlayingTrackView: View {
     @ObservedObject var playbackProgress: PlaybackProgress
     @EnvironmentObject var playlistStatus: PlaylistStatus
     @EnvironmentObject var playStatus: PlayStatus
+    @EnvironmentObject var userInfo: UserInfo
+
+    @State private var isHovered: Bool = false
 
     let cornerRadius: CGFloat = 6
 
@@ -150,6 +153,19 @@ struct NowPlayingTrackView: View {
         }
 
         return elapsed
+    }
+
+    private var currentItemId: UInt64 {
+        playlistStatus.currentItem?.id ?? 0
+    }
+
+    private var isFavored: Bool {
+        guard currentItemId != 0 else { return false }
+        return userInfo.likelist.contains(currentItemId)
+    }
+
+    private var shouldShowHeartButton: Bool {
+        currentItemId != 0 && (isFavored || isHovered)
     }
 
     var body: some View {
@@ -190,7 +206,7 @@ struct NowPlayingTrackView: View {
 
                 // Track info (title and artist stacked vertically)
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         Text("\(playlistStatus.currentItem?.title ?? "Title")")
                             .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
@@ -200,6 +216,37 @@ struct NowPlayingTrackView: View {
                                 .progressViewStyle(CircularProgressViewStyle())
                                 .scaleEffect(0.5)
                                 .frame(width: 10, height: 10)
+                        }
+
+                        if shouldShowHeartButton {
+                            Button(
+                                action: {
+                                    guard currentItemId != 0 else { return }
+                                    let favored = isFavored
+                                    Task {
+                                        var likelist = userInfo.likelist
+                                        await likeSong(
+                                            likelist: &likelist,
+                                            songId: currentItemId,
+                                            favored: favored
+                                        )
+                                        await MainActor.run {
+                                            userInfo.likelist = likelist
+                                        }
+                                    }
+                                }
+                            ) {
+                                Image(systemName: isFavored ? "heart.fill" : "heart")
+                                    .resizable()
+                                    .frame(width: 10, height: 9)
+                            }
+                            .buttonStyle(
+                                PlayControlButtonStyle(colorProvider: { isPressed in
+                                    if isFavored { return .accentColor }
+                                    return .secondary
+                                })
+                            )
+                            .help(isFavored ? "Unfavor" : "Favor")
                         }
                     }
 
@@ -222,6 +269,16 @@ struct NowPlayingTrackView: View {
 
             // Bottom: Progress bar
             PlaySliderView(playbackProgress: playbackProgress)
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            guard hovering != isHovered else { return }
+            withAnimation(.easeInOut(duration: 0.12)) {
+                isHovered = hovering
+            }
+        }
+        .onDisappear {
+            isHovered = false
         }
     }
 }
@@ -549,6 +606,7 @@ struct PlayerControlView: View {
             )
                 .environmentObject(playlistStatus)
                 .environmentObject(playStatus)
+                .environmentObject(userInfo)
 
             // Right: Action buttons
             HStack(spacing: 16) {
