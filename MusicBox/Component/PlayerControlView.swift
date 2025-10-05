@@ -13,6 +13,13 @@ import CoreAudio
 import Foundation
 import SwiftUI
 
+@MainActor
+final class PlayerControlState: ObservableObject {
+    @Published var artworkUrl: URL?
+    @Published var currentItemId: UInt64?
+    @Published var showNowPlayingPopover: Bool = false
+}
+
 struct NowPlayingPopoverView: View {
     @EnvironmentObject private var playlistStatus: PlaylistStatus
     @Binding var isPresented: Bool
@@ -523,10 +530,7 @@ struct PlayerControlView: View {
     @EnvironmentObject var playlistStatus: PlaylistStatus
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject private var playingDetailModel: PlayingDetailModel
-
-    @State var artworkUrl: URL?
-    @State private var currentItemId: UInt64?
-    @State private var showNowPlayingPopover: Bool = false
+    @EnvironmentObject private var playerControlState: PlayerControlState
 
     let height = 52.0
     let albumImageSize = 32.0
@@ -536,6 +540,23 @@ struct PlayerControlView: View {
         let minutes = (seconds_int % 3600) / 60
         let seconds = (seconds_int % 3600) % 60
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    private var nowPlayingPopoverBinding: Binding<Bool> {
+        Binding(
+            get: { playerControlState.showNowPlayingPopover },
+            set: { playerControlState.showNowPlayingPopover = $0 }
+        )
+    }
+
+    private var artworkUrl: URL? {
+        get { playerControlState.artworkUrl }
+        nonmutating set { playerControlState.artworkUrl = newValue }
+    }
+
+    private var currentItemId: UInt64? {
+        get { playerControlState.currentItemId }
+        nonmutating set { playerControlState.currentItemId = newValue }
     }
 
     var body: some View {
@@ -625,7 +646,7 @@ struct PlayerControlView: View {
 
                 // Now Playing Button
                 Button(action: {
-                    showNowPlayingPopover.toggle()
+                    playerControlState.showNowPlayingPopover.toggle()
                 }) {
                     ZStack {
                         Image(systemName: "list.bullet")
@@ -648,8 +669,8 @@ struct PlayerControlView: View {
                 }
                 .buttonStyle(PlayControlButtonStyle())
                 .help("Now Playing")
-                .popover(isPresented: $showNowPlayingPopover) {
-                    NowPlayingPopoverView(isPresented: $showNowPlayingPopover)
+                .popover(isPresented: nowPlayingPopoverBinding) {
+                    NowPlayingPopoverView(isPresented: nowPlayingPopoverBinding)
                         .environmentObject(playlistStatus)
                 }
 
@@ -692,22 +713,24 @@ struct PlayerControlView: View {
             #endif
             Task {
                 if let item = playlistStatus.currentItem {
-                    currentItemId = item.id
+                    let newArtworkUrl = await item.getArtworkUrl()
+                    await MainActor.run {
+                        playerControlState.currentItemId = item.id
+                        playerControlState.artworkUrl = newArtworkUrl
+                    }
                     #if DEBUG
                         print(
-                            "🎵 PlayerControlView: onAppear - loading artwork for \(item.title) (ID: \(item.id))"
-                        )
-                    #endif
-                    artworkUrl = await item.getArtworkUrl()
-                    #if DEBUG
-                        print(
-                            "🎵 PlayerControlView: onAppear - artwork URL loaded: \(artworkUrl?.absoluteString ?? "nil")"
+                            "🎵 PlayerControlView: onAppear - artwork URL loaded: \(newArtworkUrl?.absoluteString ?? "nil")"
                         )
                     #endif
                 } else {
                     #if DEBUG
                         print("🎵 PlayerControlView: onAppear - no current item")
                     #endif
+                    await MainActor.run {
+                        playerControlState.currentItemId = nil
+                        playerControlState.artworkUrl = nil
+                    }
                 }
             }
         }
@@ -758,7 +781,9 @@ struct PlayerControlView: View {
                                     "🎵 PlayerControlView: Setting artworkUrl to: \(newArtworkUrl?.absoluteString ?? "nil")"
                                 )
                             #endif
-                            artworkUrl = newArtworkUrl
+                            await MainActor.run {
+                                playerControlState.artworkUrl = newArtworkUrl
+                            }
                         } else {
                             #if DEBUG
                                 print(
@@ -818,7 +843,9 @@ struct PlayerControlView: View {
                                 "🎵 PlayerControlView: ID-based setting artworkUrl to: \(newArtworkUrl?.absoluteString ?? "nil")"
                             )
                         #endif
-                        artworkUrl = newArtworkUrl
+                        await MainActor.run {
+                            playerControlState.artworkUrl = newArtworkUrl
+                        }
                     } else {
                         #if DEBUG
                             print(

@@ -107,6 +107,7 @@ struct ExploreView: View {
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject var playStatus: PlayStatus
     @EnvironmentObject var playingDetailModel: PlayingDetailModel
+    @EnvironmentObject private var playerControlState: PlayerControlState
 
     init(isInitialized: Bool) {
         self.isInitialized = isInitialized
@@ -200,6 +201,7 @@ struct ExploreView: View {
                             .environmentObject(playlistStatus)
                             .environmentObject(playStatus)
                             .environmentObject(playingDetailModel)
+                            .environmentObject(playerControlState)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 20)
                     }

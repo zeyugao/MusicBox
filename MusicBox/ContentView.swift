@@ -278,6 +278,7 @@ struct ContentView: View {
     @StateObject private var userInfo = UserInfo()
     @StateObject private var playingDetailModel = PlayingDetailModel()
     @StateObject private var appSettings = AppSettings.shared
+    @StateObject private var playerControlState = PlayerControlState()
 
     @StateObject private var alertModel = AlertModal()
 
@@ -363,6 +364,7 @@ struct ContentView: View {
                         .environmentObject(playlistStatus)
                         .environmentObject(playStatus)
                         .environmentObject(playingDetailModel)
+                        .environmentObject(playerControlState)
                         .navigationTitle("Explore")
                 case let .playlist(playlist):
                     let metadata = PlaylistMetadata.netease(
@@ -379,6 +381,7 @@ struct ContentView: View {
                     .environmentObject(playStatus)
                     .environmentObject(userInfo)
                     .environmentObject(playingDetailModel)
+                    .environmentObject(playerControlState)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
             }
