@@ -140,7 +140,7 @@ struct MusicBoxApp: App {
                             AppDelegate.mainWindow = window
                             window.delegate = windowDelegate
                             // Set the window size manually since defaultSize might not work with our setup
-                            window.setContentSize(NSSize(width: windowWidth, height: windowHeight))
+                            window.setContentSize(NSSize(width: windowWidth + 20, height: windowHeight))
                             // Ensure the app doesn't terminate when the last window is closed
                             NSApplication.shared.setActivationPolicy(.regular)
                         }
@@ -149,7 +149,7 @@ struct MusicBoxApp: App {
                 .frame(minWidth: windowWidth, minHeight: windowHeight)
         }
         .handlesExternalEvents(matching: Set(arrayLiteral: "main"))
-        .defaultSize(width: windowWidth, height: windowHeight)
+        .defaultSize(width: windowWidth + 20, height: windowHeight)
         .commands {
             SidebarCommands()
             CommandGroup(after: .appInfo) {
