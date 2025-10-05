@@ -341,36 +341,34 @@ struct ContentView: View {
             .frame(minWidth: 200, idealWidth: 250)
         } detail: {
             ZStack(alignment: .bottom) {
-                VStack(spacing: 0) {
-                    switch currentSelection {
-                    case .account:
-                        if isInitialized {
-                            AccountView()
-                                .environmentObject(userInfo)
-                                .environmentObject(playlistStatus)
-                                .environmentObject(appSettings)
-                                .navigationTitle("Settings")
-                        } else {
-                            Color.clear
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }
-                    case .cloudFiles:
-                        CloudFilesView()
-                            .environmentObject(userInfo)
-                            .navigationTitle("My Cloud Files")
-                    case .explore:
-                        ExploreView(isInitialized: isInitialized)
+                switch currentSelection {
+                case .account:
+                    if isInitialized {
+                        AccountView()
                             .environmentObject(userInfo)
                             .environmentObject(playlistStatus)
-                            .navigationTitle("Explore")
-                    case let .playlist(playlist):
-                        let metadata = PlaylistMetadata.netease(
-                            playlist.id, playlist.name)
-                        PlayListView(playlistMetadata: metadata)
-                            .environmentObject(userInfo)
-                            .environmentObject(playlistStatus)
-                            .navigationTitle(playlist.name)
+                            .environmentObject(appSettings)
+                            .navigationTitle("Settings")
+                    } else {
+                        Color.clear
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+                case .cloudFiles:
+                    CloudFilesView()
+                        .environmentObject(userInfo)
+                        .navigationTitle("My Cloud Files")
+                case .explore:
+                    ExploreView(isInitialized: isInitialized)
+                        .environmentObject(userInfo)
+                        .environmentObject(playlistStatus)
+                        .navigationTitle("Explore")
+                case let .playlist(playlist):
+                    let metadata = PlaylistMetadata.netease(
+                        playlist.id, playlist.name)
+                    PlayListView(playlistMetadata: metadata)
+                        .environmentObject(userInfo)
+                        .environmentObject(playlistStatus)
+                        .navigationTitle(playlist.name)
                 }
 
                 // Floating PlayerControlView
