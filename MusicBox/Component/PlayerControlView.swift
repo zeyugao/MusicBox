@@ -213,7 +213,7 @@ struct NowPlayingTrackView: View {
 
                 // Track info (title and artist stacked vertically)
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Text("\(playlistStatus.currentItem?.title ?? "Title")")
                             .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
@@ -221,9 +221,11 @@ struct NowPlayingTrackView: View {
                         if playStatus.isLoadingNewTrack || !playStatus.readyToPlay {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle())
-                                .scaleEffect(0.5)
-                                .frame(width: 10, height: 10)
+                                .scaleEffect(0.3)
+                                .frame(width: 8, height: 8)
                         }
+
+                        Spacer()
 
                         if shouldShowHeartButton {
                             Button(
