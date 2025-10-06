@@ -422,6 +422,7 @@ class PlayStatus: ObservableObject {
         await MainActor.run {
             self.isLoadingNewTrack = true
             self.pendingItem = item
+            self.currentItem = item
         }
 
         await lyricStatus.prepareForNewTrack()
@@ -429,8 +430,6 @@ class PlayStatus: ObservableObject {
         await MainActor.run {
             self.playbackProgress.playedSecond = playedSecond ?? 0.0
         }
-
-        self.currentItem = item
 
         await updateDuration(duration: item.duration.seconds)
 
@@ -696,7 +695,19 @@ class PlayStatus: ObservableObject {
                 let status = try JSONDecoder().decode(Storage.self, from: data)
 
                 // 如果有要恢复的播放进度且当前有播放项目
-                if status.playedSecond > 0, let item = currentItem {
+                if status.playedSecond > 0 {
+                    var waitIterations = 0
+                    while currentItem == nil && pendingItem == nil && waitIterations < 10 {
+                        try? await Task.sleep(nanoseconds: 50_000_000)  // 50ms
+                        waitIterations += 1
+                    }
+
+                    let item = currentItem ?? pendingItem
+                    guard let item else {
+                        volume = status.volume
+                        return
+                    }
+
                     // 等待当前的切换操作完成
                     while switchingItem {
                         try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 秒
