@@ -165,6 +165,7 @@ struct PlayingDetailView: View {
                             lyricStatus: playStatus.lyricStatus,
                             hasRoma: $hasRoma
                         )
+                        .id(playStatus.currentItem?.id ?? 0)
                     } else if showNoLyricMessage {
                         Text("还没有歌词")
                     }
