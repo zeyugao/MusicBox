@@ -27,6 +27,7 @@ REMOTE_COMMIT_SHA=$(echo "$REMOTE_INFO" | grep 'Nightly build from commit' | sed
 
 if [ -z "$REMOTE_COMMIT_SHA" ]; then
     echo "Warning: Could not determine remote commit SHA. Proceeding with update."
+    echo "Response: $REMOTE_INFO"
 else
     # Compare versions if we have both local and remote SHAs
     if [ -n "$LOCAL_COMMIT_SHA" ]; then
