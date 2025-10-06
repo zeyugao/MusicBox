@@ -5,6 +5,7 @@
 //  Created by Elsa on 2024/4/16.
 //
 
+import AppKit
 import Combine
 import Foundation
 import SwiftUI
@@ -272,7 +273,6 @@ class AlertModal: ObservableObject {
 }
 
 struct ContentView: View {
-    @Environment(\.scenePhase) private var scenePhase
     @StateObject var playlistStatus = PlaylistStatus()
     @StateObject var playStatus = PlayStatus()
     @State private var selection: NavigationScreen = .explore
@@ -284,10 +284,12 @@ struct ContentView: View {
     @StateObject private var alertModel = AlertModal()
 
     @State private var isInitialized = false
-    @State private var appScenePhase: ScenePhase = .inactive
+    @State private var isAppActive: Bool = NSApplication.shared.isActive
     @State private var lastPlaylistRefresh: Date = .distantPast
     @State private var playlistRefreshTimerCancellable: AnyCancellable?
     @State private var isRefreshingPlaylists = false
+    @State private var didBecomeActiveObserver: NSObjectProtocol?
+    @State private var didResignActiveObserver: NSObjectProtocol?
 
     private let playlistRefreshInterval: TimeInterval = 60
 
@@ -400,7 +402,7 @@ struct ContentView: View {
                 .environmentObject(appSettings)
         }
         .onAppear {
-            appScenePhase = scenePhase
+            isAppActive = NSApplication.shared.isActive
 
             if playlistRefreshTimerCancellable == nil {
                 let publisher = Timer.publish(
@@ -413,16 +415,46 @@ struct ContentView: View {
                     Task { await refreshUserPlaylistsIfNeeded() }
                 }
             }
+
+            if didBecomeActiveObserver == nil {
+                didBecomeActiveObserver = NotificationCenter.default.addObserver(
+                    forName: NSApplication.didBecomeActiveNotification,
+                    object: nil,
+                    queue: .main
+                ) { _ in
+                    #if DEBUG
+                        print("[AppActive] didBecomeActive")
+                    #endif
+                    isAppActive = true
+                    Task { await refreshUserPlaylistsIfNeeded() }
+                }
+            }
+
+            if didResignActiveObserver == nil {
+                didResignActiveObserver = NotificationCenter.default.addObserver(
+                    forName: NSApplication.didResignActiveNotification,
+                    object: nil,
+                    queue: .main
+                ) { _ in
+                    #if DEBUG
+                        print("[AppActive] didResignActive")
+                    #endif
+                    isAppActive = false
+                }
+            }
         }
         .onDisappear {
             playlistRefreshTimerCancellable?.cancel()
             playlistRefreshTimerCancellable = nil
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-            appScenePhase = newPhase
 
-            if newPhase == .active {
-                Task { await refreshUserPlaylistsIfNeeded() }
+            if let observer = didBecomeActiveObserver {
+                NotificationCenter.default.removeObserver(observer)
+                didBecomeActiveObserver = nil
+            }
+
+            if let observer = didResignActiveObserver {
+                NotificationCenter.default.removeObserver(observer)
+                didResignActiveObserver = nil
             }
         }
         .task {
@@ -488,8 +520,15 @@ struct ContentView: View {
     }
 
     private func refreshUserPlaylistsIfNeeded(force: Bool = false) async {
-        let isActive = await MainActor.run { appScenePhase == .active }
+        #if DEBUG
+            print("[PlaylistRefresh] trigger (force=\(force))")
+        #endif
+
+        let isActive = await MainActor.run { isAppActive }
         if !isActive {
+            #if DEBUG
+                print("[PlaylistRefresh] skip: app inactive")
+            #endif
             return
         }
 
@@ -498,11 +537,17 @@ struct ContentView: View {
         }
 
         if shouldThrottle {
+            #if DEBUG
+                print("[PlaylistRefresh] skip: throttled (last=\(lastPlaylistRefresh))")
+            #endif
             return
         }
 
         let alreadyRefreshing = await MainActor.run { isRefreshingPlaylists }
         if alreadyRefreshing {
+            #if DEBUG
+                print("[PlaylistRefresh] skip: already refreshing")
+            #endif
             return
         }
 
@@ -514,11 +559,17 @@ struct ContentView: View {
         }
 
         guard let profile = (await MainActor.run { userInfo.profile }) else {
+            #if DEBUG
+                print("[PlaylistRefresh] skip: no profile")
+            #endif
             return
         }
 
         do {
-            guard let playlists = try await CloudMusicApi().user_playlist(uid: profile.userId) else {
+            guard let playlists = try await CloudMusicApi(cacheTtl: 0).user_playlist(uid: profile.userId) else {
+                #if DEBUG
+                    print("[PlaylistRefresh] API returned nil")
+                #endif
                 return
             }
 
@@ -528,6 +579,12 @@ struct ContentView: View {
                 newPlaylists: playlists
             )
 
+            #if DEBUG
+                print(
+                    "[PlaylistRefresh] fetched. oldCount=\(previousPlaylists.count) newCount=\(playlists.count) changed=\(changedPlaylistIds)"
+                )
+            #endif
+
             await MainActor.run {
                 userInfo.playlists = playlists
                 lastPlaylistRefresh = Date()
@@ -536,6 +593,9 @@ struct ContentView: View {
 
             invalidateCachesForPlaylistChanges(changedPlaylistIds)
         } catch {
+            #if DEBUG
+                print("[PlaylistRefresh] error: \(error)")
+            #endif
             print("Failed to refresh playlists: \(error)")
         }
     }

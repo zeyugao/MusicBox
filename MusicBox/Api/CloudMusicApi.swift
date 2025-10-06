@@ -130,6 +130,10 @@ class SharedCacheManager {
     }
 
     func invalidate(memberName: String, data: [String: Any]) {
+        var data = data
+        if let cookie = CloudMusicApi().getCookie() {
+            data["cookie"] = cookie
+        }
         guard
             let jsonData = try? JSONSerialization.data(
                 withJSONObject: data, options: [.sortedKeys]
@@ -185,14 +189,6 @@ class CloudMusicApi {
     }
 
     struct PlayListItem: Identifiable, Codable, Equatable, Hashable {
-        static func == (lhs: CloudMusicApi.PlayListItem, rhs: CloudMusicApi.PlayListItem) -> Bool {
-            return lhs.id == rhs.id
-        }
-
-        func hash(into hasher: inout Hasher) {
-            hasher.combine(id)
-        }
-
         let subscribed: Bool
         let coverImgUrl: String
         let name: String
@@ -203,6 +199,18 @@ class CloudMusicApi {
         let description: String?
         let creator: Profile
         let trackCount: UInt64?
+
+        static func == (lhs: CloudMusicApi.PlayListItem, rhs: CloudMusicApi.PlayListItem) -> Bool {
+            return lhs.id == rhs.id
+                && lhs.name == rhs.name
+                && lhs.subscribed == rhs.subscribed
+                && lhs.coverImgUrl == rhs.coverImgUrl
+                && lhs.trackCount == rhs.trackCount
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
+        }
     }
 
     struct RecommandPlaylistItem: Codable, Identifiable, Equatable {
