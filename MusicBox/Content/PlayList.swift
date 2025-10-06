@@ -2026,7 +2026,13 @@ struct PlayListView: View {
                                 try await CloudMusicApi().playlist_tracks(
                                     op: .del, playlistId: songId,
                                     trackIds: [song.id])
-                                updatePlaylist()
+                                NotificationCenter.default.post(
+                                    name: .refreshPlaylist,
+                                    object: nil,
+                                    userInfo: ["playlistId": songId]
+                                )
+
+                                updatePlaylist(force: true)
                             } catch let error as RequestError {
                                 AlertModal.showAlert(error.localizedDescription)
                             } catch {

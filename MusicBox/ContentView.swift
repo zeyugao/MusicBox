@@ -457,6 +457,9 @@ struct ContentView: View {
                 didResignActiveObserver = nil
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .refreshPlaylist)) { _ in
+            Task { await refreshUserPlaylistsIfNeeded(force: true) }
+        }
         .task {
             // Connect PlayStatus with PlayingDetailModel before loading state
             playStatus.setPlayingDetailModel(playingDetailModel)
