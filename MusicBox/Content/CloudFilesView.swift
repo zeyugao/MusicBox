@@ -12,45 +12,26 @@ import SwiftUI
 struct CloudFilesView: View {
     @EnvironmentObject var userInfo: UserInfo
     @State private var cloudFiles: [CloudMusicApi.CloudFile] = []
+    @State private var displayedCloudFiles: [CloudMusicApi.CloudFile] = []
     @State private var isLoading = true
     @State private var isLoadingMore = false
     @State private var hasMoreFiles = true
     @State private var selectedFileForMatch: CloudMusicApi.CloudFile?
     @State private var searchText = ""
     @State private var allFilesLoaded = false
+    @State private var searchDebounceTask: Task<Void, Never>? = nil
+    @State private var isFiltering = false
     private let pageSize = 100
-
-    var filteredCloudFiles: [CloudMusicApi.CloudFile] {
-        if searchText.isEmpty {
-            return cloudFiles
-        } else {
-            return cloudFiles.filter { file in
-                let fileName = file.fileName.lowercased()
-                let searchLower = searchText.lowercased()
-
-                if fileName.contains(searchLower) {
-                    return true
-                }
-
-                if let simpleSong = file.simpleSong,
-                    let songName = simpleSong.name
-                {
-                    return songName.lowercased().contains(searchLower)
-                }
-
-                return false
-            }
-        }
-    }
 
     var body: some View {
         Group {
             VStack {
                 CloudFileTableView(
-                    cloudFiles: filteredCloudFiles,
+                    cloudFiles: displayedCloudFiles,
                     isLoadingMore: isLoadingMore,
                     hasMoreFiles: hasMoreFiles,
                     pageSize: pageSize,
+                    isFiltering: isFiltering,
                     onLoadMore: {
                         if hasMoreFiles && !isLoadingMore {
                             Task {
@@ -76,8 +57,17 @@ struct CloudFilesView: View {
         }
         .searchable(text: $searchText, prompt: "Search by file name or song name")
         .onChange(of: searchText) { _, newValue in
-            if !newValue.isEmpty && !allFilesLoaded {
-                Task {
+            searchDebounceTask?.cancel()
+            let query = newValue
+            searchDebounceTask = Task {
+                try? await Task.sleep(nanoseconds: 220_000_000)
+                if Task.isCancelled { return }
+
+                await MainActor.run {
+                    applySearch(query)
+                }
+
+                if !query.isEmpty && !allFilesLoaded {
                     await loadAllFilesInBackground()
                 }
             }
@@ -92,14 +82,19 @@ struct CloudFilesView: View {
                 }
             }
         }
+        .onDisappear {
+            searchDebounceTask?.cancel()
+        }
     }
 
     private func loadCloudFiles(reset: Bool = false) async {
         if reset {
             DispatchQueue.main.async {
                 self.cloudFiles = []
+                self.displayedCloudFiles = []
                 self.hasMoreFiles = true
                 self.allFilesLoaded = false
+                self.isFiltering = false
             }
         }
 
@@ -107,16 +102,26 @@ struct CloudFilesView: View {
         if let files = await CloudMusicApi().user_cloud(limit: pageSize, offset: 0) {
             DispatchQueue.main.async {
                 self.cloudFiles = files
+                self.displayedCloudFiles = files
                 self.hasMoreFiles = files.count == self.pageSize
                 self.isLoading = false
                 self.allFilesLoaded = files.count < self.pageSize
+                self.isFiltering = false
+                if !self.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    self.applySearch(self.searchText)
+                }
             }
         } else {
             DispatchQueue.main.async {
                 self.cloudFiles = []
+                self.displayedCloudFiles = []
                 self.hasMoreFiles = false
                 self.isLoading = false
                 self.allFilesLoaded = true
+                self.isFiltering = false
+                if !self.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    self.applySearch(self.searchText)
+                }
             }
         }
     }
@@ -134,6 +139,12 @@ struct CloudFilesView: View {
                 self.isLoadingMore = false
                 if newFiles.count < self.pageSize {
                     self.allFilesLoaded = true
+                }
+
+                if self.isFiltering {
+                    self.applySearch(self.searchText)
+                } else {
+                    self.displayedCloudFiles.append(contentsOf: newFiles)
                 }
             }
         } else {
@@ -153,6 +164,30 @@ struct CloudFilesView: View {
             // Add a small delay to prevent blocking the UI
             try? await Task.sleep(nanoseconds: 10_000_000)  // 0.01 second
         }
+    }
+
+    private func applySearch(_ query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmed.isEmpty else {
+            displayedCloudFiles = cloudFiles
+            isFiltering = false
+            return
+        }
+
+        let searchLower = trimmed.lowercased()
+        let filtered = cloudFiles.filter { file in
+            if file.fileName.lowercased().contains(searchLower) { return true }
+            if let simpleSong = file.simpleSong,
+                let songName = simpleSong.name?.lowercased()
+            {
+                if songName.contains(searchLower) { return true }
+            }
+            return false
+        }
+
+        displayedCloudFiles = filtered
+        isFiltering = true
     }
 
     private func matchCloudFile(
@@ -352,9 +387,39 @@ class CloudFileTableViewController: NSViewController {
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
 
+    private enum CellIdentifier {
+        static let status = NSUserInterfaceItemIdentifier("CloudStatusCell")
+        static let fileName = NSUserInterfaceItemIdentifier("CloudFileNameCell")
+        static let info = NSUserInterfaceItemIdentifier("CloudFileInfoCell")
+        static let size = NSUserInterfaceItemIdentifier("CloudFileSizeCell")
+    }
+
     var cloudFiles: [CloudMusicApi.CloudFile] = [] {
         didSet {
-            tableView.reloadData()
+            let previousCount = oldValue.count
+            let newCount = cloudFiles.count
+
+            let isAppending: Bool
+            if !isFiltering,
+                newCount > previousCount,
+                previousCount > 0,
+                cloudFiles.prefix(previousCount).enumerated().allSatisfy({ index, element in
+                    element.id == oldValue[index].id
+                })
+            {
+                isAppending = true
+            } else {
+                isAppending = false
+            }
+
+            if isAppending {
+                let indexSet = IndexSet(integersIn: previousCount..<newCount)
+                tableView.beginUpdates()
+                tableView.insertRows(at: indexSet, withAnimation: [])
+                tableView.endUpdates()
+            } else {
+                tableView.reloadData()
+            }
         }
     }
 
@@ -364,6 +429,7 @@ class CloudFileTableViewController: NSViewController {
     var onLoadMore: (() -> Void)?
     var onMatchWith: ((CloudMusicApi.CloudFile) -> Void)?
     var onUnmatch: ((CloudMusicApi.CloudFile) -> Void)?
+    var isFiltering: Bool = false
 
     // Bottom padding configuration - number of blank rows to add at the bottom
     private let bottomPaddingRows = 3
@@ -415,9 +481,9 @@ class CloudFileTableViewController: NSViewController {
         // Status column
         let statusColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("status"))
         statusColumn.title = ""
-        statusColumn.width = 24
-        statusColumn.minWidth = 24
-        statusColumn.maxWidth = 24
+        statusColumn.width = 16
+        statusColumn.minWidth = 16
+        statusColumn.maxWidth = 16
         statusColumn.resizingMask = []
         tableView.addTableColumn(statusColumn)
 
@@ -425,21 +491,21 @@ class CloudFileTableViewController: NSViewController {
         let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("fileName"))
         nameColumn.title = "File Name"
         nameColumn.width = 300
-        nameColumn.minWidth = 150
+        nameColumn.minWidth = 80
         tableView.addTableColumn(nameColumn)
 
         // Matched Song Info column
         let infoColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("matchedInfo"))
         infoColumn.title = "Matched Song"
         infoColumn.width = 300
-        infoColumn.minWidth = 150
+        infoColumn.minWidth = 80
         tableView.addTableColumn(infoColumn)
 
         // File Size column
         let sizeColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("fileSize"))
         sizeColumn.title = "Size"
         sizeColumn.width = 80
-        sizeColumn.minWidth = 60
+        sizeColumn.minWidth = 40
         sizeColumn.maxWidth = 100
         tableView.addTableColumn(sizeColumn)
     }
@@ -500,22 +566,50 @@ extension CloudFileTableViewController: NSTableViewDelegate {
 
         switch identifier.rawValue {
         case "status":
-            let cellView = CloudFileStatusTableCellView()
+            let cellView: CloudFileStatusTableCellView
+            if let reused = tableView.makeView(withIdentifier: CellIdentifier.status, owner: self) as? CloudFileStatusTableCellView {
+                cellView = reused
+            } else {
+                let newView = CloudFileStatusTableCellView()
+                newView.identifier = CellIdentifier.status
+                cellView = newView
+            }
             cellView.configure(with: cloudFile)
             return cellView
 
         case "fileName":
-            let cellView = CloudFileNameTableCellView()
+            let cellView: CloudFileNameTableCellView
+            if let reused = tableView.makeView(withIdentifier: CellIdentifier.fileName, owner: self) as? CloudFileNameTableCellView {
+                cellView = reused
+            } else {
+                let newView = CloudFileNameTableCellView()
+                newView.identifier = CellIdentifier.fileName
+                cellView = newView
+            }
             cellView.configure(with: cloudFile)
             return cellView
 
         case "matchedInfo":
-            let cellView = CloudFileInfoTableCellView()
+            let cellView: CloudFileInfoTableCellView
+            if let reused = tableView.makeView(withIdentifier: CellIdentifier.info, owner: self) as? CloudFileInfoTableCellView {
+                cellView = reused
+            } else {
+                let newView = CloudFileInfoTableCellView()
+                newView.identifier = CellIdentifier.info
+                cellView = newView
+            }
             cellView.configure(with: cloudFile)
             return cellView
 
         case "fileSize":
-            let cellView = CloudFileSizeTableCellView()
+            let cellView: CloudFileSizeTableCellView
+            if let reused = tableView.makeView(withIdentifier: CellIdentifier.size, owner: self) as? CloudFileSizeTableCellView {
+                cellView = reused
+            } else {
+                let newView = CloudFileSizeTableCellView()
+                newView.identifier = CellIdentifier.size
+                cellView = newView
+            }
             cellView.configure(with: cloudFile)
             return cellView
 
@@ -598,6 +692,7 @@ struct CloudFileTableView: NSViewControllerRepresentable {
     let isLoadingMore: Bool
     let hasMoreFiles: Bool
     let pageSize: Int
+    let isFiltering: Bool
     let onLoadMore: () -> Void
     let onMatchWith: (CloudMusicApi.CloudFile) -> Void
     let onUnmatch: (CloudMusicApi.CloudFile) -> Void
@@ -608,11 +703,13 @@ struct CloudFileTableView: NSViewControllerRepresentable {
         controller.onMatchWith = onMatchWith
         controller.onUnmatch = onUnmatch
         controller.pageSize = pageSize
+        controller.isFiltering = isFiltering
         return controller
     }
 
     func updateNSViewController(_ nsViewController: CloudFileTableViewController, context: Context)
     {
+        nsViewController.isFiltering = isFiltering
         nsViewController.cloudFiles = cloudFiles
         nsViewController.isLoadingMore = isLoadingMore
         nsViewController.hasMoreFiles = hasMoreFiles
