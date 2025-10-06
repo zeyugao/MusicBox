@@ -2023,13 +2023,12 @@ struct PlayListView: View {
                     Task {
                         if case .netease(let songId, _) = playlistMetadata {
                             do {
-                                try await CloudMusicApi().playlist_tracks(
+                                try await CloudMusicApi(cacheTtl: 0).playlist_tracks(
                                     op: .del, playlistId: songId,
                                     trackIds: [song.id])
                                 NotificationCenter.default.post(
                                     name: .refreshPlaylist,
                                     object: nil,
-                                    userInfo: ["playlistId": songId]
                                 )
 
                                 updatePlaylist(force: true)
@@ -2085,9 +2084,13 @@ struct PlayListView: View {
                     ListPlaylistDialogView { selectedPlaylist in
                         Task {
                             do {
-                                try await CloudMusicApi().playlist_tracks(
+                                try await CloudMusicApi(cacheTtl: 0).playlist_tracks(
                                     op: .add, playlistId: selectedPlaylist.id,
                                     trackIds: [selectedSong.id])
+                                NotificationCenter.default.post(
+                                    name: .refreshPlaylist,
+                                    object: nil
+                                )
                             } catch let error as RequestError {
                                 AlertModal.showAlert(error.localizedDescription)
                             } catch {
