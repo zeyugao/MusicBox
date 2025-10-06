@@ -25,8 +25,27 @@ class PlaybackProgress: ObservableObject {
 class LyricStatus: ObservableObject {
     @Published var lyricTimeline: [Int] = []  // We align to 0.1s, 12.32 -> 123
     @Published var currentLyricIndex: Int? = nil
+    @Published private(set) var scrollResetToken = UUID()
 
     private var lastSearchIndex: Int = 0  // Cache last search position for performance
+
+    func prepareForNewTrack() async {
+        lastSearchIndex = 0
+        await MainActor.run {
+            self.lyricTimeline = []
+            self.currentLyricIndex = nil
+            self.scrollResetToken = UUID()
+        }
+    }
+
+    func loadTimeline(_ timeline: [Int], currentTime: Double) async {
+        lastSearchIndex = 0
+        await MainActor.run {
+            self.lyricTimeline = timeline
+            self.currentLyricIndex = self.findLyricIndex(for: currentTime)
+            self.scrollResetToken = UUID()
+        }
+    }
 
     func resetLyricIndex(currentTime: Double) {
         lastSearchIndex = 0
@@ -403,6 +422,12 @@ class PlayStatus: ObservableObject {
         await MainActor.run {
             self.isLoadingNewTrack = true
             self.pendingItem = item
+        }
+
+        await lyricStatus.prepareForNewTrack()
+
+        await MainActor.run {
+            self.playbackProgress.playedSecond = playedSecond ?? 0.0
         }
 
         self.currentItem = item

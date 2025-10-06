@@ -19,10 +19,22 @@ struct LyricView: View {
     var body: some View {
         ScrollViewReader { proxy in
             let scrollToIdx: (Int) -> Void = { idx in
+                guard !lyric.isEmpty else { return }
+                let clamped = max(0, min(idx, lyric.count - 1))
                 withAnimation(.spring) {
-                    proxy.scrollTo("lyric-\(idx)", anchor: .center)
+                    proxy.scrollTo("lyric-\(clamped)", anchor: .center)
                 }
             }
+
+            let formatTimestamp: (Double) -> String = { seconds in
+                guard seconds.isFinite else { return "00:00.00" }
+                let hundredths = max(0, Int((seconds * 100).rounded()))
+                let minutes = hundredths / 6000
+                let secondsComponent = (hundredths % 6000) / 100
+                let subSecond = hundredths % 100
+                return String(format: "%02d:%02d.%02d", minutes, secondsComponent, subSecond)
+            }
+
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading) {
                     ForEach(
@@ -33,7 +45,7 @@ struct LyricView: View {
 
                         VStack(alignment: .leading) {
                             if appSettings.showTimestamp {
-                                Text(String(format: "%.2f", line.time))
+                                Text(formatTimestamp(line.time))
                                     .lineLimit(1)
                                     .font(.footnote)
                                     .foregroundColor(.gray)
@@ -77,16 +89,28 @@ struct LyricView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             scrollToIdx(currentIndex)
                         }
+                    } else {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            scrollToIdx(0)
+                        }
                     }
                 }
                 .onChange(of: lyricStatus.currentLyricIndex) { _, newIndex in
                     #if DEBUG
                         print("LyricView: currentLyricIndex changed to \(String(describing: newIndex))")
                     #endif
-                    if let index = newIndex {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        if let index = newIndex {
                             scrollToIdx(index)
+                        } else {
+                            scrollToIdx(0)
                         }
+                    }
+                }
+                .onChange(of: lyricStatus.scrollResetToken) { _, _ in
+                    guard !lyric.isEmpty, !lyricStatus.lyricTimeline.isEmpty else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        scrollToIdx(0)
                     }
                 }
             }
@@ -117,22 +141,16 @@ struct PlayingDetailView: View {
             self.hasRoma = !lyric.romalrc.lyric.isEmpty
             let lyric = lyric.merge()
             self.lyric = lyric
-            self.playStatus.lyricStatus.lyricTimeline = lyric.map { Int($0.time * 10) }
-            self.playStatus.lyricStatus.resetLyricIndex(
-                currentTime: self.playStatus.playbackProgress.playedSecond)
+            await self.playStatus.lyricStatus.loadTimeline(
+                lyric.map { Int($0.time * 10) },
+                currentTime: self.playStatus.playbackProgress.playedSecond
+            )
 
             // Force restart lyric synchronization with new lyrics
             if playStatus.playerState == .playing {
                 playStatus.restartLyricSynchronization()
             }
 
-            // Ensure scroll position is updated after lyric index reset
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                if self.playStatus.lyricStatus.currentLyricIndex != nil {
-                    // Trigger scroll update by notifying the view
-                    self.playStatus.lyricStatus.objectWillChange.send()
-                }
-            }
             showNoLyricMessage = false
         }
     }
