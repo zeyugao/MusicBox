@@ -113,6 +113,12 @@ class SmartLyricSynchronizer: ObservableObject {
     private var getCurrentTime: (() -> Double)?
     private var shouldSynchronize: (() -> Bool)?
 
+    #if DEBUG
+        private func debugLog(_ message: String) {
+            print("[LyricSync] \(message)")
+        }
+    #endif
+
     init(
         lyricStatus: LyricStatus, getCurrentTime: @escaping () -> Double,
         shouldSynchronize: @escaping () -> Bool
@@ -123,6 +129,23 @@ class SmartLyricSynchronizer: ObservableObject {
     }
 
     func startSynchronization() {
+        if !Thread.isMainThread {
+            #if DEBUG
+                debugLog("startSynchronization: not on main thread, dispatching to main")
+            #endif
+            DispatchQueue.main.async { [weak self] in
+                self?.startSynchronization()
+            }
+            return
+        }
+
+        guard shouldSynchronize?() == true else {
+            #if DEBUG
+                debugLog("startSynchronization: shouldSynchronize false, skipping")
+            #endif
+            return
+        }
+
         guard shouldSynchronize?() == true else { return }
 
         // Immediately update lyric index when starting synchronization
@@ -132,20 +155,36 @@ class SmartLyricSynchronizer: ObservableObject {
             lyricStatus.updateLyricIndex(currentTime: getCurrentTime())
         }
 
+        #if DEBUG
+            debugLog("startSynchronization: scheduling next update")
+        #endif
         scheduleNextLyricUpdate()
     }
 
     func stopSynchronization() {
         preciseTimer?.invalidate()
         preciseTimer = nil
+        #if DEBUG
+            debugLog("stopSynchronization: timer invalidated")
+        #endif
     }
 
     func updateSynchronizationState() {
         if shouldSynchronize?() == true {
             if preciseTimer == nil {
+                #if DEBUG
+                    debugLog("updateSynchronizationState: starting (timer nil)")
+                #endif
                 startSynchronization()
+            } else {
+                #if DEBUG
+                    debugLog("updateSynchronizationState: already running")
+                #endif
             }
         } else {
+            #if DEBUG
+                debugLog("updateSynchronizationState: shouldSynchronize is false, stopping")
+            #endif
             stopSynchronization()
         }
     }
@@ -155,13 +194,34 @@ class SmartLyricSynchronizer: ObservableObject {
         if let getCurrentTime = getCurrentTime,
             let lyricStatus = lyricStatus
         {
+            #if DEBUG
+                debugLog("updateLyricIndexNow: forcing update at time \(getCurrentTime())")
+            #endif
             lyricStatus.updateLyricIndex(currentTime: getCurrentTime())
         }
     }
 
     // Restart synchronization (useful after seeking)
     func restartSynchronization() {
-        guard shouldSynchronize?() == true else { return }
+        if !Thread.isMainThread {
+            #if DEBUG
+                debugLog("restartSynchronization: not on main thread, dispatching to main")
+            #endif
+            DispatchQueue.main.async { [weak self] in
+                self?.restartSynchronization()
+            }
+            return
+        }
+
+        guard shouldSynchronize?() == true else {
+            #if DEBUG
+                debugLog("restartSynchronization: shouldSynchronize false, abort")
+            #endif
+            return
+        }
+        #if DEBUG
+            debugLog("restartSynchronization: restarting timer")
+        #endif
         stopSynchronization()
         startSynchronization()
     }
@@ -169,10 +229,27 @@ class SmartLyricSynchronizer: ObservableObject {
     private func scheduleNextLyricUpdate() {
         preciseTimer?.invalidate()
 
+        #if DEBUG
+            debugLog("scheduleNextLyricUpdate: entering on main thread? \(Thread.isMainThread)")
+        #endif
+
+        if !Thread.isMainThread {
+            #if DEBUG
+                debugLog("scheduleNextLyricUpdate: not on main thread, dispatching to main")
+            #endif
+            DispatchQueue.main.async { [weak self] in
+                self?.scheduleNextLyricUpdate()
+            }
+            return
+        }
+
         guard shouldSynchronize?() == true,
             let getCurrentTime = getCurrentTime,
             let lyricStatus = lyricStatus
         else {
+            #if DEBUG
+                debugLog("scheduleNextLyricUpdate: guard failed (shouldSynchronize=\(shouldSynchronize?() ?? false))")
+            #endif
             return
         }
 
@@ -182,22 +259,31 @@ class SmartLyricSynchronizer: ObservableObject {
             let timeInterval = max(nextChangeTime - currentTime, 0.01)  // Minimum 10ms
 
             if timeInterval > 0 && timeInterval < 10.0 {  // Only schedule if within reasonable range
+                #if DEBUG
+                    debugLog("scheduleNextLyricUpdate: scheduling precise timer in \(timeInterval)s")
+                #endif
                 preciseTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false)
                 { [weak self] _ in
                     self?.performLyricUpdate()
                 }
             } else if timeInterval >= 10.0 {
+                #if DEBUG
+                    debugLog("scheduleNextLyricUpdate: long interval (\(timeInterval)s), scheduling 5s check")
+                #endif
                 // For long intervals, schedule a check every 5 seconds to maintain synchronization
                 preciseTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) {
                     [weak self] _ in
-                    self?.performLyricUpdate()
+                        self?.performLyricUpdate()
                 }
             }
         } else {
+            #if DEBUG
+                debugLog("scheduleNextLyricUpdate: no next change, scheduling 1s fallback")
+            #endif
             // No next lyric change found, schedule a regular check after 1 second
             preciseTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) {
                 [weak self] _ in
-                self?.performLyricUpdate()
+                    self?.performLyricUpdate()
             }
         }
     }
@@ -208,6 +294,10 @@ class SmartLyricSynchronizer: ObservableObject {
             let lyricStatus = lyricStatus
         else { return }
 
+        #if DEBUG
+            let time = getCurrentTime()
+            debugLog("performLyricUpdate: updating index for time \(time), mainThread=\(Thread.isMainThread)")
+        #endif
         lyricStatus.updateLyricIndex(currentTime: getCurrentTime())
 
         // Schedule the next update
@@ -272,6 +362,9 @@ class PlayStatus: ObservableObject {
         NowPlayingCenter.handleSetPlaybackState(playing: false)
 
         // Stop smart lyric synchronization
+        #if DEBUG
+            print("[LyricSync] pausePlay: stopping synchronization")
+        #endif
         lyricSynchronizer?.stopSynchronization()
 
         // Notify about playback state change
@@ -295,6 +388,9 @@ class PlayStatus: ObservableObject {
         NowPlayingCenter.handleSetPlaybackState(playing: true)
 
         // Update smart lyric synchronization state and force immediate lyric index update
+        #if DEBUG
+            print("[LyricSync] startPlay: updating synchronization state")
+        #endif
         lyricSynchronizer?.updateSynchronizationState()
         lyricSynchronizer?.updateLyricIndexNow()
 
@@ -467,6 +563,9 @@ class PlayStatus: ObservableObject {
             await seekToOffset(offset: playedSecond)
         }
 
+        #if DEBUG
+            print("[LyricSync] seekToItem: playerState=\(playerState), readyToPlay=\(readyToPlay)")
+        #endif
         // Restart lyric synchronization for new track if currently playing
         if playerState == .playing {
             lyricSynchronizer?.restartSynchronization()
@@ -559,8 +658,14 @@ class PlayStatus: ObservableObject {
 
                     // Update lyric synchronization when playback state changes
                     if isPlaying {
+                        #if DEBUG
+                            print("[LyricSync] player rate > 0: updating synchronization state")
+                        #endif
                         self.lyricSynchronizer?.updateSynchronizationState()
                     } else {
+                        #if DEBUG
+                            print("[LyricSync] player rate == 0: stopping synchronization")
+                        #endif
                         self.lyricSynchronizer?.stopSynchronization()
                     }
                 }
@@ -768,6 +873,9 @@ class PlayStatus: ObservableObject {
             DispatchQueue.main.async {
                 // Small delay to ensure isPresented has been updated
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    #if DEBUG
+                        print("[LyricSync] detail model changed: isPresented=\(playingDetailModel.isPresented), timer running? \(self?.lyricSynchronizer?.preciseTimer != nil)")
+                    #endif
                     let wasRunning = self?.lyricSynchronizer?.preciseTimer != nil
                     self?.lyricSynchronizer?.updateSynchronizationState()
 
