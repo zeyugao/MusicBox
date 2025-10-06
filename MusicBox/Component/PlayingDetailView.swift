@@ -84,17 +84,6 @@ struct LyricView: View {
                     }
                 }
                 .padding(.bottom, 12)
-                .onAppear {
-                    if let currentIndex = lyricStatus.currentLyricIndex {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            scrollToIdx(currentIndex)
-                        }
-                    } else {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            scrollToIdx(0)
-                        }
-                    }
-                }
                 .onChange(of: lyricStatus.currentLyricIndex) { _, newIndex in
                     #if DEBUG
                         print("LyricView: currentLyricIndex changed to \(String(describing: newIndex))")
@@ -111,6 +100,14 @@ struct LyricView: View {
                     guard !lyric.isEmpty, !lyricStatus.lyricTimeline.isEmpty else { return }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         scrollToIdx(0)
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .focusCurrentPlayingItem)) {
+                    notification in
+                    if let index = notification.userInfo?["scrollToIndex"] as? Int {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            scrollToIdx(index)
+                        }
                     }
                 }
             }
@@ -145,6 +142,16 @@ struct PlayingDetailView: View {
                 lyric.map { Int($0.time * 10) },
                 currentTime: self.playStatus.playbackProgress.playedSecond
             )
+
+            if let currentIndex = self.playStatus.lyricStatus.currentLyricIndex {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NotificationCenter.default.post(
+                        name: .focusCurrentPlayingItem,
+                        object: nil,
+                        userInfo: ["scrollToIndex": currentIndex]
+                    )
+                }
+            }
 
             // Force restart lyric synchronization with new lyrics
             if playStatus.playerState == .playing {
