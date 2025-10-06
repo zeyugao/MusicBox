@@ -31,7 +31,7 @@ if [ -z "$REMOTE_COMMIT_SHA" ]; then
 else
     # Compare versions if we have both local and remote SHAs
     if [ -n "$LOCAL_COMMIT_SHA" ]; then
-        echo "Local short commit:  $LOCAL_COMMIT_SHA"
+        echo "Local short commit: $LOCAL_COMMIT_SHA"
         echo "Remote full commit: $REMOTE_COMMIT_SHA"
         # Check if the full remote SHA starts with the local short SHA
         if [[ "$REMOTE_COMMIT_SHA" == "$LOCAL_COMMIT_SHA"* ]]; then
