@@ -1579,15 +1579,15 @@ struct UploadProgressRow: View {
     let item: UploadQueueItem
     let onRetry: (() -> Void)?
 
-    private var truncatedErrorMessage: String {
-        guard let errorMessage = item.errorMessage else { return "Upload failed" }
-        return errorMessage.count > 25 ? String(errorMessage.prefix(25)) + "..." : errorMessage
+    var errorMessage: String {
+        item.errorMessage ?? "Upload failed"
     }
 
     var body: some View {
         HStack {
             Text(item.songName)
                 .lineLimit(1)
+                .frame(maxWidth: 100, alignment: .leading)
 
             Spacer()
 
@@ -1596,16 +1596,16 @@ struct UploadProgressRow: View {
                     .foregroundColor(.green)
             } else if item.isFailed {
                 HStack(spacing: 8) {
-                    Text(truncatedErrorMessage)
+                    Text(errorMessage)
                         .foregroundColor(.red)
                         .font(.caption)
                         .lineLimit(1)
-                        .frame(maxWidth: 220, alignment: .trailing)
-                        .help(item.errorMessage ?? "Upload failed")
+                        .frame(alignment: .trailing)
+                        .help(errorMessage)
 
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.red)
-                        .help(item.errorMessage ?? "Upload failed")
+                        .help(errorMessage)
                     
                     Button(action: {
                         onRetry?()

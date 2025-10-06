@@ -26,6 +26,12 @@ struct LyricView: View {
                 }
             }
 
+            let scrollToCurrentLyric: () -> Void = {
+                if let currentIndex = lyricStatus.currentLyricIndex {
+                    scrollToIdx(currentIndex)
+                }
+            }
+
             let formatTimestamp: (Double) -> String = { seconds in
                 guard seconds.isFinite else { return "00:00.00" }
                 let hundredths = max(0, Int((seconds * 100).rounded()))
@@ -107,6 +113,10 @@ struct LyricView: View {
                     if let index = notification.userInfo?["scrollToIndex"] as? Int {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             scrollToIdx(index)
+                        }
+                    } else {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            scrollToCurrentLyric()
                         }
                     }
                 }
