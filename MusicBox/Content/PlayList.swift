@@ -755,6 +755,10 @@ class SongTableViewController: NSViewController {
 
     private var playNextCacheKey: PlayNextCacheKey?
     private var playNextPositionLookup: [UInt64: Int] = [:]
+    private var pendingDropURLs: [URL] = []
+    private let fallbackAudioExtensions: Set<String> = [
+        "mp3", "aac", "m4a", "wav", "flac", "ogg", "oga", "ape", "alac", "aiff", "aif", "aifc"
+    ]
 
     var songs: [CloudMusicApi.Song]? {
         didSet {
@@ -849,6 +853,7 @@ class SongTableViewController: NSViewController {
         tableView.rowSizeStyle = .default
         tableView.doubleAction = #selector(handleDoubleClick(_:))
         tableView.target = self
+        tableView.registerForDraggedTypes([.fileURL])
 
         view.addSubview(scrollView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -1110,6 +1115,88 @@ extension SongTableViewController: NSTableViewDataSource {
         // 如果有歌曲，添加额外的空白行用于底部填充
         let songCount = songs?.count ?? 0
         return songCount > 0 ? songCount + bottomPaddingRows : 0
+    }
+
+    func tableView(
+        _ tableView: NSTableView,
+        validateDrop info: NSDraggingInfo,
+        proposedRow row: Int,
+        proposedDropOperation dropOperation: NSTableView.DropOperation
+    ) -> NSDragOperation {
+        guard let songs = songs, !songs.isEmpty else {
+            pendingDropURLs = []
+            return []
+        }
+
+        let urls = extractAudioFileURLs(from: info)
+        pendingDropURLs = urls
+
+        guard !urls.isEmpty else {
+            return []
+        }
+
+        var targetRow = row
+        if targetRow < 0 {
+            targetRow = 0
+        }
+        if targetRow >= songs.count {
+            targetRow = songs.count - 1
+        }
+
+        tableView.setDropRow(targetRow, dropOperation: .on)
+        return .copy
+    }
+
+    func tableView(
+        _ tableView: NSTableView,
+        acceptDrop info: NSDraggingInfo,
+        row: Int,
+        dropOperation: NSTableView.DropOperation
+    ) -> Bool {
+        guard dropOperation == .on, let songs = songs, !songs.isEmpty,
+            row >= 0, row < songs.count
+        else {
+            pendingDropURLs = []
+            return false
+        }
+
+        let urls = pendingDropURLs.isEmpty ? extractAudioFileURLs(from: info) : pendingDropURLs
+        pendingDropURLs = []
+
+        guard let fileURL = urls.first else {
+            return false
+        }
+
+        onUploadToCloud?(songs[row], fileURL)
+        return true
+    }
+
+    private func extractAudioFileURLs(from draggingInfo: NSDraggingInfo) -> [URL] {
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [
+            .urlReadingFileURLsOnly: true
+        ]
+
+        guard let urls = draggingInfo.draggingPasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: options
+        ) as? [URL] else {
+            return []
+        }
+
+        return urls.filter { isAudioFileURL($0) }
+    }
+
+    private func isAudioFileURL(_ url: URL) -> Bool {
+        if #available(macOS 11.0, *) {
+            if let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType,
+                contentType.conforms(to: .audio)
+            {
+                return true
+            }
+        }
+
+        let ext = url.pathExtension.lowercased()
+        return fallbackAudioExtensions.contains(ext)
     }
 }
 
