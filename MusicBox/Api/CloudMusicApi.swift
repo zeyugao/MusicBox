@@ -129,6 +129,23 @@ class SharedCacheManager {
         }
     }
 
+    func invalidate(memberName: String, data: [String: Any]) {
+        guard
+            let jsonData = try? JSONSerialization.data(
+                withJSONObject: data, options: [.sortedKeys]
+            ),
+            let jsonString = String(data: jsonData, encoding: .utf8)
+        else {
+            return
+        }
+
+        let hashedKey = md5(memberName + jsonString)
+
+        cacheQueue.async {
+            self.cache.removeValue(forKey: hashedKey)
+        }
+    }
+
     private func startPeriodicCleanup() {
         Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
             self?.cleanupExpiredItems()

@@ -272,6 +272,7 @@ class AlertModal: ObservableObject {
 }
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject var playlistStatus = PlaylistStatus()
     @StateObject var playStatus = PlayStatus()
     @State private var selection: NavigationScreen = .explore
@@ -283,6 +284,12 @@ struct ContentView: View {
     @StateObject private var alertModel = AlertModal()
 
     @State private var isInitialized = false
+    @State private var appScenePhase: ScenePhase = .inactive
+    @State private var lastPlaylistRefresh: Date = .distantPast
+    @State private var playlistRefreshTimerCancellable: AnyCancellable?
+    @State private var isRefreshingPlaylists = false
+
+    private let playlistRefreshInterval: TimeInterval = 60
 
     private var currentSelection: NavigationScreen {
         userInfo.profile == nil ? .account : selection
@@ -392,6 +399,32 @@ struct ContentView: View {
                 .environmentObject(playlistStatus)
                 .environmentObject(appSettings)
         }
+        .onAppear {
+            appScenePhase = scenePhase
+
+            if playlistRefreshTimerCancellable == nil {
+                let publisher = Timer.publish(
+                    every: playlistRefreshInterval,
+                    on: .main,
+                    in: .common
+                ).autoconnect()
+
+                playlistRefreshTimerCancellable = publisher.sink { _ in
+                    Task { await refreshUserPlaylistsIfNeeded() }
+                }
+            }
+        }
+        .onDisappear {
+            playlistRefreshTimerCancellable?.cancel()
+            playlistRefreshTimerCancellable = nil
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            appScenePhase = newPhase
+
+            if newPhase == .active {
+                Task { await refreshUserPlaylistsIfNeeded() }
+            }
+        }
         .task {
             // Connect PlayStatus with PlayingDetailModel before loading state
             playStatus.setPlayingDetailModel(playingDetailModel)
@@ -419,6 +452,10 @@ struct ContentView: View {
             playlistStatus.reinitializeRemoteCommands()
 
             isInitialized = true
+
+            if userInfo.profile != nil {
+                lastPlaylistRefresh = Date()
+            }
         }
         .alert(
             isPresented: Binding<Bool>(
@@ -447,6 +484,97 @@ struct ContentView: View {
             } else {
                 Alert(title: Text(alertModel.title), message: Text(alertModel.text))
             }
+        }
+    }
+
+    private func refreshUserPlaylistsIfNeeded(force: Bool = false) async {
+        let isActive = await MainActor.run { appScenePhase == .active }
+        if !isActive {
+            return
+        }
+
+        let shouldThrottle = await MainActor.run {
+            !force && Date().timeIntervalSince(lastPlaylistRefresh) < playlistRefreshInterval
+        }
+
+        if shouldThrottle {
+            return
+        }
+
+        let alreadyRefreshing = await MainActor.run { isRefreshingPlaylists }
+        if alreadyRefreshing {
+            return
+        }
+
+        await MainActor.run { isRefreshingPlaylists = true }
+        defer {
+            Task { @MainActor in
+                isRefreshingPlaylists = false
+            }
+        }
+
+        guard let profile = (await MainActor.run { userInfo.profile }) else {
+            return
+        }
+
+        do {
+            guard let playlists = try await CloudMusicApi().user_playlist(uid: profile.userId) else {
+                return
+            }
+
+            let previousPlaylists = await MainActor.run { userInfo.playlists }
+            let changedPlaylistIds = computeChangedPlaylistIds(
+                oldPlaylists: previousPlaylists,
+                newPlaylists: playlists
+            )
+
+            await MainActor.run {
+                userInfo.playlists = playlists
+                lastPlaylistRefresh = Date()
+                saveEncodableState(forKey: "playlists", data: playlists)
+            }
+
+            invalidateCachesForPlaylistChanges(changedPlaylistIds)
+        } catch {
+            print("Failed to refresh playlists: \(error)")
+        }
+    }
+
+    private func computeChangedPlaylistIds(
+        oldPlaylists: [CloudMusicApi.PlayListItem],
+        newPlaylists: [CloudMusicApi.PlayListItem]
+    ) -> [UInt64] {
+        let previousCounts = Dictionary(uniqueKeysWithValues: oldPlaylists.map { ($0.id, $0.trackCount) })
+
+        return newPlaylists.compactMap { playlist in
+            let oldCount = previousCounts[playlist.id] ?? nil
+            let newCount = playlist.trackCount
+
+            if oldCount == nil && newCount == nil {
+                return nil
+            }
+
+            if oldCount != newCount {
+                return playlist.id
+            }
+
+            return nil
+        }
+    }
+
+    private func invalidateCachesForPlaylistChanges(_ playlistIds: [UInt64]) {
+        guard !playlistIds.isEmpty else { return }
+
+        for playlistId in playlistIds {
+            SharedCacheManager.shared.invalidate(
+                memberName: "playlist_detail",
+                data: ["id": playlistId]
+            )
+
+            SharedCacheManager.shared.invalidate(
+                memberName: "playlist_track_all",
+                data: ["id": playlistId]
+            )
         }
     }
 }
