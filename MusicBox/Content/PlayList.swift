@@ -1331,16 +1331,24 @@ extension SongTableViewController {
 
     private func createContextMenu(for song: CloudMusicApi.Song) -> NSMenu {
         let menu = NSMenu()
+        let makeIcon: (String, String) -> NSImage? = { systemName, description in
+            guard #available(macOS 11.0, *) else { return nil }
+            let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+            let image = NSImage(systemSymbolName: systemName, accessibilityDescription: description)
+            return image?.withSymbolConfiguration(configuration)
+        }
         // Play
         let playItem = NSMenuItem(title: "Play", action: #selector(playSong(_:)), keyEquivalent: "")
         playItem.target = self
         playItem.representedObject = song
+        playItem.image = makeIcon("play.fill", "Play song")
         menu.addItem(playItem)
 
         // Play Next
         let playNextItem = NSMenuItem(title: "Play Next", action: #selector(playNext(_:)), keyEquivalent: "")
         playNextItem.target = self
         playNextItem.representedObject = song
+        playNextItem.image = makeIcon("text.badge.plus", "Play next")
         menu.addItem(playNextItem)
 
         // Add to Now Playing
@@ -1348,6 +1356,7 @@ extension SongTableViewController {
             title: "Add to Now Playing", action: #selector(addToNowPlaying(_:)), keyEquivalent: "")
         addToNowPlayingItem.target = self
         addToNowPlayingItem.representedObject = song
+        addToNowPlayingItem.image = makeIcon("music.note.list", "Add to now playing queue")
         menu.addItem(addToNowPlayingItem)
 
         // Add to Playlist
@@ -1355,6 +1364,7 @@ extension SongTableViewController {
             title: "Add to Playlist", action: #selector(addToPlaylist(_:)), keyEquivalent: "")
         addToPlaylistItem.target = self
         addToPlaylistItem.representedObject = song
+        addToPlaylistItem.image = makeIcon("plus.rectangle.on.rectangle", "Add to playlist")
         menu.addItem(addToPlaylistItem)
 
         // Delete from Playlist (if applicable)
@@ -1364,6 +1374,7 @@ extension SongTableViewController {
                 keyEquivalent: "")
             deleteItem.target = self
             deleteItem.representedObject = song
+            deleteItem.image = makeIcon("trash", "Delete from playlist")
             menu.addItem(deleteItem)
         }
 
@@ -1372,6 +1383,7 @@ extension SongTableViewController {
             title: "Upload to Cloud", action: #selector(uploadToCloud(_:)), keyEquivalent: "")
         uploadItem.target = self
         uploadItem.representedObject = song
+        uploadItem.image = makeIcon("icloud.and.arrow.up", "Upload to cloud")
         menu.addItem(uploadItem)
 
         // Copy Title
@@ -1379,6 +1391,7 @@ extension SongTableViewController {
             title: "Copy Title", action: #selector(copyTitle(_:)), keyEquivalent: "")
         copyTitleItem.target = self
         copyTitleItem.representedObject = song
+        copyTitleItem.image = makeIcon("doc.on.doc", "Copy title")
         menu.addItem(copyTitleItem)
 
         // Copy Link
@@ -1386,6 +1399,7 @@ extension SongTableViewController {
             title: "Copy Link", action: #selector(copyLink(_:)), keyEquivalent: "")
         copyLinkItem.target = self
         copyLinkItem.representedObject = song
+        copyLinkItem.image = makeIcon("link", "Copy link")
         menu.addItem(copyLinkItem)
 
         return menu
