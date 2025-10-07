@@ -1833,11 +1833,9 @@ class UploadManager: ObservableObject {
     }
 
     private func handleUploadError(index: Int, error: String) async {
-        await MainActor.run {
-            uploadQueue[index].isUploading = false
-            uploadQueue[index].isFailed = true
-            uploadQueue[index].errorMessage = error
-        }
+        uploadQueue[index].isUploading = false
+        uploadQueue[index].isFailed = true
+        uploadQueue[index].errorMessage = error
     }
     
     private func processUploadQueue() async {
@@ -1845,19 +1843,15 @@ class UploadManager: ObservableObject {
 
         while !canceled {
             // Find the next item that needs to be processed
-            guard let nextIndex = await MainActor.run(body: {
-                uploadQueue.firstIndex { item in
-                    !item.isCompleted && !item.isUploading && !item.isFailed
-                }
+            guard let nextIndex = (uploadQueue.firstIndex { item in
+                !item.isCompleted && !item.isUploading && !item.isFailed
             }) else {
                 // No more items to process
                 break
             }
 
             // Mark current item as uploading
-            await MainActor.run {
-                uploadQueue[nextIndex].isUploading = true
-            }
+            uploadQueue[nextIndex].isUploading = true
 
             let item = uploadQueue[nextIndex]
 
@@ -1865,15 +1859,13 @@ class UploadManager: ObservableObject {
                 let success = try await uploadCloudFile(
                     songId: item.songId, url: item.url, userInfo: userInfo)
 
-                await MainActor.run {
-                    uploadQueue[nextIndex].isUploading = false
-                    uploadQueue[nextIndex].isCompleted = success
-                    if !success {
-                        uploadQueue[nextIndex].isFailed = true
-                        uploadQueue[nextIndex].errorMessage = "Upload failed"
-                    } else {
-                        hasAnySuccess = true
-                    }
+                uploadQueue[nextIndex].isUploading = false
+                uploadQueue[nextIndex].isCompleted = success
+                if !success {
+                    uploadQueue[nextIndex].isFailed = true
+                    uploadQueue[nextIndex].errorMessage = "Upload failed"
+                } else {
+                    hasAnySuccess = true
                 }
             } catch let error as RequestError {
                 await handleUploadError(index: nextIndex, error: error.localizedDescription)
@@ -1882,14 +1874,12 @@ class UploadManager: ObservableObject {
             }
         }
 
-        await MainActor.run {
-            isUploading = false
-            canceled = false
+        isUploading = false
+        canceled = false
 
-            // 如果有任何成功上传，发送刷新通知
-            if hasAnySuccess {
-                NotificationCenter.default.post(name: .refreshPlaylist, object: nil)
-            }
+        // 如果有任何成功上传，发送刷新通知
+        if hasAnySuccess {
+            NotificationCenter.default.post(name: .refreshPlaylist, object: nil)
         }
     }
 
