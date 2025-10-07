@@ -486,15 +486,14 @@ class MetadataLoader {
         let asset = AVURLAsset(url: url)
         do {
             // Load all needed properties in parallel
-            async let metadataItems = asset.load(.commonMetadata)
+            async let metadataItems = asset.load(.metadata)
             async let duration = asset.load(.duration)
 
             let metadata = try await metadataItems
-            let assetDuration = try await duration
 
-            let titleItem = metadata.first(where: { $0.commonKey?.rawValue == "title" })
-            let artistItem = metadata.first(where: { $0.commonKey?.rawValue == "artist" })
-            let albumItem = metadata.first(where: { $0.commonKey?.rawValue == "albumTitle" })
+            let titleItem = metadata.first(where: { $0.commonKey == .commonKeyTitle })
+            let artistItem = metadata.first(where: { $0.commonKey == .commonKeyArtist })
+            let albumItem = metadata.first(where: { $0.commonKey == .commonKeyAlbumName })
 
             // Load metadata values in parallel
             async let title = titleItem?.load(.value) as? String ?? "Unknown"
@@ -504,7 +503,7 @@ class MetadataLoader {
             let result = MetadataResult(
                 title: try await title,
                 artist: try await artist,
-                duration: assetDuration,
+                duration: try await duration,
                 album: try await album
             )
 
