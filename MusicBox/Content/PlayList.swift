@@ -275,13 +275,14 @@ func likeSong(
     }
 }
 
-func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo) async throws -> Bool {
+func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo, appendZero: Bool = false) async throws -> Bool {
     if let metadata = await loadMetadata(url: url) {
         if let privateSongId = try await CloudMusicApi().cloud(
             filePath: url,
             songName: metadata.title,
             artist: metadata.artist,
-            album: metadata.album
+            album: metadata.album,
+            appendZero: appendZero
         ) {
             print("Private song ID: \(privateSongId)")
             try await CloudMusicApi().cloud_match(
@@ -1660,6 +1661,8 @@ struct UploadQueueItem: Identifiable {
     var isFailed: Bool = false
     var isUploading: Bool = false
     var errorMessage: String?
+    var isRetry: Bool = false
+    var retryCount: Int = 0
 }
 
 struct UploadProgressRow: View {
@@ -1813,13 +1816,15 @@ class UploadManager: ObservableObject {
     
     func retryUpload(for item: UploadQueueItem) {
         guard let index = uploadQueue.firstIndex(where: { $0.id == item.id }) else { return }
-
-        // Reset the item's state
+        
+        // Reset the item's state and increment retry count
         uploadQueue[index].isFailed = false
         uploadQueue[index].isCompleted = false
         uploadQueue[index].isUploading = false
         uploadQueue[index].errorMessage = nil
-
+        uploadQueue[index].isRetry = true
+        uploadQueue[index].retryCount += 1
+        
         // If not currently uploading, start the upload process
         if !isUploading {
             startUploading()
@@ -1837,8 +1842,18 @@ class UploadManager: ObservableObject {
 
     private func handleUploadError(index: Int, error: String) async {
         uploadQueue[index].isUploading = false
-        uploadQueue[index].isFailed = true
-        uploadQueue[index].errorMessage = error
+        uploadQueue[index].retryCount += 1
+        
+        if uploadQueue[index].retryCount < 2 {
+            // First failure: automatically retry with appendZero
+            uploadQueue[index].isFailed = false
+            uploadQueue[index].isRetry = true
+            uploadQueue[index].errorMessage = "Retrying with alternative method..."
+        } else {
+            // Second failure: mark as failed and show retry button
+            uploadQueue[index].isFailed = true
+            uploadQueue[index].errorMessage = error
+        }
     }
     
     private func processUploadQueue() async {
@@ -1860,7 +1875,7 @@ class UploadManager: ObservableObject {
 
             do {
                 let success = try await uploadCloudFile(
-                    songId: item.songId, url: item.url, userInfo: userInfo)
+                    songId: item.songId, url: item.url, userInfo: userInfo, appendZero: item.isRetry)
 
                 uploadQueue[nextIndex].isUploading = false
                 uploadQueue[nextIndex].isCompleted = success
