@@ -1684,24 +1684,27 @@ struct UploadProgressRow: View {
             } else if item.isFailed {
                 HStack(spacing: 8) {
                     Text(errorMessage)
-                        .foregroundColor(.red)
+                        .foregroundColor(item.retryCount < 2 ? .orange : .red)
                         .font(.caption)
                         .lineLimit(1)
                         .frame(alignment: .trailing)
                         .help(errorMessage)
 
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.red)
+                    Image(systemName: item.retryCount < 2 ? "arrow.clockwise" : "xmark.circle.fill")
+                        .foregroundColor(item.retryCount < 2 ? .orange : .red)
                         .help(errorMessage)
                     
-                    Button(action: {
-                        onRetry?()
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundColor(.blue)
+                    // Only show retry button after second failure
+                    if item.retryCount >= 2 {
+                        Button(action: {
+                            onRetry?()
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(.blue)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Retry upload")
                     }
-                    .buttonStyle(.borderless)
-                    .help("Retry upload")
                 }
             } else if item.isUploading {
                 ProgressView()
@@ -1844,7 +1847,7 @@ class UploadManager: ObservableObject {
         while !canceled {
             // Find the next item that needs to be processed
             guard let nextIndex = (uploadQueue.firstIndex { item in
-                !item.isCompleted && !item.isUploading && !item.isFailed
+                !item.isCompleted && !item.isUploading && (!item.isFailed || (item.isFailed && item.retryCount < 2))
             }) else {
                 // No more items to process
                 break
