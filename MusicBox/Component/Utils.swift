@@ -459,8 +459,6 @@ class ImageLoader: ObservableObject {
 
 // MARK: - Metadata Loading
 class MetadataLoader {
-    private static let metadataCache = NSCache<NSString, MetadataResult>()
-
     class MetadataResult {
         let title: String
         let artist: String
@@ -476,16 +474,8 @@ class MetadataLoader {
     }
 
     static func loadMetadata(url: URL) async -> MetadataResult? {
-        let cacheKey = NSString(string: url.absoluteString)
-
-        // Check cache first
-        if let cached = metadataCache.object(forKey: cacheKey) {
-            return cached
-        }
-
         let asset = AVURLAsset(url: url)
         do {
-            // Load all needed properties in parallel
             async let metadataItems = asset.load(.metadata)
             async let duration = asset.load(.duration)
 
@@ -506,9 +496,6 @@ class MetadataLoader {
                 duration: try await duration,
                 album: try await album
             )
-
-            // Cache the result
-            metadataCache.setObject(result, forKey: cacheKey)
 
             return result
         } catch {
