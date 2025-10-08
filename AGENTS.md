@@ -1,235 +1,99 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This guide explains how automation or coding assistants should work inside the MusicBox repository. It expands on high-level architecture with concrete implementation details so agents can navigate code confidently and make safe changes.
 
 ## Project Overview
+- MusicBox is a macOS 14+ SwiftUI application that layers native playback, lyrics, and caching on top of the NetEase Cloud Music ecosystem.
+- `MusicBoxApp.swift` bootstraps the app, wires Sparkle’s `SPUStandardUpdaterController`, and manages the main window lifecycle.
+- The NetEase C++ bridge (`QCloudMusicApi`) is surfaced through `Api/CloudMusicApi.swift`, giving Swift code access to login, playlists, and streaming endpoints.
+- Progressive audio caching, smart lyric timing, and remote control integration differentiate the player from web wrappers.
 
-MusicBox is a native macOS application built with SwiftUI that provides access to NetEase Music. The app features progressive audio caching, smart lyric synchronization, system integration, and automatic updates via Sparkle framework.
-
-## Development Commands
-
-**Build & Run:**
-- Open `MusicBox.xcodeproj` in Xcode
-- Build with ⌘+B or run with ⌘+R
-- The project requires QCloudMusicApi C++ library (automatically handled by GitHub Actions)
-
-**No traditional package manager:** This is a Swift project using Xcode, not npm/yarn.
+## Development Workflow
+- Open `MusicBox.xcodeproj` with Xcode 15 or newer, then build (`⌘B`) or run (`⌘R`) the `MusicBox` target.
+- The bridging header (`MusicBox/Api/MusicBox-Bridging-Header.h`) exposes the compiled `QCloudMusicApi` static library; no additional package manager steps are required locally.
+- Sparkle update signing is already configured for development; make sure the updater controller remains initialized in `MusicBoxApp` when altering startup code.
+- GitHub Actions handle fetching QCloudMusicApi for releases, so avoid removing the API headers or altering their relative paths.
 
 ## Architecture Overview
+- SwiftUI + Combine form the UI layer, backed by observable models for player, navigation, and user state.
+- `Player/Player.swift` encapsulates playback orchestration, queue management, and smart lyric synchronization.
+- `Api/CloudMusicApi.swift` wraps C++ entry points via `invoke`, adding caching, cookie persistence, and Swift-friendly models.
+- `CachingPlayerItem` applies a custom `AVAssetResourceLoader` delegate to cache streams while playback continues.
+- `Models/AppSettings.swift` centralizes persisted preferences and macOS-specific behaviors like sleep prevention.
 
-**Tech Stack:**
-- SwiftUI for UI (macOS 14+ target)
-- AVPlayer/AVKit for audio playback
-- QCloudMusicApi (C++ library) for NetEase Music API
-- Sparkle framework for auto-updates
-- IOKit for system sleep prevention
-- CryptoKit for MD5 hashing and caching
-
-**Key Directory Structure:**
+## Directory Map
 ```
 MusicBox/
 ├── Api/                     # NetEase Music API integration
-│   ├── CloudMusicApi.swift  # Swift wrapper for C++ API
-│   ├── QCloudMusicApi.h     # C++ library header
-│   └── MusicBox-Bridging-Header.h
-├── Player/                  # Audio playback engine
-│   ├── Player.swift         # Core audio player with smart lyric sync
-│   ├── PlaylistItem.swift   # Song metadata model
-│   ├── NowPlayingCenter.swift    # macOS media control integration
-│   └── RemoteCommandCenter.swift # Remote control handling
+├── Player/                  # Audio playback engine and queue logic
 ├── CachingPlayerItem/       # Progressive download implementation
-│   ├── CachingPlayerItem.swift      # AVPlayerItem subclass
-│   ├── ResourceLoaderDelegate.swift # HTTP streaming delegate
-│   ├── MediaFileHandle.swift        # File I/O management
-│   └── CachingPlayerItemConfiguration.swift
-├── Component/               # Reusable UI components
-│   ├── PlayerControlView.swift     # Bottom player controls
-│   ├── PlayingDetailView.swift     # Full-screen player view
-│   └── Utils.swift                 # UI utilities
-├── Content/                 # Main application views
-│   ├── Account.swift        # Login and settings
-│   ├── Explore.swift        # Music discovery
-│   ├── PlayList.swift       # Playlist management
-│   └── CloudFilesView.swift # User's cloud music files
-├── Models/                  # Data models
-│   ├── AppSettings.swift    # App configuration
-│   └── BuildInfo.swift      # Version information
-└── General/                 # Shared utilities
-    └── Extensions.swift     # Swift extensions
+├── Component/               # Reusable SwiftUI components
+├── Content/                 # Major user-facing views
+├── Models/                  # Persisted settings and metadata
+└── General/                 # Cross-cutting extensions/utilities
 ```
 
-## Core Architecture Patterns
+## Implementation Hotspots
 
-**Navigation System:**
-- Uses NavigationSplitView with sidebar + NavigationStack pattern
-- Navigation state managed through `NavigationScreen` enum (account, explore, playlist, cloudFiles)
-- PlayingDetailView overlays via NavigationPath manipulation
-- Persistent navigation state with JSON encoding
+### Application Bootstrap (`MusicBox/MusicBoxApp.swift`)
+- `AppDelegate` keeps a static `mainWindow`, overrides `applicationShouldTerminateAfterLastWindowClosed`, and ensures the app stays resident after closing.
+- `AppDelegate.setupGlobalKeyMonitor()` intercepts space-bar presses, but bypasses NSText-based responders so typing still works.
+- `WindowDelegate.windowShouldClose` hides the primary window instead of tearing down state, mirroring native macOS media apps.
+- `CheckForUpdatesViewModel` observes `SPUUpdater.canCheckForUpdates` through Combine and enables the Sparkle “Check for Updates…” menu item.
+- `MusicBoxApp` adjusts window dimensions via `setContentSize` on appear and injects custom command groups for Sparkle and a “Show MusicBox” shortcut.
 
-**State Management:**
-- ObservableObject + @Published pattern throughout
-- UserDefaults persistence for PlaylistStatus, PlayStatus, and AppSettings
-- Notification-based communication between components
-- Shared state via environment objects in SwiftUI views
+### Navigation & State (`MusicBox/ContentView.swift`, `MusicBox/Content/*`)
+- `ContentView` owns a `NavigationSplitView` and serializes `NavigationScreen` selections so the sidebar restores across launches.
+- `JSONUtils` wraps encoding/decoding helpers for any state persisted via `UserDefaults`, including navigation stacks and queue snapshots.
+- `PlayingDetailModel` exposes `@MainActor` toggles that animate the full-screen player overlay.
+- `AlertModal` listens for `AlertModal.showAlertName` notifications and renders global alerts with optional callback hooks.
+- `UserInfo` caches `CloudMusicApi.Profile`, playlist metadata, and like sets to avoid redundant network calls when the sidebar refreshes.
 
-**Audio Playback Architecture:**
-- `PlayStatus` class manages AVPlayer and playback state
-- `PlaylistStatus` handles queue management and loop modes
-- `CachingPlayerItem` enables progressive download while streaming
-- Smart lyric synchronization with precise timing
-- Integration with macOS Now Playing Center and Remote Command Center
+### Audio Engine (`MusicBox/Player/Player.swift`)
+- `PlayStatus` owns the shared `AVPlayer`, serializes `Storage` into `UserDefaults`, and publishes `.playbackStateChanged` notifications for other components.
+- `LyricStatus` keeps lyric timestamps at 0.1-second granularity, using a binary search in `findLyricIndex` for O(log n) lookups.
+- `SmartLyricSynchronizer` runs a `Timer` on the main loop, schedules callbacks from `getNextLyricChangeTime`, and restarts cleanly on seek or view changes.
+- `PlaylistStatus` implements `RemoteCommandHandler`, managing loop modes, “Play Next” queues, and remote command routing through `RemoteCommandCenter`.
+- `PlayStatus.controlPlayerObserver` reacts to commands like `.switchItem`, cancelling stale seek tasks before calling `seekToItem` to guarantee consistent transitions.
 
-## Key Implementation Details
+### Progressive Cache (`MusicBox/CachingPlayerItem/*`)
+- `CachingPlayerItem` rewrites media URLs to a custom `cachingPlayerItemScheme`, letting `AVAssetResourceLoader` redirect requests to a delegate.
+- `ResourceLoaderDelegate` streams bytes via `URLSession`, persists chunks with `MediaFileHandle`, and fulfills range requests directly from disk cache.
+- `ResourceLoaderDelegate.verifyResponse()` enforces HTTP status, expected size, and minimum file thresholds before marking downloads complete.
+- `CachingPlayerItemDelegate` callbacks report download progress and readiness back to the owning player controller.
+- `CachingPlayerItemConfiguration` centralizes buffer thresholds, read limits, and verification flags so tweaks stay consistent.
 
-### Audio System
+### API Layer (`MusicBox/Api/CloudMusicApi.swift`)
+- `CloudMusicApi` marshals Swift dictionaries into JSON, calls the bridged `invoke` function, and decodes responses into strongly typed models.
+- `SharedCacheManager` MD5-hashes request payloads, tracks TTL-expiring values, and purges stale entries on a repeating `Timer`.
+- `doRequest` reinstates cached payloads when available, else performs the C++ bridge call and caches the fresh response.
+- `RequestError` and `ServerError` provide localized messaging including custom handling for NetEase-specific result codes (for example `-462`).
+- `IntOrString` gracefully decodes IDs that the API returns inconsistently as numbers or strings.
 
-**Progressive Caching:**
-- `CachingPlayerItem` downloads audio files while streaming
-- Files cached to system cache directory with UUID naming
-- Supports resuming from cached data on subsequent plays
-- Local file playback preferred over streaming when available
+## State Persistence & Settings
+- `Models/AppSettings.swift` loads preferences on init, uses `@Published` setters to write back to `UserDefaults`, and registers for `.playbackStateChanged`.
+- `AppSettings` toggles IOKit sleep assertions through `IOPMAssertionCreateWithName`, preventing idle sleep only while music is playing.
+- `PlayStatus.loadState()` and `PlaylistStatus` persistence helpers restore the current item, queue, and timing data after relaunch.
+- `ContentView` saves sidebar selection and navigation snapshots via `JSONUtils.saveEncodableState`, keeping UI context intact across restarts.
 
-**Smart Lyric Synchronization:**
-- `SmartLyricSynchronizer` class provides precise lyric timing
-- Only runs when PlayingDetailView is visible (performance optimization)
-- Uses binary search for efficient lyric index lookup
-- Dynamic timer scheduling based on next lyric change time
+## System Integration
+- Sparkle’s updater menu is injected in `MusicBoxApp.commands`, while the controller starts automatically from the app initializer.
+- `NowPlayingCenter.handleItemChange` populates `MPNowPlayingInfoCenter` metadata, including async artwork loading through `ImageLoader`.
+- `NowPlayingCenter.handlePlaybackChange` and `.handleSetPlaybackState` keep playback positions and rates synchronized with macOS media controls.
+- `RemoteCommandCenter.handleRemoteCommands` registers callbacks with `MPRemoteCommandCenter` and delegates execution to the current `PlaylistStatus`.
+- `Notification.Name.spaceKeyPressed` and `.playbackStateChanged` serve as the cross-component messaging backbone for shortcuts and sleep control.
 
-**Playlist Management:**
-- Support for sequential, shuffle, and single-track loop modes
-- "Play Next" queue functionality with intelligent insertion
-- Persistent playlist state across app launches
-- Track deletion with smart current item handling
+## Agent Playbook
+- Extend `PlayStatus` for new playback behaviors and invoke `updateCurrentPlaybackInfo()` after mutating state to keep metadata fresh.
+- When adding NetEase endpoints, introduce Swift wrappers in `CloudMusicApi`, define deterministic cache keys, and invalidate related entries with `SharedCacheManager`.
+- Integrate new UI flows by adding `NavigationScreen` cases and persisting state through `JSONUtils` to preserve navigation on relaunch.
+- Reuse `AlertModal` notifications for global messaging instead of new global publishers to keep UX consistent.
+- Always nil out `CachingPlayerItem.delegate` before discarding a player item to prevent retain cycles and lingering downloads.
 
-### API Integration
+## Testing Checklist
+- Exercise login, playlist fetch, lyric sync, and progressive caching flows with and without network connectivity.
+- Verify window hide/restore behavior, Sparkle update menu availability, and the global space-bar shortcut on macOS 14 or later.
+- Confirm queue persistence by quitting and relaunching after changing loop modes and the “Play Next” stack.
+- Profile memory and disk usage while skipping tracks rapidly to ensure `ResourceLoaderDelegate` sessions close and cached files finalize cleanly.
 
-**NetEase Music API:**
-- C++ library `QCloudMusicApi` bridged to Swift via `CloudMusicApi.swift`
-- Comprehensive caching system with MD5-based keys and TTL expiration
-- Support for login (QR code, phone), playlist management, song streaming, cloud files
-- Automatic cookie management and session persistence
-- Rate limiting and error handling
-
-**Key API Operations:**
-- Authentication: QR code login, phone login, session refresh
-- Music Discovery: Daily recommendations, search, playlist browsing
-- Playback: Song URL resolution, progressive quality selection
-- User Data: Playlists, liked songs, cloud files, scrobbling
-
-### System Integration
-
-**macOS Integration:**
-- Now Playing Center integration with metadata and playback controls
-- Remote Command Center for media key handling
-- Global space bar shortcut for play/pause (when not in text fields)
-- Sleep prevention during playback (configurable)
-- Window management: hide instead of close, dock icon restoration
-- Sparkle framework for automatic updates
-
-**App Lifecycle:**
-- Custom AppDelegate prevents termination on window close
-- Window delegate hides instead of closing main window
-- Persistent state saving on app termination
-- Background task management for long operations
-
-### UI Architecture
-
-**SwiftUI Patterns:**
-- Extensive use of `@StateObject`, `@Published`, and `@EnvironmentObject`
-- Custom view modifiers and reusable components
-- AsyncImage with caching for album artwork
-- Alert system using NotificationCenter for cross-component communication
-
-**Key Views:**
-- `ContentView`: Main split view container with sidebar navigation
-- `PlayerControlView`: Bottom-anchored playback controls
-- `PlayingDetailView`: Full-screen player with lyrics and controls
-- Content views: Account, Explore, PlayList, CloudFilesView
-
-## Development Guidelines
-
-### Adding New Features
-
-**Audio Features:**
-- Extend `PlayStatus` for playback-related functionality
-- Use `PlaylistStatus` for queue management features
-- Follow the notification-based architecture for cross-component communication
-- Consider caching implications for performance
-
-**UI Features:**
-- Follow existing SwiftUI patterns with ObservableObject state management
-- Use environment objects for shared state
-- Implement proper navigation integration with existing NavigationScreen enum
-- Consider accessibility and keyboard navigation
-
-**API Features:**
-- Add new endpoints to `CloudMusicApi.swift`
-- Follow existing caching patterns for performance
-- Handle errors gracefully with user-friendly messages
-- Test with various network conditions
-
-### Important Considerations
-
-**Performance:**
-- Smart lyric synchronization only runs when detail view is visible
-- API responses are cached with configurable TTL
-- Image loading uses AsyncImage with built-in caching
-- Large playlist operations use background queues
-
-**Memory Management:**
-- Proper cleanup in deinit methods
-- Weak references to prevent retain cycles
-- Cancel long-running tasks on component deallocation
-- Clear delegates when replacing player items
-
-**Error Handling:**
-- User-friendly error messages via AlertModal system
-- Graceful degradation when API calls fail
-- Network error recovery and retry logic
-- Fallback behaviors for missing data
-
-**Security:**
-- Sandboxed execution with specific entitlements
-- No hardcoded credentials or API keys
-- Cookie-based session management
-- Secure file handling for cached content
-
-### Testing Guidelines
-
-**Audio Playback:**
-- Test with various audio formats and qualities
-- Verify caching behavior with network interruptions
-- Check proper cleanup when switching tracks
-- Validate lyric synchronization accuracy
-
-**API Integration:**
-- Test authentication flows (QR code, phone login)
-- Verify proper error handling for API failures
-- Check caching behavior and expiration
-- Test with various network conditions
-
-**UI Behavior:**
-- Verify navigation state persistence
-- Test window management (hide/show, dock integration)
-- Check accessibility and keyboard shortcuts
-- Validate responsive behavior with different window sizes
-
-## Common Patterns and Utilities
-
-**State Persistence:**
-- Use JSONUtils for complex state objects with saveEncodableState and loadDecodableState methods
-- UserDefaults integration for automatic persistence across app launches
-
-**Notification-Based Communication:**
-- Define notification names as extensions to Notification.Name
-- Use NotificationCenter for cross-component communication with userInfo dictionaries
-
-**Async API Calls:**
-- Follow established CloudMusicApi pattern with configurable cache TTL
-- Proper error handling and timeout management
-
-**UI State Management:**
-- Use @StateObject for owning state, @ObservedObject for passed state
-- Environment objects for shared state across view hierarchy
-
-This documentation should be updated as the codebase evolves to reflect new patterns and architectural decisions.
+This documentation should be updated as the codebase evolves to capture new patterns and architectural decisions.
