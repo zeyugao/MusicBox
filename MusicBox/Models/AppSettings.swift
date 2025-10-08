@@ -27,6 +27,12 @@ class AppSettings: ObservableObject {
             UserDefaults.standard.set(showRoma, forKey: "showRoma")
         }
     }
+    
+    @Published var enableAppendZeroRetry: Bool = true {
+        didSet {
+            UserDefaults.standard.set(enableAppendZeroRetry, forKey: "enableAppendZeroRetry")
+        }
+    }
 
     private var sleepAssertionID: IOPMAssertionID = IOPMAssertionID(0)
     private var isPlayingMusic: Bool = false
@@ -37,6 +43,13 @@ class AppSettings: ObservableObject {
         preventSleepWhenPlaying = UserDefaults.standard.bool(forKey: "preventSleepWhenPlaying")
         showTimestamp = UserDefaults.standard.bool(forKey: "showTimestamp")
         showRoma = UserDefaults.standard.bool(forKey: "showRoma")
+        if let storedEnableAppendZeroRetry = UserDefaults.standard
+            .object(forKey: "enableAppendZeroRetry") as? Bool
+        {
+            enableAppendZeroRetry = storedEnableAppendZeroRetry
+        } else {
+            enableAppendZeroRetry = true
+        }
         setupPlaybackObserver()
     }
     

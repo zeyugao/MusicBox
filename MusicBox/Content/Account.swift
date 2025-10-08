@@ -533,6 +533,16 @@ struct GeneralSettingsSection: View {
                             .toggleStyle(SwitchToggleStyle())
                     )
                 )
+
+                SettingRow(
+                    icon: "gobackward",
+                    title: "Auto Retry Cloud Uploads",
+                    description: "Retry failed uploads with the appendZero workaround",
+                    control: AnyView(
+                        Toggle("", isOn: $appSettings.enableAppendZeroRetry)
+                            .toggleStyle(SwitchToggleStyle())
+                    )
+                )
             }
             .padding(16)
             .background(Color(NSColor.controlBackgroundColor))

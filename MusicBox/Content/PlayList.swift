@@ -1667,10 +1667,32 @@ struct UploadQueueItem: Identifiable {
 
 struct UploadProgressRow: View {
     let item: UploadQueueItem
+    let isAutoRetryEnabled: Bool
     let onRetry: (() -> Void)?
 
     var errorMessage: String {
         item.errorMessage ?? "Upload failed"
+    }
+    
+    private var failureColor: Color {
+        if isAutoRetryEnabled && item.retryCount < 2 {
+            return .orange
+        }
+        return .red
+    }
+    
+    private var failureIconName: String {
+        if isAutoRetryEnabled && item.retryCount < 2 {
+            return "arrow.clockwise"
+        }
+        return "xmark.circle.fill"
+    }
+    
+    private var shouldShowRetryButton: Bool {
+        if isAutoRetryEnabled {
+            return item.retryCount >= 2
+        }
+        return item.retryCount >= 1
     }
 
     var body: some View {
@@ -1687,18 +1709,18 @@ struct UploadProgressRow: View {
             } else if item.isFailed {
                 HStack(spacing: 8) {
                     Text(errorMessage)
-                        .foregroundColor(item.retryCount < 2 ? .orange : .red)
+                        .foregroundColor(failureColor)
                         .font(.caption)
                         .lineLimit(1)
                         .frame(alignment: .trailing)
                         .help(errorMessage)
 
-                    Image(systemName: item.retryCount < 2 ? "arrow.clockwise" : "xmark.circle.fill")
-                        .foregroundColor(item.retryCount < 2 ? .orange : .red)
+                    Image(systemName: failureIconName)
+                        .foregroundColor(failureColor)
                         .help(errorMessage)
                     
-                    // Only show retry button after second failure
-                    if item.retryCount >= 2 {
+                    // Only show retry button when auto retry is exhausted or disabled
+                    if shouldShowRetryButton {
                         Button(action: {
                             onRetry?()
                         }) {
@@ -1733,6 +1755,7 @@ struct UploadProgressRow: View {
 struct UploadProgressDialog: View {
     @ObservedObject var uploadManager: UploadManager
     @Binding var isPresented: Bool
+    @ObservedObject private var appSettings = AppSettings.shared
 
     var body: some View {
         VStack(spacing: 10) {
@@ -1745,7 +1768,10 @@ struct UploadProgressDialog: View {
             ScrollView {
                 VStack(spacing: 4) {
                     ForEach(uploadManager.uploadQueue) { item in
-                        UploadProgressRow(item: item) {
+                        UploadProgressRow(
+                            item: item,
+                            isAutoRetryEnabled: appSettings.enableAppendZeroRetry
+                        ) {
                             uploadManager.retryUpload(for: item)
                         }
                     }
@@ -1782,10 +1808,12 @@ class UploadManager: ObservableObject {
 
     private let userInfo: UserInfo
     private let onRefresh: (() -> Void)?
+    private let appSettings: AppSettings
 
     init(userInfo: UserInfo, onRefresh: (() -> Void)? = nil) {
         self.userInfo = userInfo
         self.onRefresh = onRefresh
+        self.appSettings = AppSettings.shared
     }
 
     var completedCount: Int {
@@ -1822,7 +1850,7 @@ class UploadManager: ObservableObject {
         uploadQueue[index].isCompleted = false
         uploadQueue[index].isUploading = false
         uploadQueue[index].errorMessage = nil
-        uploadQueue[index].isRetry = true
+        uploadQueue[index].isRetry = appSettings.enableAppendZeroRetry
         uploadQueue[index].retryCount += 1
         
         // If not currently uploading, start the upload process
@@ -1844,8 +1872,8 @@ class UploadManager: ObservableObject {
         uploadQueue[index].isUploading = false
         uploadQueue[index].retryCount += 1
         
-        if uploadQueue[index].retryCount < 2 {
-            // First failure: automatically retry with appendZero
+        if appSettings.enableAppendZeroRetry && uploadQueue[index].retryCount < 2 {
+            // First failure: automatically retry with appendZero when enabled
             uploadQueue[index].isFailed = false
             uploadQueue[index].isRetry = true
             uploadQueue[index].errorMessage = "Retrying with alternative method..."
@@ -1853,6 +1881,9 @@ class UploadManager: ObservableObject {
             // Second failure: mark as failed and show retry button
             uploadQueue[index].isFailed = true
             uploadQueue[index].errorMessage = error
+            if !appSettings.enableAppendZeroRetry {
+                uploadQueue[index].isRetry = false
+            }
         }
     }
     
@@ -1862,7 +1893,12 @@ class UploadManager: ObservableObject {
         while !canceled {
             // Find the next item that needs to be processed
             guard let nextIndex = (uploadQueue.firstIndex { item in
-                !item.isCompleted && !item.isUploading && (!item.isFailed || (item.isFailed && item.retryCount < 2))
+                guard !item.isCompleted && !item.isUploading else { return false }
+                if appSettings.enableAppendZeroRetry {
+                    return !item.isFailed || item.retryCount < 2
+                } else {
+                    return !item.isFailed
+                }
             }) else {
                 // No more items to process
                 break
@@ -1875,7 +1911,10 @@ class UploadManager: ObservableObject {
 
             do {
                 let success = try await uploadCloudFile(
-                    songId: item.songId, url: item.url, userInfo: userInfo, appendZero: item.isRetry)
+                    songId: item.songId,
+                    url: item.url,
+                    userInfo: userInfo,
+                    appendZero: appSettings.enableAppendZeroRetry && item.isRetry)
 
                 uploadQueue[nextIndex].isUploading = false
                 uploadQueue[nextIndex].isCompleted = success
