@@ -888,32 +888,49 @@ class CloudMusicApi {
     func cloud(filePath: URL, songName: String?, artist: String?, album: String?, appendZero: Bool = false) async throws
         -> UInt64?
     {
-        let data: String = {
-            guard var fileData = try? Data(contentsOf: filePath) else {
-                return ""
-            }
-            
-            if appendZero {
-                let randomByte1 = UInt8.random(in: 0...255)
-                let randomByte2 = UInt8.random(in: 0...255)
-                fileData.append(randomByte1)
-                fileData.append(randomByte2)
-            }
-            
-            return fileData.base64EncodedString()
-        }()
-        
-        guard !data.isEmpty else {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: filePath.path) else {
             throw RequestError.Request("cloud failed to read file")
         }
 
-        let filename = filePath.lastPathComponent
+        var uploadURL = filePath
+        var temporaryFileURL: URL?
+
+        if appendZero {
+            let tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            let extensionSuffix = filePath.pathExtension.isEmpty ? "" : ".\(filePath.pathExtension)"
+            let tempURL = tempDirectory.appendingPathComponent(UUID().uuidString + extensionSuffix)
+
+            try fileManager.copyItem(at: filePath, to: tempURL)
+            let fileHandle = try FileHandle(forWritingTo: tempURL)
+            defer { try? fileHandle.close() }
+
+            try fileHandle.seekToEnd()
+            let randomBytes = Data([UInt8.random(in: 0...255), UInt8.random(in: 0...255)])
+            try fileHandle.write(contentsOf: randomBytes)
+
+            uploadURL = tempURL
+            temporaryFileURL = tempURL
+        }
+
+        defer {
+            if let temporaryFileURL {
+                try? fileManager.removeItem(at: temporaryFileURL)
+            }
+        }
+
+        let fileSize = (try? uploadURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        guard fileSize > 0 else {
+            throw RequestError.Request("cloud failed to read file")
+        }
+
+        let filename = uploadURL.lastPathComponent
 
         let p =
             [
-                "dataAsBase64": 1,
+                "dataInPath": true,
                 "songFile": [
-                    "data": data,
+                    "path": uploadURL.path,
                     "name": filename,
                 ],
                 "songName": songName ?? filename,
