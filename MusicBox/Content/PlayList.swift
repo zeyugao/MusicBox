@@ -275,14 +275,13 @@ func likeSong(
     }
 }
 
-func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo, appendZero: Bool = false) async throws -> Bool {
+func uploadCloudFile(songId: UInt64, url: URL, userInfo: UserInfo) async throws -> Bool {
     if let metadata = await loadMetadata(url: url) {
         if let privateSongId = try await CloudMusicApi().cloud(
             filePath: url,
             songName: metadata.title,
             artist: metadata.artist,
-            album: metadata.album,
-            appendZero: appendZero
+            album: metadata.album
         ) {
             print("Private song ID: \(privateSongId)")
             try await CloudMusicApi().cloud_match(
@@ -1661,45 +1660,21 @@ struct UploadQueueItem: Identifiable {
     var isFailed: Bool = false
     var isUploading: Bool = false
     var errorMessage: String?
-    var isRetry: Bool = false
-    var retryCount: Int = 0
 }
 
 struct UploadProgressRow: View {
     let item: UploadQueueItem
-    let isAutoRetryEnabled: Bool
     let onRetry: (() -> Void)?
 
-    var errorMessage: String {
-        item.errorMessage ?? "Upload failed"
-    }
-    
-    private var failureColor: Color {
-        if isAutoRetryEnabled && item.retryCount < 2 {
-            return .orange
-        }
-        return .red
-    }
-    
-    private var failureIconName: String {
-        if isAutoRetryEnabled && item.retryCount < 2 {
-            return "arrow.clockwise"
-        }
-        return "xmark.circle.fill"
-    }
-    
-    private var shouldShowRetryButton: Bool {
-        if isAutoRetryEnabled {
-            return item.retryCount >= 2
-        }
-        return item.retryCount >= 1
+    private var truncatedErrorMessage: String {
+        guard let errorMessage = item.errorMessage else { return "Upload failed" }
+        return errorMessage.count > 25 ? String(errorMessage.prefix(25)) + "..." : errorMessage
     }
 
     var body: some View {
         HStack {
             Text(item.songName)
                 .lineLimit(1)
-                .frame(maxWidth: 100, alignment: .leading)
 
             Spacer()
 
@@ -1708,28 +1683,25 @@ struct UploadProgressRow: View {
                     .foregroundColor(.green)
             } else if item.isFailed {
                 HStack(spacing: 8) {
-                    Text(errorMessage)
-                        .foregroundColor(failureColor)
+                    Text(truncatedErrorMessage)
+                        .foregroundColor(.red)
                         .font(.caption)
                         .lineLimit(1)
-                        .frame(alignment: .trailing)
-                        .help(errorMessage)
+                        .frame(maxWidth: 220, alignment: .trailing)
+                        .help(item.errorMessage ?? "Upload failed")
 
-                    Image(systemName: failureIconName)
-                        .foregroundColor(failureColor)
-                        .help(errorMessage)
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                        .help(item.errorMessage ?? "Upload failed")
                     
-                    // Only show retry button when auto retry is exhausted or disabled
-                    if shouldShowRetryButton {
-                        Button(action: {
-                            onRetry?()
-                        }) {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundColor(.blue)
-                        }
-                        .buttonStyle(.borderless)
-                        .help("Retry upload")
+                    Button(action: {
+                        onRetry?()
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(.blue)
                     }
+                    .buttonStyle(.borderless)
+                    .help("Retry upload")
                 }
             } else if item.isUploading {
                 ProgressView()
@@ -1755,7 +1727,6 @@ struct UploadProgressRow: View {
 struct UploadProgressDialog: View {
     @ObservedObject var uploadManager: UploadManager
     @Binding var isPresented: Bool
-    @ObservedObject private var appSettings = AppSettings.shared
 
     var body: some View {
         VStack(spacing: 10) {
@@ -1768,10 +1739,7 @@ struct UploadProgressDialog: View {
             ScrollView {
                 VStack(spacing: 4) {
                     ForEach(uploadManager.uploadQueue) { item in
-                        UploadProgressRow(
-                            item: item,
-                            isAutoRetryEnabled: appSettings.enableAppendZeroRetry
-                        ) {
+                        UploadProgressRow(item: item) {
                             uploadManager.retryUpload(for: item)
                         }
                     }
@@ -1808,12 +1776,10 @@ class UploadManager: ObservableObject {
 
     private let userInfo: UserInfo
     private let onRefresh: (() -> Void)?
-    private let appSettings: AppSettings
 
     init(userInfo: UserInfo, onRefresh: (() -> Void)? = nil) {
         self.userInfo = userInfo
         self.onRefresh = onRefresh
-        self.appSettings = AppSettings.shared
     }
 
     var completedCount: Int {
@@ -1844,15 +1810,13 @@ class UploadManager: ObservableObject {
     
     func retryUpload(for item: UploadQueueItem) {
         guard let index = uploadQueue.firstIndex(where: { $0.id == item.id }) else { return }
-        
-        // Reset the item's state and increment retry count
+
+        // Reset the item's state
         uploadQueue[index].isFailed = false
         uploadQueue[index].isCompleted = false
         uploadQueue[index].isUploading = false
         uploadQueue[index].errorMessage = nil
-        uploadQueue[index].isRetry = appSettings.enableAppendZeroRetry
-        uploadQueue[index].retryCount += 1
-        
+
         // If not currently uploading, start the upload process
         if !isUploading {
             startUploading()
@@ -1869,21 +1833,10 @@ class UploadManager: ObservableObject {
     }
 
     private func handleUploadError(index: Int, error: String) async {
-        uploadQueue[index].isUploading = false
-        uploadQueue[index].retryCount += 1
-        
-        if appSettings.enableAppendZeroRetry && uploadQueue[index].retryCount < 2 {
-            // First failure: automatically retry with appendZero when enabled
-            uploadQueue[index].isFailed = false
-            uploadQueue[index].isRetry = true
-            uploadQueue[index].errorMessage = "Retrying with alternative method..."
-        } else {
-            // Second failure: mark as failed and show retry button
+        await MainActor.run {
+            uploadQueue[index].isUploading = false
             uploadQueue[index].isFailed = true
             uploadQueue[index].errorMessage = error
-            if !appSettings.enableAppendZeroRetry {
-                uploadQueue[index].isRetry = false
-            }
         }
     }
     
@@ -1892,12 +1845,9 @@ class UploadManager: ObservableObject {
 
         while !canceled {
             // Find the next item that needs to be processed
-            guard let nextIndex = (uploadQueue.firstIndex { item in
-                guard !item.isCompleted && !item.isUploading else { return false }
-                if appSettings.enableAppendZeroRetry {
-                    return !item.isFailed || item.retryCount < 2
-                } else {
-                    return !item.isFailed
+            guard let nextIndex = await MainActor.run(body: {
+                uploadQueue.firstIndex { item in
+                    !item.isCompleted && !item.isUploading && !item.isFailed
                 }
             }) else {
                 // No more items to process
@@ -1905,24 +1855,25 @@ class UploadManager: ObservableObject {
             }
 
             // Mark current item as uploading
-            uploadQueue[nextIndex].isUploading = true
+            await MainActor.run {
+                uploadQueue[nextIndex].isUploading = true
+            }
 
             let item = uploadQueue[nextIndex]
 
             do {
                 let success = try await uploadCloudFile(
-                    songId: item.songId,
-                    url: item.url,
-                    userInfo: userInfo,
-                    appendZero: appSettings.enableAppendZeroRetry && item.isRetry)
+                    songId: item.songId, url: item.url, userInfo: userInfo)
 
-                uploadQueue[nextIndex].isUploading = false
-                uploadQueue[nextIndex].isCompleted = success
-                if !success {
-                    uploadQueue[nextIndex].isFailed = true
-                    uploadQueue[nextIndex].errorMessage = "Upload failed"
-                } else {
-                    hasAnySuccess = true
+                await MainActor.run {
+                    uploadQueue[nextIndex].isUploading = false
+                    uploadQueue[nextIndex].isCompleted = success
+                    if !success {
+                        uploadQueue[nextIndex].isFailed = true
+                        uploadQueue[nextIndex].errorMessage = "Upload failed"
+                    } else {
+                        hasAnySuccess = true
+                    }
                 }
             } catch let error as RequestError {
                 await handleUploadError(index: nextIndex, error: error.localizedDescription)
@@ -1931,12 +1882,14 @@ class UploadManager: ObservableObject {
             }
         }
 
-        isUploading = false
-        canceled = false
+        await MainActor.run {
+            isUploading = false
+            canceled = false
 
-        // 如果有任何成功上传，发送刷新通知
-        if hasAnySuccess {
-            NotificationCenter.default.post(name: .refreshPlaylist, object: nil)
+            // 如果有任何成功上传，发送刷新通知
+            if hasAnySuccess {
+                NotificationCenter.default.post(name: .refreshPlaylist, object: nil)
+            }
         }
     }
 
