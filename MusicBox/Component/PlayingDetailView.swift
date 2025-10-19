@@ -145,7 +145,7 @@ struct PlayingDetailView: View {
         if let currentId = playStatus.currentItem?.id,
             let lyric = await CloudMusicApi(cacheTtl: -1).lyric_new(id: currentId)
         {
-            self.hasRoma = !lyric.romalrc.lyric.isEmpty
+            self.hasRoma = !(lyric.romalrc?.lyric.isEmpty ?? true)
             let lyric = lyric.merge()
             self.lyric = lyric
             await self.playStatus.lyricStatus.loadTimeline(
