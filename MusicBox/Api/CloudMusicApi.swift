@@ -1271,8 +1271,8 @@ class CloudMusicApi {
 
         func merge() -> [LyricLine] {
             let lrc = self.lrc.parse()
-            let tlyric = self.tlyric.parse()
-            let romalrc = self.romalrc.parse()
+            let tlyric = self.tlyric?.parse() ?? []
+            let romalrc = self.romalrc?.parse() ?? []
 
             var result: [LyricLine] = []
             var lrcIndex = 0
@@ -1320,8 +1320,8 @@ class CloudMusicApi {
 
         // let klyric: LyricNew.Lyric
         let lrc: LyricNew.Lyric
-        let tlyric: LyricNew.Lyric
-        let romalrc: LyricNew.Lyric
+        let tlyric: LyricNew.Lyric?
+        let romalrc: LyricNew.Lyric?
     }
 
     func lyric_new(id: UInt64) async -> LyricNew? {
