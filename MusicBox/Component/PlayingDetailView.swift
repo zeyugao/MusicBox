@@ -134,6 +134,14 @@ struct PlayingDetailView: View {
 
     func updateLyric() async {
         showNoLyricMessage = false
+        lyric = nil
+
+        let defaultLyricLine = CloudMusicApi.LyricLine(
+            time: 0,
+            lyric: "无歌词",
+            tlyric: nil,
+            romalrc: nil
+        )
 
         Task {
             try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 second
@@ -146,7 +154,10 @@ struct PlayingDetailView: View {
             let lyric = await CloudMusicApi(cacheTtl: -1).lyric_new(id: currentId)
         {
             self.hasRoma = !(lyric.romalrc?.lyric.isEmpty ?? true)
-            let lyric = lyric.merge()
+            var lyric = lyric.merge()
+            if lyric.isEmpty {
+                lyric = [defaultLyricLine]
+            }
             self.lyric = lyric
             await self.playStatus.lyricStatus.loadTimeline(
                 lyric.map { Int($0.time * 10) },
@@ -168,6 +179,15 @@ struct PlayingDetailView: View {
                 playStatus.restartLyricSynchronization()
             }
 
+            showNoLyricMessage = false
+        } else {
+            let fallback = [defaultLyricLine]
+            self.lyric = fallback
+            self.hasRoma = false
+            await self.playStatus.lyricStatus.loadTimeline(
+                fallback.map { Int($0.time * 10) },
+                currentTime: self.playStatus.playbackProgress.playedSecond
+            )
             showNoLyricMessage = false
         }
     }
