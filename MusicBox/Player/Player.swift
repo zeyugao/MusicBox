@@ -1243,13 +1243,24 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     }
 
     func replacePlaylist(
-        _ items: [PlaylistItem], continuePlaying: Bool = true, shouldSaveState: Bool = true
+        _ items: [PlaylistItem],
+        continuePlaying: Bool = true,
+        shouldSaveState: Bool = true,
+        startIndex: Int? = nil
     ) async {
         await MainActor.run {
             playlist = items
             playNextItemsCount = 0
         }
-        await seekToItem(offset: 0, shouldPlay: continuePlaying)
+
+        let targetIndex = startIndex ?? 0
+        if items.isEmpty {
+            await seekToItem(offset: 0, shouldPlay: continuePlaying)
+        } else {
+            let normalizedIndex = max(0, min(targetIndex, items.count - 1))
+            await seekToItem(offset: normalizedIndex, shouldPlay: continuePlaying)
+        }
+
         if shouldSaveState {
             saveState()
         }

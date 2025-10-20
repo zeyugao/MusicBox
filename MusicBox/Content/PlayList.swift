@@ -203,24 +203,55 @@ class PlaylistDetailModel: ObservableObject {
     func update() {
         Task {
             guard let originalSongs = originalSongs else { return }
-            var songs = originalSongs
-            if !searchText.isEmpty {
-                let keyword = searchText.lowercased()
-                songs = songs.filter { song in
-                    song.name.lowercased().contains(keyword)
-                        || song.ar.map(\.name).joined(separator: "").lowercased().contains(keyword)
-                        || song.al.name.lowercased().contains(keyword)
-                }
-            }
-
-            if let sortOrder = sortOrder {
-                songs = songs.sorted(using: sortOrder)
-            }
-            let newSongs = songs
+            let newSongs = applyFiltersAndSorting(to: originalSongs)
 
             await MainActor.run {
                 self.songs = newSongs
             }
+        }
+    }
+
+    private func applyFiltersAndSorting(to songs: [CloudMusicApi.Song]) -> [CloudMusicApi.Song] {
+        var filteredSongs = songs
+
+        if !searchText.isEmpty {
+            let keyword = searchText.lowercased()
+            filteredSongs = filteredSongs.filter { song in
+                song.name.lowercased().contains(keyword)
+                    || song.ar.map(\.name).joined(separator: "").lowercased().contains(keyword)
+                    || song.al.name.lowercased().contains(keyword)
+            }
+        }
+
+        if let sortOrder = sortOrder {
+            filteredSongs = filteredSongs.sorted(using: sortOrder)
+        }
+
+        return filteredSongs
+    }
+
+    private func waitForInitialLoadCompletion() async {
+        while await MainActor.run(body: { self.isLoading && self.originalSongs == nil }) {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+    }
+
+    func songsForPlayback(loadEntirePlaylist: Bool = false) async -> [CloudMusicApi.Song] {
+        await waitForInitialLoadCompletion()
+
+        if loadEntirePlaylist {
+            let needsFullLoad = await MainActor.run {
+                self.hasMoreSongs && !self.allSongsLoaded
+            }
+
+            if needsFullLoad {
+                await loadAllSongsInBackground()
+            }
+        }
+
+        return await MainActor.run {
+            guard let originalSongs = self.originalSongs else { return [] }
+            return self.applyFiltersAndSorting(to: originalSongs)
         }
     }
 }
@@ -1595,6 +1626,7 @@ struct SongTableView: NSViewControllerRepresentable {
 }
 
 struct PlaylistToolbar: ToolbarContent {
+    @ObservedObject var model: PlaylistDetailModel
     let songs: [CloudMusicApi.Song]
     let playlistMetadata: PlaylistMetadata?
     let playlistStatus: PlaylistStatus
@@ -1615,11 +1647,26 @@ struct PlaylistToolbar: ToolbarContent {
                 Menu {
                     Button(action: {
                         Task {
-                            let newItems = songs.map { song in
+                            let songsToPlay = await model.songsForPlayback(loadEntirePlaylist: true)
+                            guard !songsToPlay.isEmpty else { return }
+
+                            let newItems = songsToPlay.map { song in
                                 loadItem(song: song)
                             }
-                            let _ = await playlistStatus.replacePlaylist(
-                                newItems, continuePlaying: true, shouldSaveState: true)
+
+                            guard !newItems.isEmpty else { return }
+
+                            let startIndex =
+                                (playlistStatus.loopMode == .shuffle && newItems.count > 1)
+                                ? Int.random(in: 0..<newItems.count)
+                                : 0
+
+                            await playlistStatus.replacePlaylist(
+                                newItems,
+                                continuePlaying: true,
+                                shouldSaveState: true,
+                                startIndex: startIndex
+                            )
                         }
                     }) {
                         Label("Play All", systemImage: "play")
@@ -1627,9 +1674,15 @@ struct PlaylistToolbar: ToolbarContent {
 
                     Button(action: {
                         Task {
-                            let newItems = songs.map { song in
+                            let songsToAdd = await model.songsForPlayback(loadEntirePlaylist: true)
+                            guard !songsToAdd.isEmpty else { return }
+
+                            let newItems = songsToAdd.map { song in
                                 loadItem(song: song)
                             }
+
+                            guard !newItems.isEmpty else { return }
+
                             let _ = await playlistStatus.addItemsToPlaylist(
                                 newItems, continuePlaying: false, shouldSaveState: true)
                         }
@@ -2205,6 +2258,7 @@ struct PlayListView: View {
             .searchable(text: $searchText, prompt: "Search in Playlist")
             .toolbar {
                 PlaylistToolbar(
+                    model: model,
                     songs: model.songs ?? [],
                     playlistMetadata: playlistMetadata,
                     playlistStatus: playlistStatus,

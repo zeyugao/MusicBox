@@ -562,7 +562,7 @@ struct PlayerControlView: View {
     }
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 24) {
             // Left: Playback controls
             HStack(spacing: 16) {
                 Button(action: {
@@ -605,21 +605,21 @@ struct PlayerControlView: View {
                         .frame(width: 14, height: 14)
                 }
                 .buttonStyle(PlayControlButtonStyle())
+                
+                Button(action: {
+                    playlistStatus.switchToNextLoopMode()
+                }) {
+                    Image(
+                        systemName: playlistStatus.loopMode == .once
+                            ? "repeat.1"
+                            : (playlistStatus.loopMode == .sequence ? "repeat" : "shuffle")
+                    )
+                    .resizable()
+                    .frame(width: 16, height: 16)
+                }
+                .buttonStyle(PlayControlButtonStyle())
+                .foregroundColor(.primary)
             }
-
-            Button(action: {
-                playlistStatus.switchToNextLoopMode()
-            }) {
-                Image(
-                    systemName: playlistStatus.loopMode == .once
-                        ? "repeat.1"
-                        : (playlistStatus.loopMode == .sequence ? "repeat" : "shuffle")
-                )
-                .resizable()
-                .frame(width: 16, height: 16)
-            }
-            .buttonStyle(PlayControlButtonStyle())
-            .foregroundColor(.primary)
 
             // Left-aligned: Album art with track info, and progress below
             NowPlayingTrackView(
@@ -633,19 +633,6 @@ struct PlayerControlView: View {
 
             // Right: Action buttons
             HStack(spacing: 16) {
-                // Lyrics/Detail View Button
-                Button(action: {
-                    playingDetailModel.togglePlayingDetail()
-                }) {
-                    Image(systemName: "quote.bubble")
-                        .resizable()
-                        .frame(width: 16, height: 16)
-                }
-                .buttonStyle(PlayControlButtonStyle(colorProvider: { isPressed in
-                    playingDetailModel.isPresented ? .accentColor : (isPressed ? .secondary : .primary)
-                }))
-                .help(playingDetailModel.isPresented ? "Hide Lyrics" : "Show Lyrics")
-
                 // Now Playing Button
                 Button(action: {
                     playerControlState.showNowPlayingPopover.toggle()
@@ -700,6 +687,19 @@ struct PlayerControlView: View {
                 // Volume popover button
                 VolumePopoverButton(playStatus: playStatus)
                 AudioOutputDeviceButton()
+
+                // Lyrics/Detail View Button
+                Button(action: {
+                    playingDetailModel.togglePlayingDetail()
+                }) {
+                    Image(systemName: "quote.bubble")
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                }
+                .buttonStyle(PlayControlButtonStyle(colorProvider: { isPressed in
+                    playingDetailModel.isPresented ? .accentColor : (isPressed ? .secondary : .primary)
+                }))
+                .help(playingDetailModel.isPresented ? "Hide Lyrics" : "Show Lyrics")
             }
         }
         .padding(.horizontal, 24)
@@ -888,9 +888,7 @@ struct NowPlayingRowView: View {
                     .frame(width: 20)
                     .font(.caption)
             } else {
-                Text("\(index + 1)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Color.clear
                     .frame(width: 20)
             }
 
