@@ -657,7 +657,7 @@ struct AccountActionsSection: View {
         
         // Clear playlist and pause current playback
         playlistStatus.pausePlay()
-        playlistStatus.clearPlaylist()
+        await playlistStatus.clearPlaylist()
     }
 }
 

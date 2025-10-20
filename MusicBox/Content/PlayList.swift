@@ -138,8 +138,8 @@ class PlaylistDetailModel: ObservableObject {
         }
     }
 
-    func loadMoreSongs() async {
-        guard !isLoadingMore && hasMoreSongs && !allSongsLoaded else { return }
+    private func loadMoreSongsInternal() async -> [CloudMusicApi.Song]? {
+        guard !isLoadingMore && hasMoreSongs && !allSongsLoaded else { return nil }
 
         await MainActor.run {
             self.isLoadingMore = true
@@ -165,20 +165,26 @@ class PlaylistDetailModel: ObservableObject {
                 }
             }
             self.update()
+            return newSongs
         } else {
             await MainActor.run {
                 self.hasMoreSongs = false
                 self.isLoadingMore = false
                 self.allSongsLoaded = true
             }
+            return nil
         }
+    }
+
+    func loadMoreSongs() async {
+        let _ = await loadMoreSongsInternal()
     }
 
     func loadAllSongsInBackground() async {
         guard !allSongsLoaded else { return }
 
-        while hasMoreSongs {
-            await loadMoreSongs()
+        while await MainActor.run(resultType: Bool.self, body: { self.hasMoreSongs && !self.allSongsLoaded }) {
+            let _ = await loadMoreSongsInternal()
             // Add small delay to prevent blocking UI
             try? await Task.sleep(nanoseconds: 10_000_000)  // 0.01 second
         }
@@ -198,6 +204,10 @@ class PlaylistDetailModel: ObservableObject {
 
     func resetSearchText() {
         searchText = ""
+    }
+
+    var hasActiveFilters: Bool {
+        !searchText.isEmpty || sortOrder != nil
     }
 
     func update() {
@@ -230,6 +240,10 @@ class PlaylistDetailModel: ObservableObject {
         return filteredSongs
     }
 
+    func totalTrackCount() async -> Int {
+        await MainActor.run { self.allTrackIds.count }
+    }
+
     private func waitForInitialLoadCompletion() async {
         while await MainActor.run(body: { self.isLoading && self.originalSongs == nil }) {
             try? await Task.sleep(nanoseconds: 50_000_000)
@@ -252,6 +266,35 @@ class PlaylistDetailModel: ObservableObject {
         return await MainActor.run {
             guard let originalSongs = self.originalSongs else { return [] }
             return self.applyFiltersAndSorting(to: originalSongs)
+        }
+    }
+
+    func streamSongsForPlayback(loadEntirePlaylist: Bool = false) -> AsyncStream<[CloudMusicApi.Song]> {
+        AsyncStream { continuation in
+            Task {
+                await waitForInitialLoadCompletion()
+
+                let initialSongs = await MainActor.run { self.originalSongs ?? [] }
+                if !initialSongs.isEmpty {
+                    continuation.yield(initialSongs)
+                }
+
+                guard loadEntirePlaylist, !self.hasActiveFilters else {
+                    continuation.finish()
+                    return
+                }
+
+                while await MainActor.run(resultType: Bool.self, body: { self.hasMoreSongs && !self.allSongsLoaded }) {
+                    if let newSongs = await loadMoreSongsInternal(), !newSongs.isEmpty {
+                        continuation.yield(newSongs)
+                    } else {
+                        // Either another load is still in progress or loading failed; wait briefly.
+                        try? await Task.sleep(nanoseconds: 10_000_000)
+                    }
+                }
+
+                continuation.finish()
+            }
         }
     }
 }
@@ -1647,26 +1690,74 @@ struct PlaylistToolbar: ToolbarContent {
                 Menu {
                     Button(action: {
                         Task {
-                            let songsToPlay = await model.songsForPlayback(loadEntirePlaylist: true)
-                            guard !songsToPlay.isEmpty else { return }
+                            func playUsingPrefetchedSongs(_ songs: [CloudMusicApi.Song]) async {
+                                guard !songs.isEmpty else { return }
 
-                            let newItems = songsToPlay.map { song in
-                                loadItem(song: song)
+                                let newItems = songs.map { song in
+                                    loadItem(song: song)
+                                }
+
+                                guard !newItems.isEmpty else { return }
+
+                                let startIndex =
+                                    (await MainActor.run(resultType: Bool.self) {
+                                        playlistStatus.loopMode == .shuffle
+                                    } && newItems.count > 1)
+                                    ? Int.random(in: 0..<newItems.count)
+                                    : 0
+
+                                await playlistStatus.replacePlaylist(
+                                    newItems,
+                                    continuePlaying: true,
+                                    shouldSaveState: true,
+                                    startIndex: startIndex
+                                )
                             }
 
-                            guard !newItems.isEmpty else { return }
+                            if model.hasActiveFilters {
+                                let songsToPlay = await model.songsForPlayback(loadEntirePlaylist: true)
+                                await playUsingPrefetchedSongs(songsToPlay)
+                            } else {
+                                let totalCount = await model.totalTrackCount()
 
-                            let startIndex =
-                                (playlistStatus.loopMode == .shuffle && newItems.count > 1)
-                                ? Int.random(in: 0..<newItems.count)
-                                : 0
+                                if totalCount == 0 {
+                                    let songsToPlay = await model.songsForPlayback(loadEntirePlaylist: true)
+                                    await playUsingPrefetchedSongs(songsToPlay)
+                                    return
+                                }
 
-                            await playlistStatus.replacePlaylist(
-                                newItems,
-                                continuePlaying: true,
-                                shouldSaveState: true,
-                                startIndex: startIndex
-                            )
+                                let startIndex =
+                                    (await MainActor.run(resultType: Bool.self) {
+                                        playlistStatus.loopMode == .shuffle
+                                    } && totalCount > 1)
+                                    ? Int.random(in: 0..<totalCount)
+                                    : 0
+
+                                let songStream = model.streamSongsForPlayback(loadEntirePlaylist: true)
+                                let itemStream = AsyncStream<[PlaylistItem]> { continuation in
+                                    let streamTask = Task {
+                                        for await chunk in songStream {
+                                            let items = chunk.map { song in
+                                                loadItem(song: song)
+                                            }
+                                            continuation.yield(items)
+                                        }
+                                        continuation.finish()
+                                    }
+
+                                    continuation.onTermination = { _ in
+                                        streamTask.cancel()
+                                    }
+                                }
+
+                                await playlistStatus.replacePlaylistStreaming(
+                                    totalCount: totalCount,
+                                    startIndex: startIndex,
+                                    continuePlaying: true,
+                                    shouldSaveState: true,
+                                    itemStream: itemStream
+                                )
+                            }
                         }
                     }) {
                         Label("Play All", systemImage: "play")
@@ -2241,10 +2332,13 @@ struct PlayListView: View {
                                 try await CloudMusicApi(cacheTtl: 0).playlist_tracks(
                                     op: .add, playlistId: selectedPlaylist.id,
                                     trackIds: [selectedSong.id])
-                                NotificationCenter.default.post(
-                                    name: .refreshPlaylist,
-                                    object: nil
-                                )
+
+                                if playlistMetadata?.id == selectedPlaylist.id {
+                                    NotificationCenter.default.post(
+                                        name: .refreshPlaylist,
+                                        object: nil
+                                    )
+                                }
                             } catch let error as RequestError {
                                 AlertModal.showAlert(error.localizedDescription)
                             } catch {

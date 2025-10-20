@@ -34,7 +34,7 @@ struct NowPlayingPopoverView: View {
                             .font(.headline)
                         Spacer()
                         Button(action: {
-                            playlistStatus.clearPlaylist()
+                            Task { await playlistStatus.clearPlaylist() }
                         }) {
                             Image(systemName: "trash")
                                 .resizable()
@@ -74,7 +74,7 @@ struct NowPlayingPopoverView: View {
                             .help("Scroll to Current")
 
                             Button(action: {
-                                playlistStatus.clearPlaylist()
+                                Task { await playlistStatus.clearPlaylist() }
                             }) {
                                 Image(systemName: "trash")
                                     .resizable()
