@@ -881,17 +881,6 @@ struct NowPlayingRowView: View {
     
     var body: some View {
         HStack {
-            // Current playing indicator or position
-            if index == currentItemIndex {
-                Image(systemName: "speaker.3.fill")
-                    .foregroundColor(.accentColor)
-                    .frame(width: 20)
-                    .font(.caption)
-            } else {
-                Color.clear
-                    .frame(width: 20)
-            }
-
             // Song info
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
@@ -921,22 +910,27 @@ struct NowPlayingRowView: View {
 
             Spacer()
 
-            // Play Next button (only show for non-current items, on hover, and not already in play next queue)
-            if index != currentItemIndex && showButtons && !isInPlayNextQueue {
-                Button(action: {
-                    Task {
-                        await playlistStatus.addToPlayNext(item)
+            if index == currentItemIndex {
+                // Current playing indicator or layout spacer
+                Image(systemName: "speaker.3.fill")
+                    .foregroundColor(.accentColor)
+                    .font(.caption)
+            } else if showButtons {
+                // Play Next button (only show for non-current items, on hover, and not already in play next queue)
+                if !isInPlayNextQueue {
+                    Button(action: {
+                        Task {
+                            await playlistStatus.addToPlayNext(item)
+                        }
+                    }) {
+                        Image(systemName: "text.badge.plus")
+                            .foregroundColor(.orange)
                     }
-                }) {
-                    Image(systemName: "text.badge.plus")
-                        .foregroundColor(.orange)
+                    .buttonStyle(.borderless)
+                    .help("Play Next")
                 }
-                .buttonStyle(.borderless)
-                .help("Play Next")
-            }
 
-            // Remove button (only show on hover)
-            if showButtons {
+                // Remove button (only show on hover)
                 Button(action: {
                     Task {
                         await playlistStatus.deleteBySongId(id: item.id)
@@ -949,7 +943,7 @@ struct NowPlayingRowView: View {
                 .help("Remove")
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 6)
