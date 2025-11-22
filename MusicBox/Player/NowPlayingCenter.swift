@@ -28,7 +28,7 @@ class NowPlayingCenter {
             nowPlayingInfo[MPMediaItemPropertyTitle] = currentItem.title
             nowPlayingInfo[MPMediaItemPropertyArtist] = currentItem.artist
             if let nsSong = currentItem.nsSong {
-                nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = nsSong.al.name
+                nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = nsSong.albumName
             }
 
             if let artworkUrl = await currentItem.getArtworkUrl(),

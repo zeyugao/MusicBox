@@ -229,7 +229,7 @@ class PlaylistDetailModel: ObservableObject {
             filteredSongs = filteredSongs.filter { song in
                 song.name.lowercased().contains(keyword)
                     || song.ar.compactMap(\.name).joined().lowercased().contains(keyword)
-                    || song.al.name.lowercased().contains(keyword)
+                    || song.albumName.lowercased().contains(keyword)
             }
         }
 
@@ -766,7 +766,7 @@ class SongAlbumTableCellView: NSTableCellView {
     }
 
     func configure(with song: CloudMusicApi.Song) {
-        albumLabel.stringValue = song.al.name
+        albumLabel.stringValue = song.albumName.isEmpty ? "Unknown Album" : song.albumName
     }
 }
 
@@ -1132,7 +1132,7 @@ class SongTableViewController: NSViewController {
                 keyPath = "name"
             } else if comparator.keyPath == \CloudMusicApi.Song.ar[0].name {
                 keyPath = "ar.0.name"
-            } else if comparator.keyPath == \CloudMusicApi.Song.al.name {
+            } else if comparator.keyPath == \CloudMusicApi.Song.albumName {
                 keyPath = "al.name"
             } else if comparator.keyPath == \CloudMusicApi.Song.dt {
                 keyPath = "dt"
@@ -1407,7 +1407,7 @@ extension SongTableViewController: NSTableViewDelegate {
         let isSameColumn =
             (clickedKey == "name" && currentSortKey == \CloudMusicApi.Song.name)
             || (clickedKey == "ar.0.name" && currentSortKey == \CloudMusicApi.Song.ar[0].name)
-            || (clickedKey == "al.name" && currentSortKey == \CloudMusicApi.Song.al.name)
+            || (clickedKey == "al.name" && currentSortKey == \CloudMusicApi.Song.albumName)
             || (clickedKey == "dt" && currentSortKey == \CloudMusicApi.Song.dt)
 
         if isSameColumn {
@@ -1452,7 +1452,7 @@ extension SongTableViewController: NSTableViewDelegate {
         case "ar.0.name":
             return [KeyPathComparator(\CloudMusicApi.Song.ar[0].name, order: order)]
         case "al.name":
-            return [KeyPathComparator(\CloudMusicApi.Song.al.name, order: order)]
+            return [KeyPathComparator(\CloudMusicApi.Song.albumName, order: order)]
         case "dt":
             return [KeyPathComparator(\CloudMusicApi.Song.dt, order: order)]
         default:

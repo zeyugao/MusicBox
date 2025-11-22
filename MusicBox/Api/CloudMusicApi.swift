@@ -236,7 +236,7 @@ class CloudMusicApi {
 
     struct Album: Codable {
         let id: UInt64
-        let name: String
+        let name: String?
         let pic: UInt64
         let picUrl: String
         let tns: [String]
@@ -364,6 +364,10 @@ class CloudMusicApi {
 
         func getHighestQuality() -> Quality? {
             return hr ?? sq ?? h ?? m ?? l
+        }
+
+        var albumName: String {
+            al.name ?? ""
         }
     }
 
