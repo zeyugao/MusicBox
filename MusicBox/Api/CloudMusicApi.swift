@@ -199,6 +199,7 @@ class CloudMusicApi {
         let description: String?
         let creator: Profile
         let trackCount: UInt64?
+        let cloudTrackCount: UInt64?
 
         static func == (lhs: CloudMusicApi.PlayListItem, rhs: CloudMusicApi.PlayListItem) -> Bool {
             return lhs.id == rhs.id
@@ -206,6 +207,7 @@ class CloudMusicApi {
                 && lhs.subscribed == rhs.subscribed
                 && lhs.coverImgUrl == rhs.coverImgUrl
                 && lhs.trackCount == rhs.trackCount
+                && lhs.cloudTrackCount == rhs.cloudTrackCount
         }
 
         func hash(into hasher: inout Hasher) {
@@ -248,6 +250,28 @@ class CloudMusicApi {
 
         let alias: [String]
         let tns: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case name
+            case alias
+            case tns
+        }
+
+        init(id: UInt64, name: String?, alias: [String] = [], tns: [String] = []) {
+            self.id = id
+            self.name = name
+            self.alias = alias
+            self.tns = tns
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(UInt64.self, forKey: .id)
+            name = try container.decodeIfPresent(String.self, forKey: .name)
+            alias = try container.decodeIfPresent([String].self, forKey: .alias) ?? []
+            tns = try container.decodeIfPresent([String].self, forKey: .tns) ?? []
+        }
     }
 
     struct CloudMusic: Codable {
