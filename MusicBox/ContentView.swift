@@ -270,6 +270,15 @@ class AlertModal: ObservableObject {
             self?.showSaveOption = true
         }
     }
+
+    @MainActor
+    func reset() {
+        text = ""
+        title = ""
+        showSaveOption = false
+        saveCallback = nil
+        AlertModal.pendingSaveCallback = nil
+    }
 }
 
 struct ContentView: View {
@@ -497,12 +506,10 @@ struct ContentView: View {
                 get: { !alertModel.text.isEmpty },
                 set: {
                     if !$0 {
-                        alertModel.text = ""
-                        alertModel.title = ""
-                        alertModel.showSaveOption = false
-                        alertModel.saveCallback = nil
-                        // Clear the static callback when alert is dismissed
-                        AlertModal.pendingSaveCallback = nil
+                        // Defer clearing to avoid publishing changes during view updates
+                        Task { @MainActor in
+                            alertModel.reset()
+                        }
                     }
                 }
             )
