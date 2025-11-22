@@ -779,10 +779,10 @@ struct MatchWithModalView: View {
                                 Text(song.name)
                                     .font(.body)
                                     .lineLimit(1)
-                                Text(song.ar.map { $0.name }.joined(separator: ", "))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
+                                Text(song.ar.compactMap(\.name).joined(separator: ", "))
+                                   .font(.caption)
+                                   .foregroundColor(.secondary)
+                                   .lineLimit(1)
                             }
 
                             Spacer()

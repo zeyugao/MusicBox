@@ -244,7 +244,7 @@ class CloudMusicApi {
 
     struct Artist: Codable {
         let id: UInt64
-        let name: String
+        let name: String?
 
         let alias: [String]
         let tns: [String]

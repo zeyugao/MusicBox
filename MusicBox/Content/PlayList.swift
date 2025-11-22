@@ -228,7 +228,7 @@ class PlaylistDetailModel: ObservableObject {
             let keyword = searchText.lowercased()
             filteredSongs = filteredSongs.filter { song in
                 song.name.lowercased().contains(keyword)
-                    || song.ar.map(\.name).joined(separator: "").lowercased().contains(keyword)
+                    || song.ar.compactMap(\.name).joined().lowercased().contains(keyword)
                     || song.al.name.lowercased().contains(keyword)
             }
         }
@@ -305,7 +305,7 @@ func loadItem(song: CloudMusicApi.Song, songData: CloudMusicApi.SongData) async 
         id: songData.id,
         url: url,
         title: song.name,
-        artist: song.ar.map(\.name).joined(separator: ", "),
+        artist: song.ar.compactMap(\.name).joined(separator: ", "),
         albumId: song.al.id,
         ext: songData.type,
         duration: CMTime(value: songData.time, timescale: 1000),
@@ -320,7 +320,7 @@ func loadItem(song: CloudMusicApi.Song) -> PlaylistItem {
         id: song.id,
         url: nil,
         title: song.name,
-        artist: song.ar.map(\.name).joined(separator: ", "),
+        artist: song.ar.compactMap(\.name).joined(separator: ", "),
         albumId: song.al.id,
         ext: nil,
         duration: CMTime(value: song.dt, timescale: 1000),
@@ -731,7 +731,7 @@ class SongArtistTableCellView: NSTableCellView {
     }
 
     func configure(with song: CloudMusicApi.Song) {
-        artistLabel.stringValue = song.ar.map(\.name).joined(separator: ", ")
+        artistLabel.stringValue = song.ar.compactMap(\.name).joined(separator: ", ")
     }
 }
 
