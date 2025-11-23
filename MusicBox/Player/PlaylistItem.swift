@@ -92,8 +92,12 @@ func getCachedMusicFile(id: UInt64) -> URL? {
     guard let appMusicFolder = getMusicBoxFolder() else {
         return nil
     }
-
-    let exts = ["mp3", "MP3", "flac", "FLAC"]
+    let exts = [
+        "mp3", "MP3", "flac", "FLAC", "m4a", "M4A", "aac", "AAC", "wav", "WAV", "ogg", "OGG",
+        "alac", "ALAC", "aiff", "AIFF", "caf", "CAF", "opus", "OPUS", "wma", "WMA", "mp4", "MP4",
+        "webm", "WEBM", "aax", "AAX", "aa", "AA", "dsd", "DSD", "dff", "DFF", "dsf", "DSF", "pcm",
+        "PCM", "flv", "FLV",
+    ]
     for ext in exts {
         let localFileUrl = appMusicFolder.appendingPathComponent("\(id).\(ext)")
         if FileManager.default.fileExists(atPath: localFileUrl.path) {
