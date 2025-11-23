@@ -548,6 +548,7 @@ class PlayStatus: ObservableObject {
             assert(playedSecond == nil || playedSecond == 0.0)
             let cacheItem = await CachingPlayerItem(
                 url: url, saveFilePath: savePath.path, customFileExtension: ext)
+            cacheItem.passOnObject = item
             setLoadingProgress(0.0)
             await MainActor.run {
                 cacheItem.delegate = self
@@ -932,7 +933,15 @@ extension PlayStatus: CachingPlayerItemDelegate {
     }
 
     func playerItemDidFailToPlay(_ playerItem: CachingPlayerItem, withError error: Error?) {
-        let message = "playerItemDidFailToPlay: \(error?.localizedDescription ?? "No reason")"
+        let track = (playerItem.passOnObject as? PlaylistItem) ?? currentItem ?? pendingItem
+        let trackDescription: String
+        if let track {
+            trackDescription = "\"\(track.title)\" by \(track.artist) (id: \(track.id))"
+        } else {
+            trackDescription = "Unknown track"
+        }
+        let errorDescription = error?.localizedDescription ?? "No reason"
+        let message = "playerItemDidFailToPlay: \(trackDescription) -> \(errorDescription)"
         print(message)
         AlertModal.showAlert(message)
 
