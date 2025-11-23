@@ -38,6 +38,9 @@ final class MediaFileHandle {
 
 extension MediaFileHandle {
     var attributes: [FileAttributeKey : Any]? {
+        guard FileManager.default.fileExists(atPath: filePath) else {
+            return nil
+        }
         do {
             return try FileManager.default.attributesOfItem(atPath: filePath)
         } catch let error as NSError {

@@ -325,6 +325,8 @@ class PlayStatus: ObservableObject {
 
     var currentItem: PlaylistItem? = nil
     private var pendingItem: PlaylistItem? = nil
+    private var trackRetryCounts: [UInt64: Int] = [:]
+    private let maxRetryAttemptsPerTrack = 1
 
     enum PlayerState: Int {
         case unknown = 0
@@ -515,6 +517,10 @@ class PlayStatus: ObservableObject {
             switchingItem = false
         }
 
+        if currentItem?.id != item.id && pendingItem?.id != item.id {
+            trackRetryCounts[item.id] = 0
+        }
+
         await MainActor.run {
             self.isLoadingNewTrack = true
             self.pendingItem = item
@@ -548,9 +554,9 @@ class PlayStatus: ObservableObject {
             assert(playedSecond == nil || playedSecond == 0.0)
             let cacheItem = await CachingPlayerItem(
                 url: url, saveFilePath: savePath.path, customFileExtension: ext)
-            cacheItem.passOnObject = item
             setLoadingProgress(0.0)
             await MainActor.run {
+                cacheItem.passOnObject = item
                 cacheItem.delegate = self
             }
             playerItem = cacheItem
@@ -924,6 +930,9 @@ class PlayStatus: ObservableObject {
 
 extension PlayStatus: CachingPlayerItemDelegate {
     func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
+        if let track = playerItem.passOnObject as? PlaylistItem {
+            trackRetryCounts[track.id] = 0
+        }
         Task { @MainActor [weak self] in
             self?.readyToPlay = true
             self?.isLoadingNewTrack = false
@@ -941,9 +950,39 @@ extension PlayStatus: CachingPlayerItemDelegate {
             trackDescription = "Unknown track"
         }
         let errorDescription = error?.localizedDescription ?? "No reason"
-        let message = "playerItemDidFailToPlay: \(trackDescription) -> \(errorDescription)"
+        let shouldPurgeCache = isLikelyCorruptedMedia(error)
+        var actionNote = ""
+        var scheduledRetry = false
+
+        if shouldPurgeCache, let track {
+            let retryCount = trackRetryCounts[track.id, default: 0]
+            if retryCount < maxRetryAttemptsPerTrack {
+                trackRetryCounts[track.id] = retryCount + 1
+                if removeCachedFile(for: track) {
+                    print("Removed cached file for track \(track.id), attempting re-download.")
+                    Task { [weak self] in
+                        await self?.seekToItem(item: track, playedSecond: nil)
+                        await self?.startPlay()
+                    }
+                    actionNote = " (cleared cache, retrying)"
+                    scheduledRetry = true
+                } else {
+                    print("No cached file removed for track \(track.id); will not retry.")
+                    actionNote = " (cache missing, skipping retry)"
+                }
+            } else {
+                print("Retry limit reached for track \(track.id); will not retry.")
+                actionNote = " (retry limit reached)"
+            }
+        }
+
+        let message = "playerItemDidFailToPlay: \(trackDescription) -> \(errorDescription)\(actionNote)"
         print(message)
         AlertModal.showAlert(message)
+
+        if scheduledRetry {
+            return
+        }
 
         // Clear loading state on failure
         Task { @MainActor [weak self] in
@@ -952,6 +991,51 @@ extension PlayStatus: CachingPlayerItemDelegate {
         }
 
         self.nextTrack()
+    }
+
+    private func isLikelyCorruptedMedia(_ error: Error?) -> Bool {
+        guard let nsError = error as NSError? else { return false }
+
+        if let reason = nsError.localizedFailureReason,
+            reason.lowercased().contains("media may be damaged")
+        {
+            return true
+        }
+
+        if nsError.domain == AVFoundationErrorDomain,
+            nsError.code == -11829  // AVError.cannotOpen
+        {
+            return true
+        }
+
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError,
+            underlying.domain == NSOSStatusErrorDomain, underlying.code == -12848
+        {
+            return true
+        }
+
+        return false
+    }
+
+    private func removeCachedFile(for track: PlaylistItem) -> Bool {
+        let fileManager = FileManager.default
+        let candidatePaths: [URL] = [
+            track.getPotentialLocalUrl(),
+            getCachedMusicFile(id: track.id),
+        ].compactMap { $0 }
+
+        for path in candidatePaths {
+            if fileManager.fileExists(atPath: path.path) {
+                do {
+                    try fileManager.removeItem(at: path)
+                    return true
+                } catch {
+                    print("Failed to remove cached file for track \(track.id) at \(path.path): \(error)")
+                }
+            }
+        }
+
+        return false
     }
 
     func playerItemPlaybackStalled(_ playerItem: CachingPlayerItem) {
