@@ -4,3 +4,4 @@ build
 *.dmg
 *.xcarchive
 updates_folder
+.derivedData
