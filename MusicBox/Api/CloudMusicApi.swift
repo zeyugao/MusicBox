@@ -182,6 +182,15 @@ class CloudMusicApi {
 
     static let RecommandSongPlaylistId: UInt64 = 0
 
+    private func transportError(from data: Data) -> RequestError? {
+        guard let serverError = data.asType(ServerError.self, silent: true) else { return nil }
+        let message = serverError.msg ?? serverError.message ?? ""
+        guard serverError.code == 502,
+            message.localizedCaseInsensitiveContains("RST_STREAM")
+        else { return nil }
+        return .errorCode((serverError.code, message))
+    }
+
     struct Profile: Codable, Equatable {
         let avatarUrl: String
         let nickname: String
@@ -441,10 +450,14 @@ class CloudMusicApi {
                 let cacheKey = memberName + jsonString
                 if cacheTtl != 0 {
                     if let cachedData = SharedCacheManager.shared.get(for: cacheKey) as? Data {
-                        SharedCacheManager.shared.set(
-                            value: cachedData, for: cacheKey, ttl: cacheTtl)
-                        continuation.resume(returning: cachedData)
-                        return
+                        if transportError(from: cachedData) != nil {
+                            SharedCacheManager.shared.invalidate(memberName: memberName, data: data)
+                        } else {
+                            SharedCacheManager.shared.set(
+                                value: cachedData, for: cacheKey, ttl: cacheTtl)
+                            continuation.resume(returning: cachedData)
+                            return
+                        }
                     }
                 }
 
@@ -457,6 +470,10 @@ class CloudMusicApi {
                             let jsonResult = String(cString: cString)
 
                             if let jsonData = jsonResult.data(using: .utf8) {
+                                if let error = transportError(from: jsonData) {
+                                    continuation.resume(throwing: error)
+                                    return
+                                }
                                 SharedCacheManager.shared.set(
                                     value: jsonData, for: cacheKey, ttl: cacheTtl)
                                 continuation.resume(returning: jsonData)
