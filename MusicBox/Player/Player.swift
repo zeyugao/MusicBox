@@ -1120,6 +1120,16 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     @Published var loopMode: LoopMode = .sequence
     private var switchingItem: Bool = false
 
+    // MARK: - Shuffle State
+
+    /// A pre-generated playback timeline used when `loopMode == .shuffle`.
+    /// `shuffleSequenceIndex` points to the currently playing item inside this timeline.
+    private var shuffleSequence: [UInt64] = []
+    private var shuffleSequenceIndex: Int? = nil
+
+    /// Keep the upcoming shuffle timeline "long" so next/previous behave deterministically.
+    private let shufflePrefetchCycles: Int = 3
+
     @Published var playlist: [PlaylistItem] = []
     @Published var playNextItemsCount: Int = 0
     @Published var currentItemIndex: Int? = nil
@@ -1141,7 +1151,182 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         try await mutationCoordinator.withLock(operation)
     }
 
+    // MARK: - Shuffle Helpers
+
+    private func resetShuffleState() {
+        shuffleSequence.removeAll(keepingCapacity: true)
+        shuffleSequenceIndex = nil
+    }
+
+    private func fisherYatesShuffled<T, R: RandomNumberGenerator>(_ items: [T], using rng: inout R)
+        -> [T]
+    {
+        guard items.count > 1 else { return items }
+        var result = items
+        for i in stride(from: result.count - 1, through: 1, by: -1) {
+            let j = Int.random(in: 0...i, using: &rng)
+            if i != j {
+                result.swapAt(i, j)
+            }
+        }
+        return result
+    }
+
+    private func makeShuffleCycle(playlistIDs: [UInt64], avoidingFirstBeing avoidID: UInt64?) -> [UInt64]
+    {
+        guard !playlistIDs.isEmpty else { return [] }
+
+        var rng = SystemRandomNumberGenerator()
+        var cycle = fisherYatesShuffled(playlistIDs, using: &rng)
+
+        if let avoidID, cycle.count > 1, cycle.first == avoidID {
+            let swapIndex = Int.random(in: 1..<(cycle.count), using: &rng)
+            cycle.swapAt(0, swapIndex)
+        }
+
+        return cycle
+    }
+
+    private func bootstrapShuffleSequenceFromCurrentItem() async {
+        await withPlaylistLock {
+            let (playlist, currentItemIndex) = await MainActor.run {
+                (self.playlist, self.currentItemIndex ?? 0)
+            }
+
+            guard !playlist.isEmpty else {
+                resetShuffleState()
+                return
+            }
+
+            let normalizedCurrentIndex = max(0, min(currentItemIndex, playlist.count - 1))
+            let currentID = playlist[normalizedCurrentIndex].id
+            let playlistIDs = playlist.map(\.id)
+
+            shuffleSequence = [currentID]
+            shuffleSequenceIndex = 0
+
+            // Initial cycle: current + shuffled remainder (no immediate repeat).
+            let remaining = playlistIDs.filter { $0 != currentID }
+            if !remaining.isEmpty {
+                var rng = SystemRandomNumberGenerator()
+                shuffleSequence.append(contentsOf: fisherYatesShuffled(remaining, using: &rng))
+            }
+
+            ensureShufflePrefetched(currentID: currentID, playlistIDs: playlistIDs)
+        }
+    }
+
+    private func ensureShuffleStateAligned(currentID: UInt64, playlistIDs: [UInt64]) {
+        if let idx = shuffleSequenceIndex,
+            idx >= 0,
+            idx < shuffleSequence.count,
+            shuffleSequence[idx] == currentID
+        {
+            return
+        }
+
+        if let idx = shuffleSequence.firstIndex(of: currentID) {
+            shuffleSequenceIndex = idx
+            return
+        }
+
+        // Current item changed externally while in shuffle: rebuild from current item.
+        shuffleSequence = [currentID]
+        shuffleSequenceIndex = 0
+
+        let remaining = playlistIDs.filter { $0 != currentID }
+        if !remaining.isEmpty {
+            var rng = SystemRandomNumberGenerator()
+            shuffleSequence.append(contentsOf: fisherYatesShuffled(remaining, using: &rng))
+        }
+    }
+
+    private func ensureShufflePrefetched(currentID: UInt64, playlistIDs: [UInt64]) {
+        guard loopMode == .shuffle else { return }
+        guard let idx = shuffleSequenceIndex, idx >= 0, idx < shuffleSequence.count else { return }
+        guard !playlistIDs.isEmpty else { return }
+
+        let desiredUpcomingCount = max(playlistIDs.count * shufflePrefetchCycles, 1)
+        var upcomingCount = shuffleSequence.count - idx - 1
+
+        while upcomingCount < desiredUpcomingCount {
+            let avoidID = shuffleSequence.last
+            let cycle = makeShuffleCycle(playlistIDs: playlistIDs, avoidingFirstBeing: avoidID)
+            guard !cycle.isEmpty else { break }
+            shuffleSequence.append(contentsOf: cycle)
+            upcomingCount = shuffleSequence.count - idx - 1
+        }
+    }
+
+    private func applyShuffleOverride(nextID: UInt64, currentID: UInt64, playlistIDs: [UInt64]) {
+        guard loopMode == .shuffle else { return }
+        guard nextID != currentID else { return }
+
+        ensureShuffleStateAligned(currentID: currentID, playlistIDs: playlistIDs)
+
+        guard let idx = shuffleSequenceIndex, idx >= 0, idx < shuffleSequence.count else { return }
+
+        let nextPos = idx + 1
+        if nextPos < shuffleSequence.count, shuffleSequence[nextPos] == nextID {
+            shuffleSequenceIndex = nextPos
+            return
+        }
+
+        if nextPos < shuffleSequence.count {
+            shuffleSequence.removeSubrange(nextPos..<shuffleSequence.count)
+        }
+        shuffleSequence.append(nextID)
+        shuffleSequenceIndex = idx + 1
+
+        // After an override (Play Next / manual select), regenerate the remainder of the current shuffle cycle
+        // so the just-selected track won't immediately show up again in the next Fisher-Yates permutation.
+        let remaining = playlistIDs.filter { $0 != nextID }
+        if !remaining.isEmpty {
+            var rng = SystemRandomNumberGenerator()
+            shuffleSequence.append(contentsOf: fisherYatesShuffled(remaining, using: &rng))
+        }
+
+        ensureShufflePrefetched(currentID: nextID, playlistIDs: playlistIDs)
+    }
+
+    private func nextShuffleID(playlistIDs: [UInt64]) -> UInt64? {
+        guard let idx = shuffleSequenceIndex, idx >= 0, idx < shuffleSequence.count else { return nil }
+
+        let playlistIdSet = Set(playlistIDs)
+        var candidate = idx + 1
+
+        while candidate < shuffleSequence.count {
+            let candidateID = shuffleSequence[candidate]
+            if playlistIdSet.contains(candidateID) {
+                shuffleSequenceIndex = candidate
+                return candidateID
+            }
+            candidate += 1
+        }
+
+        return nil
+    }
+
+    private func previousShuffleID(playlistIDs: [UInt64]) -> UInt64? {
+        guard let idx = shuffleSequenceIndex, idx > 0, idx < shuffleSequence.count else { return nil }
+
+        let playlistIdSet = Set(playlistIDs)
+        var candidate = idx - 1
+
+        while candidate >= 0 {
+            let candidateID = shuffleSequence[candidate]
+            if playlistIdSet.contains(candidateID) {
+                shuffleSequenceIndex = candidate
+                return candidateID
+            }
+            candidate -= 1
+        }
+
+        return nil
+    }
+
     func switchToNextLoopMode() {
+        let previousMode = loopMode
         switch loopMode {
         case .once:
             loopMode = .sequence
@@ -1149,6 +1334,19 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             loopMode = .shuffle
         case .shuffle:
             loopMode = .once
+        }
+
+        if previousMode == .shuffle && loopMode != .shuffle {
+            Task { [weak self] in
+                guard let self else { return }
+                await self.withPlaylistLock {
+                    self.resetShuffleState()
+                }
+            }
+        } else if previousMode != .shuffle && loopMode == .shuffle {
+            Task { [weak self] in
+                await self?.bootstrapShuffleSequenceFromCurrentItem()
+            }
         }
     }
 
@@ -1192,49 +1390,88 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             return
         }
 
-        let offset: Int
-        if loopMode == .shuffle {
-            // If we have play next items, consume them sequentially first
-            if playNextItemsCount > 0 {
-                let _ = await consumePlayNextItem()
-                offset = 1  // Move to next item sequentially (preserving play next queue)
-            } else {
-                // Resume shuffle behavior for remaining items
-                var nextIdx = Int.random(in: 0..<playlist.count)
-                while nextIdx == currentItemIndex && playlist.count > 1 {
-                    nextIdx = Int.random(in: 0..<playlist.count)
-                }
-                offset = nextIdx - (currentItemIndex ?? 0)
+        await withPlaylistLock {
+            let (playlist, currentItemIndex, playNextItemsCount, loopMode) = await MainActor.run {
+                (self.playlist, self.currentItemIndex ?? 0, self.playNextItemsCount, self.loopMode)
             }
-        } else {
+
+            guard !playlist.isEmpty else { return }
+
+            if loopMode == .shuffle {
+                let playlistIDs = playlist.map(\.id)
+                let normalizedCurrentIndex = max(0, min(currentItemIndex, playlist.count - 1))
+                let currentID = playlist[normalizedCurrentIndex].id
+
+                if playNextItemsCount > 0 {
+                    // Consume play-next items sequentially first, but keep shuffle history consistent.
+                    let _ = await consumePlayNextItem()
+                    let nextIndex = (normalizedCurrentIndex + 1) % playlist.count
+                    let nextID = playlist[nextIndex].id
+                    applyShuffleOverride(nextID: nextID, currentID: currentID, playlistIDs: playlistIDs)
+
+                    RemoteCommandCenter.handleRemoteCommands(using: self)
+                    await seekToItem(offset: nextIndex, shouldPlay: true, clearPlayNext: false)
+                    return
+                }
+
+                ensureShuffleStateAligned(currentID: currentID, playlistIDs: playlistIDs)
+                ensureShufflePrefetched(currentID: currentID, playlistIDs: playlistIDs)
+
+                guard let nextID = nextShuffleID(playlistIDs: playlistIDs) else {
+                    // Fallback: if shuffle state can't produce a next item, behave like sequential next.
+                    RemoteCommandCenter.handleRemoteCommands(using: self)
+                    await seekByItem(offset: 1, shouldPlay: true, clearPlayNext: false)
+                    return
+                }
+
+                guard let nextIndex = playlist.firstIndex(where: { $0.id == nextID }) else { return }
+
+                RemoteCommandCenter.handleRemoteCommands(using: self)
+                await seekToItem(offset: nextIndex, shouldPlay: true, clearPlayNext: false)
+                return
+            }
+
             // Sequential mode - consume play next counter if applicable but don't clear queue
             if playNextItemsCount > 0 {
                 let _ = await consumePlayNextItem()
             }
-            offset = 1
+
+            RemoteCommandCenter.handleRemoteCommands(using: self)
+            await seekByItem(offset: 1, shouldPlay: true, clearPlayNext: false)
         }
-        
-        // Re-register remote commands to ensure they work reliably
-        // This helps recover from any system-level remote command center resets
-        RemoteCommandCenter.handleRemoteCommands(using: self)
-        
-        // Explicitly preserve the play next queue when moving to next track
-        await seekByItem(offset: offset, shouldPlay: true, clearPlayNext: false)
     }
 
     func previousTrack() async {
-        let offset: Int
-        if loopMode == .shuffle {
-            var nextIdx = Int.random(in: 0..<playlist.count)
-            while nextIdx == currentItemIndex && playlist.count > 1 {
-                nextIdx = Int.random(in: 0..<playlist.count)
+        await withPlaylistLock {
+            let (playlist, currentItemIndex, loopMode) = await MainActor.run {
+                (self.playlist, self.currentItemIndex ?? 0, self.loopMode)
             }
-            offset = nextIdx
-        } else {
-            offset = -1
+
+            guard !playlist.isEmpty else { return }
+
+            if loopMode == .shuffle {
+                let playlistIDs = playlist.map(\.id)
+                let normalizedCurrentIndex = max(0, min(currentItemIndex, playlist.count - 1))
+                let currentID = playlist[normalizedCurrentIndex].id
+
+                ensureShuffleStateAligned(currentID: currentID, playlistIDs: playlistIDs)
+
+                guard let previousID = previousShuffleID(playlistIDs: playlistIDs) else {
+                    // No history yet: restart current track.
+                    await seekToItem(offset: normalizedCurrentIndex, playedSecond: 0.0, clearPlayNext: true)
+                    startPlay()
+                    return
+                }
+
+                guard let previousIndex = playlist.firstIndex(where: { $0.id == previousID }) else { return }
+                await seekToItem(offset: previousIndex, playedSecond: 0.0, clearPlayNext: true)
+                startPlay()
+                return
+            }
+
+            await seekByItem(offset: -1)
+            startPlay()
         }
-        await seekByItem(offset: offset)
-        startPlay()
     }
 
     func seekByItem(offset: Int, shouldPlay: Bool = false, clearPlayNext: Bool = true) async {
@@ -1247,6 +1484,18 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
 
     func playBySongId(id: UInt64) async {
         guard let index = playlist.firstIndex(where: { $0.id == id }) else { return }
+        if loopMode == .shuffle {
+            await withPlaylistLock {
+                let (playlist, currentItemIndex) = await MainActor.run {
+                    (self.playlist, self.currentItemIndex ?? 0)
+                }
+                guard !playlist.isEmpty else { return }
+                let playlistIDs = playlist.map(\.id)
+                let normalizedCurrentIndex = max(0, min(currentItemIndex, playlist.count - 1))
+                let currentID = playlist[normalizedCurrentIndex].id
+                applyShuffleOverride(nextID: id, currentID: currentID, playlistIDs: playlistIDs)
+            }
+        }
         await seekToItem(offset: index, shouldPlay: true)
     }
 
@@ -1403,6 +1652,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         shouldSaveState: Bool = true,
         startIndex: Int? = nil
     ) async {
+        resetShuffleState()
         await MainActor.run {
             playlist = items
             playNextItemsCount = 0
@@ -1429,6 +1679,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         itemStream: AsyncStream<[PlaylistItem]>
     ) async {
         await withPlaylistLock {
+            resetShuffleState()
             await MainActor.run {
                 playlist = []
                 playNextItemsCount = 0
@@ -1482,6 +1733,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     private func replaceFromCurrentPositionUnlocked(
         _ items: [PlaylistItem], continuePlaying: Bool = true, shouldSaveState: Bool = true
     ) async {
+        resetShuffleState()
         await MainActor.run {
             guard let currentIndex = currentItemIndex else {
                 playlist = items
@@ -1593,6 +1845,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
 
     func clearPlaylist() async {
         await withPlaylistLock {
+            resetShuffleState()
             await MainActor.run {
                 playlist = []
                 playNextItemsCount = 0
