@@ -398,7 +398,7 @@ struct CommentsWindowView: View {
                     .controlSize(.regular)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                commentsListView()
+                commentsScrollView()
             }
         }
         .toolbar {
@@ -418,70 +418,96 @@ struct CommentsWindowView: View {
     }
 
     private func toggleReplies(parentCommentId: UInt64) {
-        if expandedParentCommentIds.contains(parentCommentId) {
-            expandedParentCommentIds.remove(parentCommentId)
-            model.cancelFloorThread(parentCommentId: parentCommentId)
-            return
-        }
+        withAnimation(nil) {
+            if expandedParentCommentIds.contains(parentCommentId) {
+                expandedParentCommentIds.remove(parentCommentId)
+                model.cancelFloorThread(parentCommentId: parentCommentId)
+                return
+            }
 
-        expandedParentCommentIds.insert(parentCommentId)
-        model.loadFloorThread(parentCommentId: parentCommentId)
+            expandedParentCommentIds.insert(parentCommentId)
+            model.loadFloorThread(parentCommentId: parentCommentId)
+        }
     }
 
-    @ViewBuilder
-    private func commentsListView() -> some View {
-        List {
-            if let errorMessage = model.errorMessage, !errorMessage.isEmpty {
-                Section {
-                    Text(errorMessage)
-                        .foregroundColor(.secondary)
-                        .textSelection(.enabled)
-                }
-            }
+    private func commentsScrollView() -> some View {
+        let maxContentWidth: CGFloat = 720
 
-            if !model.hotComments.isEmpty {
-                Section("热门") {
-                    ForEach(model.hotComments) { comment in
-                        CommentListItemView(
-                            comment: comment,
-                            model: model,
-                            isExpanded: expandedParentCommentIds.contains(comment.commentId),
-                            onToggleReplies: toggleReplies(parentCommentId:)
-                        )
-                    }
-                }
-            }
+        return ScrollView {
+            HStack(alignment: .top) {
+                Spacer(minLength: 0)
 
-            Section("评论") {
-                if model.comments.isEmpty {
-                    if model.hotComments.isEmpty {
-                        Text("暂无评论")
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    if let errorMessage = model.errorMessage, !errorMessage.isEmpty {
+                        Text(errorMessage)
                             .foregroundColor(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                } else {
-                    ForEach(model.comments) { comment in
-                        CommentListItemView(
-                            comment: comment,
-                            model: model,
-                            isExpanded: expandedParentCommentIds.contains(comment.commentId),
-                            onToggleReplies: toggleReplies(parentCommentId:)
-                        )
-                    }
-                }
 
-                if model.hasMore {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .controlSize(.small)
-                        Spacer()
+                    if !model.hotComments.isEmpty {
+                        Text("热门")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        ForEach(model.hotComments) { comment in
+                            CommentListItemView(
+                                comment: comment,
+                                model: model,
+                                isExpanded: expandedParentCommentIds.contains(comment.commentId),
+                                onToggleReplies: toggleReplies(parentCommentId:)
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
-                    .id(model.comments.count)
-                    .onAppear {
-                        model.loadMore()
+
+                    Text("评论")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if model.comments.isEmpty {
+                        if model.hotComments.isEmpty {
+                            Text("暂无评论")
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    } else {
+                        ForEach(model.comments) { comment in
+                            CommentListItemView(
+                                comment: comment,
+                                model: model,
+                                isExpanded: expandedParentCommentIds.contains(comment.commentId),
+                                onToggleReplies: toggleReplies(parentCommentId:)
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+
+                    if model.hasMore {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .controlSize(.small)
+                            Spacer()
+                        }
+                        .id(model.comments.count)
+                        .onAppear {
+                            model.loadMore()
+                        }
                     }
                 }
+                .frame(maxWidth: maxContentWidth, alignment: .leading)
+
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+        .transaction { transaction in
+            transaction.animation = nil
         }
     }
 }
@@ -559,10 +585,7 @@ struct CommentRowView: View {
                     }
                 }
 
-                Text(bodyText)
-                    .font(.body)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(bodyText).textSelection(.enabled)
 
                 if let quoteText {
                     Text(quoteText)
