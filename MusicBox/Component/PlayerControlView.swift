@@ -266,6 +266,23 @@ struct NowPlayingTrackView: View {
                                 }
                             }
                             .disabled(currentItemId == 0)
+
+                            if let sourcePlaylist = playlistStatus.currentItem?.sourcePlaylist {
+                                Divider()
+                                Button("定位到歌单") {
+                                    guard let currentItem = playlistStatus.currentItem else { return }
+                                    NotificationCenter.default.post(
+                                        name: .navigateToPlaylist,
+                                        object: nil,
+                                        userInfo: [
+                                            "playlistId": sourcePlaylist.id,
+                                            "playlistName": sourcePlaylist.name,
+                                            "songId": currentItem.id,
+                                        ]
+                                    )
+                                }
+                                .disabled(currentItemId == 0)
+                            }
                         } label: {
                             Image(systemName: "ellipsis")
                                 .resizable()

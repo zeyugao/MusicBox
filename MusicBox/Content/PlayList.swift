@@ -139,14 +139,17 @@ class PlaylistDetailModel: ObservableObject {
     }
 
     private func loadMoreSongsInternal() async -> [CloudMusicApi.Song]? {
-        guard !isLoadingMore && hasMoreSongs && !allSongsLoaded else { return nil }
+        let shouldLoad = await MainActor.run { !self.isLoadingMore && self.hasMoreSongs && !self.allSongsLoaded }
+        guard shouldLoad else { return nil }
 
         await MainActor.run {
             self.isLoadingMore = true
         }
 
-        let currentCount = originalSongs?.count ?? 0
-        let nextBatch = Array(allTrackIds.dropFirst(currentCount).prefix(pageSize))
+        let (currentCount, trackIds) = await MainActor.run {
+            (self.originalSongs?.count ?? 0, self.allTrackIds)
+        }
+        let nextBatch = Array(trackIds.dropFirst(currentCount).prefix(pageSize))
 
         if let newSongs = await CloudMusicApi().song_detail(ids: nextBatch) {
             await MainActor.run {
@@ -187,6 +190,39 @@ class PlaylistDetailModel: ObservableObject {
             let _ = await loadMoreSongsInternal()
             // Add small delay to prevent blocking UI
             try? await Task.sleep(nanoseconds: 10_000_000)  // 0.01 second
+        }
+    }
+
+    func loadUntilSongLoaded(songId: UInt64) async {
+        let targetIndex = await MainActor.run { self.allTrackIds.firstIndex(of: songId) }
+        guard let targetIndex else { return }
+
+        let requiredCount = targetIndex + 1
+
+        while !Task.isCancelled {
+            let (loadedCount, hasMoreSongs, allSongsLoaded, isLoadingMore) = await MainActor.run {
+                (
+                    self.originalSongs?.count ?? 0,
+                    self.hasMoreSongs,
+                    self.allSongsLoaded,
+                    self.isLoadingMore
+                )
+            }
+
+            if loadedCount >= requiredCount {
+                break
+            }
+
+            if allSongsLoaded || !hasMoreSongs {
+                break
+            }
+
+            if isLoadingMore {
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                continue
+            }
+
+            let _ = await loadMoreSongsInternal()
         }
     }
 
@@ -893,6 +929,13 @@ class SongTableViewController: NSViewController {
 
     private var focusCurrentPlayingItemObserver: NSObjectProtocol?
 
+    private var playbackSourcePlaylist: PlaybackSourcePlaylist? {
+        if case let .netease(id, name) = playlistMetadata {
+            return PlaybackSourcePlaylist(id: id, name: name)
+        }
+        return nil
+    }
+
     override func loadView() {
         view = NSView()
         setupTableView()
@@ -1115,8 +1158,39 @@ class SongTableViewController: NSViewController {
         }
 
         if let index = songs.firstIndex(where: { $0.id == selectedItem }) {
-            tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+            if tableView.selectedRow != index {
+                tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+            }
+
+            let rowRect = tableView.rect(ofRow: index)
+            if !tableView.visibleRect.intersects(rowRect) {
+                scrollToRowCentered(index)
+            }
         }
+    }
+
+    private func scrollToRowCentered(_ index: Int) {
+        guard index >= 0 else { return }
+        guard tableView.numberOfRows > 0 else { return }
+
+        let visibleRect = tableView.visibleRect
+        let rowHeight = tableView.rowHeight
+        guard rowHeight > 0 else {
+            tableView.scrollRowToVisible(index)
+            return
+        }
+
+        let visibleRows = Int(visibleRect.height / rowHeight)
+        let halfVisibleRows = max(visibleRows / 2, 0)
+
+        if index < halfVisibleRows {
+            tableView.scroll(NSPoint(x: 0, y: 0))
+            return
+        }
+
+        let targetRow = index - halfVisibleRows
+        let targetRect = tableView.rect(ofRow: targetRow)
+        tableView.scroll(NSPoint(x: 0, y: targetRect.minY))
     }
 
     private func updateSortDescriptors() {
@@ -1177,6 +1251,7 @@ class SongTableViewController: NSViewController {
             // Clear play next items when playing immediately
             playlistStatus?.clearPlayNext()
             let newItem = loadItem(song: song)
+            newItem.sourcePlaylist = playbackSourcePlaylist
             let _ = await playlistStatus?.addItemAndSeekTo(newItem, shouldPlay: true)
         }
     }
@@ -1580,6 +1655,7 @@ extension SongTableViewController {
             // Clear play next items when playing immediately
             playlistStatus?.clearPlayNext()
             let newItem = loadItem(song: song)
+            newItem.sourcePlaylist = playbackSourcePlaylist
             let _ = await playlistStatus?.addItemAndSeekTo(newItem, shouldPlay: true)
         }
     }
@@ -1588,6 +1664,7 @@ extension SongTableViewController {
         guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
         Task {
             let newItem = loadItem(song: song)
+            newItem.sourcePlaylist = playbackSourcePlaylist
             await playlistStatus?.addToPlayNext(newItem)
         }
     }
@@ -1596,6 +1673,7 @@ extension SongTableViewController {
         guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
         Task {
             let newItem = loadItem(song: song)
+            newItem.sourcePlaylist = playbackSourcePlaylist
             await playlistStatus?.addToPlayNext(newItem)
         }
     }
@@ -1694,6 +1772,13 @@ struct PlaylistToolbar: ToolbarContent {
     let userInfo: UserInfo
     let onRefresh: () -> Void
 
+    private var playbackSourcePlaylist: PlaybackSourcePlaylist? {
+        if case let .netease(id, name) = playlistMetadata {
+            return PlaybackSourcePlaylist(id: id, name: name)
+        }
+        return nil
+    }
+
     var body: some ToolbarContent {
         if case .songs = playlistMetadata {
             ToolbarItemGroup {
@@ -1711,8 +1796,11 @@ struct PlaylistToolbar: ToolbarContent {
                             func playUsingPrefetchedSongs(_ songs: [CloudMusicApi.Song]) async {
                                 guard !songs.isEmpty else { return }
 
+                                let sourcePlaylist = playbackSourcePlaylist
                                 let newItems = songs.map { song in
-                                    loadItem(song: song)
+                                    let item = loadItem(song: song)
+                                    item.sourcePlaylist = sourcePlaylist
+                                    return item
                                 }
 
                                 guard !newItems.isEmpty else { return }
@@ -1755,8 +1843,11 @@ struct PlaylistToolbar: ToolbarContent {
                                 let itemStream = AsyncStream<[PlaylistItem]> { continuation in
                                     let streamTask = Task {
                                         for await chunk in songStream {
+                                            let sourcePlaylist = playbackSourcePlaylist
                                             let items = chunk.map { song in
-                                                loadItem(song: song)
+                                                let item = loadItem(song: song)
+                                                item.sourcePlaylist = sourcePlaylist
+                                                return item
                                             }
                                             continuation.yield(items)
                                         }
@@ -1786,8 +1877,11 @@ struct PlaylistToolbar: ToolbarContent {
                             let songsToAdd = await model.songsForPlayback(loadEntirePlaylist: true)
                             guard !songsToAdd.isEmpty else { return }
 
+                            let sourcePlaylist = playbackSourcePlaylist
                             let newItems = songsToAdd.map { song in
-                                loadItem(song: song)
+                                let item = loadItem(song: song)
+                                item.sourcePlaylist = sourcePlaylist
+                                return item
                             }
 
                             guard !newItems.isEmpty else { return }
@@ -2254,9 +2348,13 @@ struct PlayListView: View {
     @State private var searchText = ""
     @State private var searchDebounceTask: Task<Void, Never>? = nil
     @State private var selectedSongToAdd: CloudMusicApi.Song?
+    @State private var lastHandledLocateRequestId: UUID?
+    @State private var locateTask: Task<Void, Never>?
 
     var playlistMetadata: PlaylistMetadata?
     var onLoadComplete: (() -> Void)?
+    var locateRequest: PlaylistLocateRequest?
+    var onLocateHandled: ((PlaylistLocateRequest) -> Void)?
 
     private func handleUploadToCloud(song: CloudMusicApi.Song, url: URL) async {
         // 发送通知给 UploadButton 来处理上传队列
@@ -2389,9 +2487,13 @@ struct PlayListView: View {
             .task {
                 updatePlaylist()
             }
+            .task(id: locateRequest?.id) {
+                await locateSongIfNeeded()
+            }
             .onDisappear {
                 loadingTask?.cancel()
                 searchDebounceTask?.cancel()
+                locateTask?.cancel()
             }
             .onReceive(NotificationCenter.default.publisher(for: .refreshPlaylist)) { _ in
                 Task {
@@ -2460,5 +2562,54 @@ struct PlayListView: View {
         DispatchQueue.main.async { self.sortOrder = sortOrder }
         model.applySorting(by: [sortOrder[0]])
         model.update()
+    }
+
+    private func locateSongIfNeeded() async {
+        guard let locateRequest else { return }
+        guard locateRequest.id != lastHandledLocateRequestId else { return }
+        guard locateRequest.playlistId == playlistMetadata?.id else { return }
+
+        locateTask?.cancel()
+        locateTask = Task {
+            while !Task.isCancelled {
+                let isReady = await MainActor.run {
+                    self.model.curId == self.playlistMetadata?.id && !self.model.isLoading && self.model.originalSongs != nil
+                }
+
+                if isReady {
+                    break
+                }
+
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
+
+            if Task.isCancelled { return }
+
+            await MainActor.run {
+                self.searchText = ""
+            }
+            model.resetSearchText()
+            model.update()
+
+            await model.loadUntilSongLoaded(songId: locateRequest.songId)
+            model.update()
+
+            let isSongAvailable = await MainActor.run {
+                (self.model.songs ?? []).contains(where: { $0.id == locateRequest.songId })
+            }
+
+            await MainActor.run {
+                if isSongAvailable {
+                    self.selectedItem = locateRequest.songId
+                }
+                self.lastHandledLocateRequestId = locateRequest.id
+            }
+
+            await MainActor.run {
+                onLocateHandled?(locateRequest)
+            }
+        }
+
+        await locateTask?.value
     }
 }

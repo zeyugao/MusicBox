@@ -8,6 +8,11 @@ Struct `PlaylistItem` is a playable track as an item in a playlist.
 import AVFoundation
 import Foundation
 
+struct PlaybackSourcePlaylist: Codable, Hashable {
+    let id: UInt64
+    let name: String
+}
+
 private final class RunBlocking<T, Failure: Error> {
     fileprivate var value: Result<T, Failure>? = nil
 }
@@ -171,12 +176,15 @@ class PlaylistItem: Identifiable, Codable, Equatable {
 
     let nsSong: CloudMusicApi.Song?
 
+    var sourcePlaylist: PlaybackSourcePlaylist?
+
     /// Initializes a valid item.
     init(
         id: UInt64, url: URL?, title: String, artist: String, albumId: UInt64, ext: String?,
         duration: CMTime,
         artworkUrl: URL?,
-        nsSong: CloudMusicApi.Song?
+        nsSong: CloudMusicApi.Song?,
+        sourcePlaylist: PlaybackSourcePlaylist? = nil
     ) {
         self.id = id
         self.url = url
@@ -188,10 +196,11 @@ class PlaylistItem: Identifiable, Codable, Equatable {
         self.error = nil
         self.artworkUrl = artworkUrl
         self.nsSong = nsSong
+        self.sourcePlaylist = sourcePlaylist
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, url, title, artist, ext, duration, albumId, artworkUrl, nsSong
+        case id, url, title, artist, ext, duration, albumId, artworkUrl, nsSong, sourcePlaylist
     }
 
     required init(from decoder: Decoder) throws {
@@ -206,6 +215,7 @@ class PlaylistItem: Identifiable, Codable, Equatable {
         albumId = try container.decode(UInt64.self, forKey: .albumId)
         artworkUrl = try container.decodeIfPresent(URL.self, forKey: .artworkUrl)
         nsSong = try container.decodeIfPresent(CloudMusicApi.Song.self, forKey: .nsSong)
+        sourcePlaylist = try container.decodeIfPresent(PlaybackSourcePlaylist.self, forKey: .sourcePlaylist)
         error = nil  // This should be handled according to your application logic
     }
 
@@ -222,6 +232,7 @@ class PlaylistItem: Identifiable, Codable, Equatable {
         try container.encode(albumId, forKey: .albumId)
         try container.encodeIfPresent(artworkUrl, forKey: .artworkUrl)
         try container.encodeIfPresent(nsSong, forKey: .nsSong)
+        try container.encodeIfPresent(sourcePlaylist, forKey: .sourcePlaylist)
     }
 
     func getLocalUrl() async -> URL? {

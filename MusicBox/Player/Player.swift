@@ -1622,6 +1622,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             }
             return playlist.count - 1 // Return expected index
         }
+        await MainActor.run {
+            playlist[idIdx].sourcePlaylist = item.sourcePlaylist
+        }
         if shouldSaveState {
             await MainActor.run {
                 saveState()

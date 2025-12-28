@@ -10,6 +10,22 @@ import Combine
 import Foundation
 import SwiftUI
 
+extension Notification.Name {
+    static let navigateToPlaylist = Notification.Name("navigateToPlaylist")
+}
+
+struct PlaylistLocateRequest: Identifiable, Equatable {
+    let id: UUID
+    let playlistId: UInt64
+    let songId: UInt64
+
+    init(id: UUID = UUID(), playlistId: UInt64, songId: UInt64) {
+        self.id = id
+        self.playlistId = playlistId
+        self.songId = songId
+    }
+}
+
 enum DisplayContentType {
     case userinfo
     case playlist
@@ -298,6 +314,7 @@ struct ContentView: View {
     @StateObject private var playingDetailModel = PlayingDetailModel()
     @StateObject private var appSettings = AppSettings.shared
     @StateObject private var playerControlState = PlayerControlState()
+    @State private var playlistLocateRequest: PlaylistLocateRequest?
 
     @StateObject private var alertModel = AlertModal()
 
@@ -396,7 +413,17 @@ struct ContentView: View {
                 case let .playlist(playlist):
                     let metadata = PlaylistMetadata.netease(
                         playlist.id, playlist.name)
-                    PlayListView(playlistMetadata: metadata)
+                    let locateRequest =
+                        playlistLocateRequest?.playlistId == playlist.id ? playlistLocateRequest : nil
+                    PlayListView(
+                        playlistMetadata: metadata,
+                        locateRequest: locateRequest,
+                        onLocateHandled: { request in
+                            if playlistLocateRequest?.id == request.id {
+                                playlistLocateRequest = nil
+                            }
+                        }
+                    )
                         .environmentObject(userInfo)
                         .environmentObject(playlistStatus)
                         .navigationTitle(playlist.name)
@@ -477,6 +504,18 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .refreshPlaylist)) { _ in
             Task { await refreshUserPlaylistsIfNeeded(force: true) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToPlaylist)) { notification in
+            guard let playlistId = notification.userInfo?["playlistId"] as? UInt64,
+                let playlistName = notification.userInfo?["playlistName"] as? String
+            else { return }
+
+            if let songId = notification.userInfo?["songId"] as? UInt64 {
+                playlistLocateRequest = PlaylistLocateRequest(playlistId: playlistId, songId: songId)
+            } else {
+                playlistLocateRequest = nil
+            }
+            selection = .playlist(playlist: .netease(playlistId, playlistName))
         }
         .task {
             // Connect PlayStatus with PlayingDetailModel before loading state
