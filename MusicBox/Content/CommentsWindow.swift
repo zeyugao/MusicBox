@@ -85,6 +85,36 @@ struct CommentsTarget: Hashable, Codable, Identifiable {
     }
 }
 
+enum CommentsSortOption: CaseIterable, Hashable, Identifiable {
+    case hot
+    case recommend
+    case time
+
+    var id: String { title }
+
+    var title: String {
+        switch self {
+        case .hot:
+            return "热门"
+        case .recommend:
+            return "推荐"
+        case .time:
+            return "时间"
+        }
+    }
+
+    var apiSortType: CloudMusicApi.CommentNewSortType {
+        switch self {
+        case .hot:
+            return .hot
+        case .recommend:
+            return .recommend
+        case .time:
+            return .time
+        }
+    }
+}
+
 @MainActor
 final class CommentsWindowManager: NSObject, NSWindowDelegate {
     static let shared = CommentsWindowManager()
@@ -165,7 +195,6 @@ final class CommentsViewModel: ObservableObject {
 
     let target: CommentsTarget
 
-    @Published private(set) var hotComments: [CloudMusicApi.Comment] = []
     @Published private(set) var comments: [CloudMusicApi.Comment] = []
     @Published private(set) var totalCount: Int = 0
     @Published private(set) var hasMore: Bool = false
@@ -178,7 +207,9 @@ final class CommentsViewModel: ObservableObject {
     @Published private(set) var floorErrorMessages: [UInt64: String] = [:]
 
     private let pageSize: Int = 30
-    private var offset: Int = 0
+    private var pageNo: Int = 1
+    private var timeCursor: Int64? = nil
+    private var sortOption: CommentsSortOption = .hot
 
     private var loadTask: Task<Void, Never>?
     private var loadMoreTask: Task<Void, Never>?
@@ -186,6 +217,12 @@ final class CommentsViewModel: ObservableObject {
 
     init(target: CommentsTarget) {
         self.target = target
+    }
+
+    func changeSort(to option: CommentsSortOption) {
+        guard sortOption != option else { return }
+        sortOption = option
+        loadInitial()
     }
 
     func loadInitial() {
@@ -197,29 +234,39 @@ final class CommentsViewModel: ObservableObject {
         floorTasks.removeAll()
         isLoading = true
         errorMessage = nil
-        offset = 0
-        hotComments = []
         comments = []
         hasMore = false
         totalCount = 0
         isLoadingMore = false
+        pageNo = 1
+        timeCursor = nil
         floorThreads = [:]
         floorLoadingIds.removeAll()
         floorErrorMessages = [:]
 
         let target = target
+        let sortOption = sortOption
         let pageSize = pageSize
         loadTask = Task.detached(priority: .utility) { [weak self] in
             do {
-                let page = try await Self.fetchComments(target: target, limit: pageSize, offset: 0, before: nil)
+                let page = try await Self.fetchComments(
+                    target: target,
+                    pageNo: 1,
+                    pageSize: pageSize,
+                    sortOption: sortOption,
+                    cursor: nil
+                )
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     guard let self else { return }
-                    self.hotComments = page.hotComments ?? []
+                    guard self.sortOption == sortOption else { return }
                     self.comments = page.comments ?? []
-                    self.totalCount = page.total ?? 0
-                    self.hasMore = page.more ?? false
-                    self.offset = self.comments.count
+                    self.totalCount = page.totalCount ?? 0
+                    self.hasMore = page.hasMore ?? false
+                    self.pageNo = 1
+                    if sortOption == .time {
+                        self.timeCursor = Self.extractTimeCursor(from: page.cursor)
+                    }
                     self.isLoading = false
                 }
             } catch {
@@ -234,32 +281,39 @@ final class CommentsViewModel: ObservableObject {
     }
 
     func loadMore() {
-        guard hasMore, !isLoadingMore else { return }
+        guard hasMore, !isLoadingMore, !isLoading else { return }
         loadMoreTask?.cancel()
         isLoadingMore = true
         errorMessage = nil
 
         let target = target
+        let sortOption = sortOption
         let pageSize = pageSize
-        let currentOffset = offset
+        let nextPageNo = pageNo + 1
+        let cursor = sortOption == .time ? timeCursor : nil
         loadMoreTask = Task.detached(priority: .utility) { [weak self] in
             do {
                 let page = try await Self.fetchComments(
                     target: target,
-                    limit: pageSize,
-                    offset: currentOffset,
-                    before: nil
+                    pageNo: nextPageNo,
+                    pageSize: pageSize,
+                    sortOption: sortOption,
+                    cursor: cursor
                 )
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     guard let self else { return }
+                    guard self.sortOption == sortOption else { return }
                     let newComments = page.comments ?? []
                     if !newComments.isEmpty {
                         self.comments.append(contentsOf: newComments)
-                        self.offset += newComments.count
                     }
-                    self.hasMore = page.more ?? false
-                    self.totalCount = page.total ?? self.totalCount
+                    self.hasMore = page.hasMore ?? false
+                    self.totalCount = page.totalCount ?? self.totalCount
+                    self.pageNo = nextPageNo
+                    if sortOption == .time {
+                        self.timeCursor = Self.extractTimeCursor(from: page.cursor)
+                    }
                     self.isLoadingMore = false
                 }
             } catch {
@@ -270,6 +324,16 @@ final class CommentsViewModel: ObservableObject {
                     self.isLoadingMore = false
                 }
             }
+        }
+    }
+
+    private static func extractTimeCursor(from cursor: IntOrString?) -> Int64? {
+        guard let cursor else { return nil }
+        switch cursor {
+        case .int(let value):
+            return Int64(value)
+        case .string(let value):
+            return Int64(value)
         }
     }
 
@@ -367,27 +431,19 @@ final class CommentsViewModel: ObservableObject {
 
     nonisolated private static func fetchComments(
         target: CommentsTarget,
-        limit: Int,
-        offset: Int,
-        before: Int64?
-    ) async throws -> CloudMusicApi.CommentsPage {
-        let api = CloudMusicApi(cacheTtl: 15)
-        switch target.kind {
-        case .playlist:
-            return try await api.comment_playlist(
-                id: target.resourceId,
-                limit: limit,
-                offset: offset,
-                before: before
-            )
-        case .song:
-            return try await api.comment_music(
-                id: target.resourceId,
-                limit: limit,
-                offset: offset,
-                before: before
-            )
-        }
+        pageNo: Int,
+        pageSize: Int,
+        sortOption: CommentsSortOption,
+        cursor: Int64?
+    ) async throws -> CloudMusicApi.CommentNewPage.DataPayload {
+        try await CloudMusicApi(cacheTtl: 15).comment_new(
+            type: target.resourceType,
+            id: target.resourceId,
+            pageNo: pageNo,
+            pageSize: pageSize,
+            sortType: sortOption.apiSortType,
+            cursor: cursor
+        )
     }
 
     nonisolated private static func fetchFloor(
@@ -410,6 +466,7 @@ struct CommentsWindowView: View {
     let target: CommentsTarget
 
     @State private var expandedParentCommentIds: Set<UInt64> = []
+    @State private var sortOption: CommentsSortOption = .hot
     @StateObject private var model: CommentsViewModel
 
     init(target: CommentsTarget) {
@@ -429,6 +486,14 @@ struct CommentsWindowView: View {
         }
         .toolbar {
             ToolbarItemGroup {
+                Picker("", selection: $sortOption) {
+                    ForEach(CommentsSortOption.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
                 Button {
                     expandedParentCommentIds.removeAll()
                     model.loadInitial()
@@ -440,6 +505,10 @@ struct CommentsWindowView: View {
         }
         .onAppear {
             model.loadInitial()
+        }
+        .onChange(of: sortOption) { _, newValue in
+            expandedParentCommentIds.removeAll()
+            model.changeSort(to: newValue)
         }
     }
 
@@ -471,30 +540,13 @@ struct CommentsWindowView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    if !model.hotComments.isEmpty {
-                        Text("热门")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        ForEach(model.hotComments) { comment in
-                            CommentListItemView(
-                                comment: comment,
-                                model: model,
-                                isExpanded: expandedParentCommentIds.contains(comment.commentId),
-                                onToggleReplies: toggleReplies(parentCommentId:)
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-
-                    Text("评论")
+                    Text(sortOption.title)
                         .font(.headline)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     if model.comments.isEmpty {
-                        if model.hotComments.isEmpty {
+                        if model.errorMessage == nil || model.errorMessage?.isEmpty == true {
                             Text("暂无评论")
                                 .foregroundColor(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -541,29 +593,24 @@ struct CommentsWindowView: View {
 struct CommentRowView: View {
     let comment: CloudMusicApi.Comment
     var showsRepliesIndicator: Bool = true
-    var hideQuoteWhenReplyingToUserId: UInt64? = nil
+    var floorOwnerUserId: UInt64? = nil
 
     private var bodyText: String {
         let text = (comment.richContent ?? comment.content).sanitizedCommentText
         return text.isEmpty ? comment.content.sanitizedCommentText : text
     }
 
-    private var quoteText: String? {
+    private var replyingToText: String? {
         guard
             let firstReply = comment.beReplied?.first,
-            let replyContent = (firstReply.richContent ?? firstReply.content)?.sanitizedCommentText,
-            !replyContent.isEmpty
+            let repliedUser = firstReply.user
         else { return nil }
 
-        if let hideUserId = hideQuoteWhenReplyingToUserId,
-            let repliedUserId = firstReply.user?.userId,
-            repliedUserId == hideUserId
-        {
+        if let floorOwnerUserId, repliedUser.userId == floorOwnerUserId {
             return nil
         }
 
-        let replyUser = firstReply.user?.nickname ?? "Unknown"
-        return "↪︎ \(replyUser): \(replyContent)"
+        return "回复 \(repliedUser.nickname)："
     }
 
     private var repliesText: String? {
@@ -613,8 +660,8 @@ struct CommentRowView: View {
 
                 Text(bodyText).textSelection(.enabled)
 
-                if let quoteText {
-                    Text(quoteText)
+                if let replyingToText {
+                    Text(replyingToText)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
@@ -689,7 +736,7 @@ struct FloorRepliesInlineView: View {
                         CommentRowView(
                             comment: comment,
                             showsRepliesIndicator: false,
-                            hideQuoteWhenReplyingToUserId: thread.ownerComment?.user.userId
+                            floorOwnerUserId: thread.ownerComment?.user.userId
                         )
                     }
                 } else if !isLoading {

@@ -37,7 +37,7 @@ struct ServerError: Decodable, Error {
     let message: String?
 }
 
-enum IntOrString: Decodable {
+enum IntOrString: Decodable, Hashable {
     case int(Int)
     case string(String)
 
@@ -486,6 +486,27 @@ class CloudMusicApi {
         let hotComments: [Comment]?
         let comments: [Comment]?
         let topComments: [Comment]?
+    }
+
+    enum CommentNewSortType: Int, Codable {
+        case recommend = 1
+        case hot = 2
+        case time = 3
+    }
+
+    struct CommentNewPage: Decodable, Hashable {
+        struct DataPayload: Decodable, Hashable {
+            let comments: [Comment]?
+            let hasMore: Bool?
+            let cursor: IntOrString?
+            let totalCount: Int?
+            let sortType: Int?
+            let commentsTitle: String?
+        }
+
+        let code: Int
+        let message: String?
+        let data: DataPayload?
     }
 
     struct FloorCommentsPage: Decodable, Hashable {
@@ -961,6 +982,31 @@ class CloudMusicApi {
             throw RequestError.noData
         }
         return parsed
+    }
+
+    func comment_new(
+        type: CommentResourceType,
+        id: UInt64,
+        pageNo: Int = 1,
+        pageSize: Int = 20,
+        sortType: CommentNewSortType = .hot,
+        cursor: Int64? = nil
+    ) async throws -> CommentNewPage.DataPayload {
+        var p: [String: Any] = [
+            "type": type.rawValue,
+            "id": id,
+            "pageNo": pageNo,
+            "pageSize": pageSize,
+            "sortType": sortType.rawValue,
+        ]
+        if let cursor {
+            p["cursor"] = cursor
+        }
+        let ret = try await doRequest(memberName: "comment_new", data: p)
+        guard let parsed = ret.asType(CommentNewPage.self, silent: true), let data = parsed.data else {
+            throw RequestError.noData
+        }
+        return data
     }
 
     func comment_floor(
