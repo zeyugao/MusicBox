@@ -1563,6 +1563,14 @@ extension SongTableViewController {
         copyLinkItem.image = makeIcon("link", "Copy link")
         menu.addItem(copyLinkItem)
 
+        // View Comments
+        let viewCommentsItem = NSMenuItem(
+            title: "查看评论", action: #selector(viewComments(_:)), keyEquivalent: "")
+        viewCommentsItem.target = self
+        viewCommentsItem.representedObject = song
+        viewCommentsItem.image = makeIcon("text.bubble", "View comments")
+        menu.addItem(viewCommentsItem)
+
         return menu
     }
 
@@ -1622,6 +1630,16 @@ extension SongTableViewController {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(
             "https://music.163.com/#/song?id=\(song.id)", forType: .string)
+    }
+
+    @objc private func viewComments(_ sender: NSMenuItem) {
+        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        let subtitle = song.ar.compactMap(\.name).joined(separator: ", ")
+        Task { @MainActor in
+            CommentsWindowManager.shared.show(
+                target: .song(id: song.id, name: song.name, subtitle: subtitle)
+            )
+        }
     }
 }
 

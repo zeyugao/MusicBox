@@ -426,6 +426,84 @@ class CloudMusicApi {
         let url: String
     }
 
+    // MARK: - Comments
+
+    enum CommentResourceType: Int, Codable {
+        case music = 0
+        case mv = 1
+        case playlist = 2
+        case album = 3
+        case dj = 4
+        case video = 5
+        case event = 6
+        case radio = 7
+    }
+
+    struct CommentUser: Decodable, Hashable {
+        let userId: UInt64
+        let nickname: String
+        let avatarUrl: String?
+    }
+
+    struct CommentIPLocation: Decodable, Hashable {
+        let location: String?
+    }
+
+    struct CommentBeReplied: Decodable, Hashable {
+        let beRepliedCommentId: UInt64?
+        let content: String?
+        let richContent: String?
+        let status: Int?
+        let user: CommentUser?
+    }
+
+    struct CommentShowFloorComment: Decodable, Hashable {
+        let replyCount: Int?
+        let showReplyCount: Bool?
+    }
+
+    struct Comment: Decodable, Identifiable, Hashable {
+        let commentId: UInt64
+        let content: String
+        let richContent: String?
+        let time: Int64?
+        let timeStr: String?
+        let likedCount: Int?
+        let liked: Bool?
+        let ipLocation: CommentIPLocation?
+        let user: CommentUser
+        let beReplied: [CommentBeReplied]?
+        let showFloorComment: CommentShowFloorComment?
+
+        var id: UInt64 { commentId }
+    }
+
+    struct CommentsPage: Decodable, Hashable {
+        let code: Int
+        let total: Int?
+        let more: Bool?
+        let moreHot: Bool?
+        let hotComments: [Comment]?
+        let comments: [Comment]?
+        let topComments: [Comment]?
+    }
+
+    struct FloorCommentsPage: Decodable, Hashable {
+        struct DataPayload: Decodable, Hashable {
+            let ownerComment: Comment?
+            let bestComments: [Comment]?
+            let comments: [Comment]?
+            let hasMore: Bool?
+            let time: Int64?
+            let totalCount: Int?
+            let currentComment: Comment?
+        }
+
+        let code: Int
+        let message: String?
+        let data: DataPayload?
+    }
+
     private struct ApiResponse<T: Decodable>: Decodable {
         let code: Int
         let data: T
@@ -841,6 +919,71 @@ class CloudMusicApi {
         }
         print("playlist_track_all failed")
         return nil
+    }
+
+    func comment_music(
+        id: UInt64,
+        limit: Int = 20,
+        offset: Int = 0,
+        before: Int64? = nil
+    ) async throws -> CommentsPage {
+        var p: [String: Any] = [
+            "id": id,
+            "limit": limit,
+            "offset": offset,
+        ]
+        if let before {
+            p["before"] = before
+        }
+        let ret = try await doRequest(memberName: "comment_music", data: p)
+        guard let parsed = ret.asType(CommentsPage.self, silent: true) else {
+            throw RequestError.noData
+        }
+        return parsed
+    }
+
+    func comment_playlist(
+        id: UInt64,
+        limit: Int = 20,
+        offset: Int = 0,
+        before: Int64? = nil
+    ) async throws -> CommentsPage {
+        var p: [String: Any] = [
+            "id": id,
+            "limit": limit,
+            "offset": offset,
+        ]
+        if let before {
+            p["before"] = before
+        }
+        let ret = try await doRequest(memberName: "comment_playlist", data: p)
+        guard let parsed = ret.asType(CommentsPage.self, silent: true) else {
+            throw RequestError.noData
+        }
+        return parsed
+    }
+
+    func comment_floor(
+        parentCommentId: UInt64,
+        id: UInt64,
+        type: CommentResourceType,
+        limit: Int = 20,
+        time: Int64? = nil
+    ) async throws -> FloorCommentsPage.DataPayload {
+        var p: [String: Any] = [
+            "parentCommentId": parentCommentId,
+            "id": id,
+            "type": type.rawValue,
+            "limit": limit,
+        ]
+        if let time {
+            p["time"] = time
+        }
+        let ret = try await doRequest(memberName: "comment_floor", data: p)
+        guard let parsed = ret.asType(FloorCommentsPage.self, silent: true), let data = parsed.data else {
+            throw RequestError.noData
+        }
+        return data
     }
 
     private var seq: Int {

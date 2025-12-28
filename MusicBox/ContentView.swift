@@ -147,6 +147,15 @@ struct PlaylistRowView: View {
             Spacer()
         }
         .padding(.vertical, 2)
+        .contextMenu {
+            Button {
+                CommentsWindowManager.shared.show(
+                    target: .playlist(id: playlist.id, name: playlist.name)
+                )
+            } label: {
+                Label("查看评论", systemImage: "text.bubble")
+            }
+        }
     }
 }
 
