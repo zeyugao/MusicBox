@@ -71,6 +71,46 @@ MusicBox/
 - `RequestError` and `ServerError` provide localized messaging including custom handling for NetEase-specific result codes (for example `-462`).
 - `IntOrString` gracefully decodes IDs that the API returns inconsistently as numbers or strings.
 
+### Probing New NetEase APIs (Python + `QCloudMusicApi.dylib`)
+When adding a new endpoint that isn’t wrapped in `CloudMusicApi` yet, quickly probe the request/response shape by calling the `QCloudMusicApi` **dynamic library** from Python (ctypes). This is usually faster than iterating in Swift.
+
+- **Build/locate the dylib**: `../QCloudMusicApi/build/QCloudMusicApi/Release/QCloudMusicApi.dylib` (path may vary).
+- **Important**: the dylib initializes Qt plugin paths from `QDir::currentPath()`, so run Python with `cwd` set to the dylib directory (or `os.chdir` to it) to avoid SSL/plugin issues.
+- **Enumerate available API names**: `memberCount()` + `memberName(index)` let you list all exported “member” endpoints you can `invoke`.
+- **Call an endpoint**: `invoke(memberName, jsonString)` returns the **JSON body string** (parse with `json.loads`).
+- **Login-required endpoints**: pass a `cookie` field in the JSON payload (or call `set_cookie(cookie)` if you prefer setting it globally).
+- **Noisy Qt logs**: set `QT_LOGGING_RULES=*.debug=false` to silence debug output (see the Python example).
+
+Minimal one-off probe (run from the MusicBox repo root):
+
+```py
+import ctypes, json, os
+from pathlib import Path
+
+lib_dir = Path("../QCloudMusicApi/build/QCloudMusicApi/Release").resolve()
+cookie_path = Path("../QCloudMusicApi/.vscode/cookie.txt").resolve()
+cookie = cookie_path.read_text(encoding="utf-8").strip() if cookie_path.exists() else ""
+
+os.chdir(lib_dir)
+lib = ctypes.CDLL(str(lib_dir / "QCloudMusicApi.dylib"))
+
+lib.memberCount.restype = ctypes.c_int
+lib.memberName.argtypes = [ctypes.c_int]
+lib.memberName.restype = ctypes.c_char_p
+lib.invoke.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+lib.invoke.restype = ctypes.c_char_p
+
+print("memberCount:", lib.memberCount())
+print("first 20:", [lib.memberName(i).decode("utf-8") for i in range(min(20, lib.memberCount()))])
+
+# Example: probe “comment_new” (playlist hot sort)
+payload = {"type": 2, "id": 705123491, "sortType": 2, "pageNo": 1, "pageSize": 20, "cookie": cookie}
+resp = lib.invoke(b"comment_new", json.dumps(payload).encode("utf-8"))
+print(json.loads(resp))
+```
+
+Reference implementation: `../QCloudMusicApi/QCloudMusicApi/example/my_capi.py` (includes reading a cookie and calling `invoke`).
+
 ## State Persistence & Settings
 - `Models/AppSettings.swift` loads preferences on init, uses `@Published` setters to write back to `UserDefaults`, and registers for `.playbackStateChanged`.
 - `AppSettings` toggles IOKit sleep assertions through `IOPMAssertionCreateWithName`, preventing idle sleep only while music is playing.
