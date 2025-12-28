@@ -489,10 +489,29 @@ struct CommentsWindowView: View {
 struct CommentRowView: View {
     let comment: CloudMusicApi.Comment
     var showsRepliesIndicator: Bool = true
+    var hideQuoteWhenReplyingToUserId: UInt64? = nil
 
     private var bodyText: String {
         let text = (comment.richContent ?? comment.content).sanitizedCommentText
         return text.isEmpty ? comment.content.sanitizedCommentText : text
+    }
+
+    private var quoteText: String? {
+        guard
+            let firstReply = comment.beReplied?.first,
+            let replyContent = (firstReply.richContent ?? firstReply.content)?.sanitizedCommentText,
+            !replyContent.isEmpty
+        else { return nil }
+
+        if let hideUserId = hideQuoteWhenReplyingToUserId,
+            let repliedUserId = firstReply.user?.userId,
+            repliedUserId == hideUserId
+        {
+            return nil
+        }
+
+        let replyUser = firstReply.user?.nickname ?? "Unknown"
+        return "↪︎ \(replyUser): \(replyContent)"
     }
 
     private var repliesText: String? {
@@ -545,15 +564,12 @@ struct CommentRowView: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if let firstReply = comment.beReplied?.first,
-                    let replyContent = (firstReply.richContent ?? firstReply.content)?.sanitizedCommentText,
-                    !replyContent.isEmpty
-                {
-                    let replyUser = firstReply.user?.nickname ?? "Unknown"
-                    Text("↪︎ \(replyUser): \(replyContent)")
+                if let quoteText {
+                    Text(quoteText)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
 
                 if let repliesText {
@@ -621,7 +637,11 @@ struct FloorRepliesInlineView: View {
             if let thread {
                 if !thread.comments.isEmpty {
                     ForEach(thread.comments) { comment in
-                        CommentRowView(comment: comment, showsRepliesIndicator: false)
+                        CommentRowView(
+                            comment: comment,
+                            showsRepliesIndicator: false,
+                            hideQuoteWhenReplyingToUserId: thread.ownerComment?.user.userId
+                        )
                     }
                 } else if !isLoading {
                     Text("暂无回复")
