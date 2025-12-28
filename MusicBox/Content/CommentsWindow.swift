@@ -644,14 +644,21 @@ struct CommentRowView: View {
     private var replyingToText: String? {
         guard
             let firstReply = comment.beReplied?.first,
-            let repliedUser = firstReply.user
+            let replyContent = (firstReply.richContent ?? firstReply.content)?
+                .sanitizedCommentText
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            !replyContent.isEmpty
         else { return nil }
 
-        if let floorOwnerUserId, repliedUser.userId == floorOwnerUserId {
+        if let floorOwnerUserId,
+            let repliedUserId = firstReply.user?.userId,
+            repliedUserId == floorOwnerUserId
+        {
             return nil
         }
 
-        return "回复 \(repliedUser.nickname)："
+        let replyUser = firstReply.user?.nickname ?? "Unknown"
+        return "↪︎ \(replyUser): \(replyContent)"
     }
 
     private var repliesText: String? {
