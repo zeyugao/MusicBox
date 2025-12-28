@@ -59,13 +59,16 @@ struct AsyncImageWithCache<I: View, P: View>: View {
     private let url: URL?
     private let placeholder: P
     private let image: (Image) -> I
+    private let loadingIndicatorScale: CGFloat
 
     init(
         url: URL?,
+        loadingIndicatorScale: CGFloat = 0.8,
         @ViewBuilder image: @escaping (Image) -> I,
         @ViewBuilder placeholder: () -> P
     ) {
         self.url = url
+        self.loadingIndicatorScale = loadingIndicatorScale
         self.placeholder = placeholder()
         self.image = image
         _loader = StateObject(wrappedValue: ImageLoader(url: url))
@@ -88,7 +91,7 @@ struct AsyncImageWithCache<I: View, P: View>: View {
                     placeholder
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
+                        .scaleEffect(loadingIndicatorScale)
                 }
             } else if loader.hasError {
                 ZStack {

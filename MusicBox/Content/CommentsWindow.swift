@@ -615,11 +615,6 @@ struct CommentsWindowView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    Text(sortOption.title)
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
                     if model.comments.isEmpty {
                         if model.errorMessage == nil || model.errorMessage?.isEmpty == true {
                             Text("暂无评论")
@@ -651,6 +646,7 @@ struct CommentsWindowView: View {
                         }
                     }
                 }
+                .padding(.top, 6)
                 .frame(maxWidth: maxContentWidth, alignment: .leading)
 
                 Spacer(minLength: 0)
@@ -702,7 +698,10 @@ struct CommentRowView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            AsyncImageWithCache(url: URL(string: comment.user.avatarUrl?.https ?? "")) { image in
+            AsyncImageWithCache(
+                url: URL(string: comment.user.avatarUrl?.https ?? ""),
+                loadingIndicatorScale: 0.33
+            ) { image in
                 image.resizable()
                     .aspectRatio(contentMode: .fill)
             } placeholder: {
