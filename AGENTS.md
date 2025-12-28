@@ -13,7 +13,7 @@ This guide explains how automation or coding assistants should work inside the M
 - The bridging header (`MusicBox/Api/MusicBox-Bridging-Header.h`) exposes the compiled `QCloudMusicApi` static library; no additional package manager steps are required locally.
 - Sparkle update signing is already configured for development; make sure the updater controller remains initialized in `MusicBoxApp` when altering startup code.
 - GitHub Actions handle fetching QCloudMusicApi for releases, so avoid removing the API headers or altering their relative paths.
-- For CLI builds, follow the defaults in `.github/workflows/build.yml` and run a Debug-only build locally: `xcodebuild -project MusicBox.xcodeproj -scheme MusicBox -configuration Debug build -parallelizeTargets -jobs $(sysctl -n hw.ncpu)` after ensuring the `QCloudMusicApi` checkout is available at `../QCloudMusicApi`.
+- For CLI builds, follow the defaults in `.github/workflows/build.yml` and run a Debug-only build locally: `xcodebuild -project MusicBox.xcodeproj -scheme MusicBox -configuration Debug build -parallelizeTargets -jobs 8` after ensuring the `QCloudMusicApi` checkout is available at `../QCloudMusicApi`.
 
 ## Architecture Overview
 - SwiftUI + Combine form the UI layer, backed by observable models for player, navigation, and user state.
