@@ -140,8 +140,6 @@ struct NowPlayingTrackView: View {
     @EnvironmentObject var playStatus: PlayStatus
     @EnvironmentObject var userInfo: UserInfo
 
-    @State private var isHovered: Bool = false
-
     let cornerRadius: CGFloat = 6
 
     private func secondsToMinutesAndSeconds(seconds: Double) -> String {
@@ -169,10 +167,6 @@ struct NowPlayingTrackView: View {
     private var isFavored: Bool {
         guard currentItemId != 0 else { return false }
         return userInfo.likelist.contains(currentItemId)
-    }
-
-    private var shouldShowHeartButton: Bool {
-        currentItemId != 0 && (isFavored || isHovered)
     }
 
     var body: some View {
@@ -227,36 +221,62 @@ struct NowPlayingTrackView: View {
 
                         Spacer()
 
-                        if shouldShowHeartButton {
-                            Button(
-                                action: {
-                                    guard currentItemId != 0 else { return }
-                                    let favored = isFavored
-                                    Task {
-                                        var likelist = userInfo.likelist
-                                        await likeSong(
-                                            likelist: &likelist,
-                                            songId: currentItemId,
-                                            favored: favored
-                                        )
-                                        await MainActor.run {
-                                            userInfo.likelist = likelist
-                                        }
+                        Button(
+                            action: {
+                                guard currentItemId != 0 else { return }
+                                let favored = isFavored
+                                Task {
+                                    var likelist = userInfo.likelist
+                                    await likeSong(
+                                        likelist: &likelist,
+                                        songId: currentItemId,
+                                        favored: favored
+                                    )
+                                    await MainActor.run {
+                                        userInfo.likelist = likelist
                                     }
                                 }
-                            ) {
-                                Image(systemName: isFavored ? "heart.fill" : "heart")
-                                    .resizable()
-                                    .frame(width: 10, height: 9)
                             }
-                            .buttonStyle(
-                                PlayControlButtonStyle(colorProvider: { isPressed in
-                                    if isFavored { return .accentColor }
-                                    return .secondary
-                                })
-                            )
-                            .help(isFavored ? "Unfavor" : "Favor")
+                        ) {
+                            Image(systemName: isFavored ? "heart.fill" : "heart")
+                                .resizable()
+                                .frame(width: 10, height: 9)
                         }
+                        .buttonStyle(
+                            PlayControlButtonStyle(colorProvider: { _ in
+                                if currentItemId == 0 { return .secondary }
+                                if isFavored { return .accentColor }
+                                return .secondary
+                            })
+                        )
+                        .disabled(currentItemId == 0)
+                        .help(isFavored ? "Unfavor" : "Favor")
+
+                        Menu {
+                            Button("查看评论") {
+                                guard let currentItem = playlistStatus.currentItem else { return }
+                                Task { @MainActor in
+                                    CommentsWindowManager.shared.show(
+                                        target: .song(
+                                            id: currentItem.id,
+                                            name: currentItem.title,
+                                            subtitle: currentItem.artist
+                                        )
+                                    )
+                                }
+                            }
+                            .disabled(currentItemId == 0)
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 14, height: 12)
+                        }
+                        .menuIndicator(.hidden)
+                        .menuStyle(.borderlessButton)
+                        .buttonStyle(PlayControlButtonStyle(colorProvider: { _ in .secondary }))
+                        .disabled(currentItemId == 0)
+                        .help("更多")
                     }
 
                     HStack(spacing: 6) {
@@ -278,16 +298,6 @@ struct NowPlayingTrackView: View {
 
             // Bottom: Progress bar
             PlaySliderView(playbackProgress: playbackProgress)
-        }
-        .contentShape(Rectangle())
-        .onHover { hovering in
-            guard hovering != isHovered else { return }
-            withAnimation(.easeInOut(duration: 0.12)) {
-                isHovered = hovering
-            }
-        }
-        .onDisappear {
-            isHovered = false
         }
     }
 }
