@@ -91,6 +91,22 @@ final class CommentsWindowManager: NSObject, NSWindowDelegate {
 
     private var controllers: [CommentsTarget: NSWindowController] = [:]
 
+    private static func position(_ window: NSWindow, near anchorWindow: NSWindow) {
+        var frame = window.frame
+        let anchorFrame = anchorWindow.frame
+
+        frame.origin.x = anchorFrame.midX - frame.width / 2
+        frame.origin.y = anchorFrame.midY - frame.height / 2
+
+        let screen = anchorWindow.screen ?? NSScreen.main
+        if let visibleFrame = screen?.visibleFrame {
+            frame.origin.x = min(max(frame.origin.x, visibleFrame.minX), visibleFrame.maxX - frame.width)
+            frame.origin.y = min(max(frame.origin.y, visibleFrame.minY), visibleFrame.maxY - frame.height)
+        }
+
+        window.setFrame(frame, display: false)
+    }
+
     func show(target: CommentsTarget) {
         if let existing = controllers[target], let window = existing.window {
             window.makeKeyAndOrderFront(nil)
@@ -110,7 +126,17 @@ final class CommentsWindowManager: NSObject, NSWindowDelegate {
         window.delegate = self
 
         let controller = NSWindowController(window: window)
+        controller.shouldCascadeWindows = false
         controllers[target] = controller
+
+        if let mainWindow = AppDelegate.mainWindow, mainWindow.isVisible {
+            Self.position(window, near: mainWindow)
+        } else if let keyWindow = NSApp.keyWindow, keyWindow.isVisible {
+            Self.position(window, near: keyWindow)
+        } else {
+            window.center()
+        }
+
         controller.showWindow(nil)
 
         NSApp.activate(ignoringOtherApps: true)
