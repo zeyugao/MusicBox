@@ -17,6 +17,14 @@ private enum CommentTextSanitizer {
         pattern: "<c0m_cvt\\b[^>]*>.*?</c0m_cvt>",
         options: [.caseInsensitive, .dotMatchesLineSeparators]
     )
+    static let brRegex = try! NSRegularExpression(
+        pattern: "<br\\s*/?>",
+        options: [.caseInsensitive]
+    )
+    static let anyTagRegex = try! NSRegularExpression(
+        pattern: "<[^>]+>",
+        options: [.caseInsensitive, .dotMatchesLineSeparators]
+    )
 
     static func sanitize(_ text: String) -> String {
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -27,16 +35,42 @@ private enum CommentTextSanitizer {
             withTemplate: ""
         )
         let range2 = NSRange(withoutWrapped.startIndex..<withoutWrapped.endIndex, in: withoutWrapped)
-        return cvtSelfClosingRegex.stringByReplacingMatches(
+        let withoutSelfClosing = cvtSelfClosingRegex.stringByReplacingMatches(
             in: withoutWrapped,
             options: [],
             range: range2,
             withTemplate: ""
         )
+
+        let range3 = NSRange(withoutSelfClosing.startIndex..<withoutSelfClosing.endIndex, in: withoutSelfClosing)
+        let withLineBreaks = brRegex.stringByReplacingMatches(
+            in: withoutSelfClosing,
+            options: [],
+            range: range3,
+            withTemplate: "\n"
+        )
+
+        let range4 = NSRange(withLineBreaks.startIndex..<withLineBreaks.endIndex, in: withLineBreaks)
+        let withoutTags = anyTagRegex.stringByReplacingMatches(
+            in: withLineBreaks,
+            options: [],
+            range: range4,
+            withTemplate: ""
+        )
+
+        return withoutTags.decodingHTMLEntities
     }
 }
 
 private extension String {
+    var decodingHTMLEntities: String {
+        var text = replacingOccurrences(of: "&nbsp;", with: " ")
+        if let decoded = CFXMLCreateStringByUnescapingEntities(nil, text as CFString, nil) {
+            text = decoded as String
+        }
+        return text
+    }
+
     var sanitizedCommentText: String {
         CommentTextSanitizer.sanitize(self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
