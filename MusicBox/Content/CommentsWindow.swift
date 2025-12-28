@@ -188,6 +188,7 @@ final class CommentsViewModel: ObservableObject {
         var ownerComment: CloudMusicApi.Comment?
         var bestComments: [CloudMusicApi.Comment]
         var comments: [CloudMusicApi.Comment]
+        var commentIdSet: Set<UInt64>
         var hasMore: Bool
         var nextTime: Int64?
         var totalCount: Int
@@ -210,6 +211,7 @@ final class CommentsViewModel: ObservableObject {
     private var pageNo: Int = 1
     private var timeCursor: Int64? = nil
     private var sortOption: CommentsSortOption = .hot
+    private var commentIdSet: Set<UInt64> = []
 
     private var loadTask: Task<Void, Never>?
     private var loadMoreTask: Task<Void, Never>?
@@ -240,6 +242,7 @@ final class CommentsViewModel: ObservableObject {
         isLoadingMore = false
         pageNo = 1
         timeCursor = nil
+        commentIdSet = []
         floorThreads = [:]
         floorLoadingIds.removeAll()
         floorErrorMessages = [:]
@@ -260,10 +263,20 @@ final class CommentsViewModel: ObservableObject {
                 await MainActor.run {
                     guard let self else { return }
                     guard self.sortOption == sortOption else { return }
-                    self.comments = page.comments ?? []
+                    let initialComments = page.comments ?? []
+                    var uniqueComments: [CloudMusicApi.Comment] = []
+                    uniqueComments.reserveCapacity(initialComments.count)
+                    var commentIdSet: Set<UInt64> = []
+                    for comment in initialComments {
+                        if commentIdSet.insert(comment.commentId).inserted {
+                            uniqueComments.append(comment)
+                        }
+                    }
+                    self.comments = uniqueComments
                     self.totalCount = page.totalCount ?? 0
                     self.hasMore = page.hasMore ?? false
                     self.pageNo = 1
+                    self.commentIdSet = commentIdSet
                     if sortOption == .time {
                         self.timeCursor = Self.extractTimeCursor(from: page.cursor)
                     }
@@ -306,7 +319,16 @@ final class CommentsViewModel: ObservableObject {
                     guard self.sortOption == sortOption else { return }
                     let newComments = page.comments ?? []
                     if !newComments.isEmpty {
-                        self.comments.append(contentsOf: newComments)
+                        var uniqueComments: [CloudMusicApi.Comment] = []
+                        uniqueComments.reserveCapacity(newComments.count)
+                        for comment in newComments {
+                            if self.commentIdSet.insert(comment.commentId).inserted {
+                                uniqueComments.append(comment)
+                            }
+                        }
+                        if !uniqueComments.isEmpty {
+                            self.comments.append(contentsOf: uniqueComments)
+                        }
                     }
                     self.hasMore = page.hasMore ?? false
                     self.totalCount = page.totalCount ?? self.totalCount
@@ -356,11 +378,21 @@ final class CommentsViewModel: ObservableObject {
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     guard let self else { return }
+                    let comments = data.comments ?? []
+                    var uniqueComments: [CloudMusicApi.Comment] = []
+                    uniqueComments.reserveCapacity(comments.count)
+                    var commentIdSet: Set<UInt64> = []
+                    for comment in comments {
+                        if commentIdSet.insert(comment.commentId).inserted {
+                            uniqueComments.append(comment)
+                        }
+                    }
                     self.floorThreads[parentCommentId] = FloorThread(
                         parentCommentId: parentCommentId,
                         ownerComment: data.ownerComment,
                         bestComments: data.bestComments ?? [],
-                        comments: data.comments ?? [],
+                        comments: uniqueComments,
+                        commentIdSet: commentIdSet,
                         hasMore: data.hasMore ?? false,
                         nextTime: data.time,
                         totalCount: data.totalCount ?? 0
@@ -402,7 +434,16 @@ final class CommentsViewModel: ObservableObject {
 
                     let newComments = data.comments ?? []
                     if !newComments.isEmpty {
-                        thread.comments.append(contentsOf: newComments)
+                        var uniqueComments: [CloudMusicApi.Comment] = []
+                        uniqueComments.reserveCapacity(newComments.count)
+                        for comment in newComments {
+                            if thread.commentIdSet.insert(comment.commentId).inserted {
+                                uniqueComments.append(comment)
+                            }
+                        }
+                        if !uniqueComments.isEmpty {
+                            thread.comments.append(contentsOf: uniqueComments)
+                        }
                     }
                     thread.hasMore = data.hasMore ?? false
                     thread.nextTime = data.time
