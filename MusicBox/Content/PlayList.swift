@@ -904,6 +904,13 @@ class SongTableViewController: NSViewController {
         }
     }
 
+    var scrollTargetSongId: CloudMusicApi.Song.ID? {
+        didSet {
+            guard scrollTargetSongId != oldValue else { return }
+            scrollToTargetSongIfNeeded()
+        }
+    }
+
     var sortOrder: [KeyPathComparator<CloudMusicApi.Song>] = [] {
         didSet {
             updateSortDescriptors()
@@ -1167,6 +1174,12 @@ class SongTableViewController: NSViewController {
                 scrollToRowCentered(index)
             }
         }
+    }
+
+    private func scrollToTargetSongIfNeeded() {
+        guard let songs, let targetId = scrollTargetSongId else { return }
+        guard let index = songs.firstIndex(where: { $0.id == targetId }) else { return }
+        scrollToRowCentered(index)
     }
 
     private func scrollToRowCentered(_ index: Int) {
@@ -1726,6 +1739,7 @@ extension SongTableViewController {
 struct SongTableView: NSViewControllerRepresentable {
     let songs: [CloudMusicApi.Song]?
     @Binding var selectedItem: CloudMusicApi.Song.ID?
+    let scrollTargetSongId: CloudMusicApi.Song.ID?
     @Binding var sortOrder: [KeyPathComparator<CloudMusicApi.Song>]
     let userInfo: UserInfo
     let playlistStatus: PlaylistStatus
@@ -1756,6 +1770,7 @@ struct SongTableView: NSViewControllerRepresentable {
     func updateNSViewController(_ nsViewController: SongTableViewController, context: Context) {
         nsViewController.songs = songs
         nsViewController.selectedItem = selectedItem
+        nsViewController.scrollTargetSongId = scrollTargetSongId
         nsViewController.sortOrder = sortOrder
         nsViewController.playlistMetadata = playlistMetadata
         nsViewController.isLoadingMore = isLoadingMore
@@ -2341,6 +2356,7 @@ struct PlayListView: View {
     @EnvironmentObject var playlistStatus: PlaylistStatus
 
     @State private var selectedItem: CloudMusicApi.Song.ID?
+    @State private var scrollTargetSongId: CloudMusicApi.Song.ID?
     @State private var sortOrder = [KeyPathComparator<CloudMusicApi.Song>]()
     @State private var loadingTask: Task<Void, Never>? = nil
     @State private var currentLoadingTaskId = UUID()
@@ -2374,6 +2390,7 @@ struct PlayListView: View {
             SongTableView(
                 songs: model.songs,
                 selectedItem: $selectedItem,
+                scrollTargetSongId: scrollTargetSongId,
                 sortOrder: $sortOrder,
                 userInfo: userInfo,
                 playlistStatus: playlistStatus,
@@ -2600,13 +2617,21 @@ struct PlayListView: View {
 
             await MainActor.run {
                 if isSongAvailable {
-                    self.selectedItem = locateRequest.songId
+                    self.selectedItem = nil
+                    self.scrollTargetSongId = locateRequest.songId
                 }
                 self.lastHandledLocateRequestId = locateRequest.id
             }
 
             await MainActor.run {
                 onLocateHandled?(locateRequest)
+            }
+
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                if self.lastHandledLocateRequestId == locateRequest.id {
+                    self.scrollTargetSongId = nil
+                }
             }
         }
 
