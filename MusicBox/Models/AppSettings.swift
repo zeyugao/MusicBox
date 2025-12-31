@@ -8,6 +8,13 @@
 import Foundation
 import IOKit.pwr_mgt
 
+enum DoubleClickPlayAction: Int, CaseIterable, Identifiable {
+    case replacePlaylistWithSongList = 0
+    case appendSongToPlaylist = 1
+
+    var id: Int { rawValue }
+}
+
 class AppSettings: ObservableObject {
     @Published var preventSleepWhenPlaying: Bool = false {
         didSet {
@@ -27,6 +34,12 @@ class AppSettings: ObservableObject {
             UserDefaults.standard.set(showRoma, forKey: "showRoma")
         }
     }
+
+    @Published var doubleClickPlayAction: DoubleClickPlayAction = .appendSongToPlaylist {
+        didSet {
+            UserDefaults.standard.set(doubleClickPlayAction.rawValue, forKey: "doubleClickPlayAction")
+        }
+    }
     
     private var sleepAssertionID: IOPMAssertionID = IOPMAssertionID(0)
     private var isPlayingMusic: Bool = false
@@ -37,6 +50,11 @@ class AppSettings: ObservableObject {
         preventSleepWhenPlaying = UserDefaults.standard.bool(forKey: "preventSleepWhenPlaying")
         showTimestamp = UserDefaults.standard.bool(forKey: "showTimestamp")
         showRoma = UserDefaults.standard.bool(forKey: "showRoma")
+        let rawValue =
+            UserDefaults.standard.object(forKey: "doubleClickPlayAction") as? Int
+            ?? DoubleClickPlayAction.appendSongToPlaylist.rawValue
+        doubleClickPlayAction =
+            DoubleClickPlayAction(rawValue: rawValue) ?? .appendSongToPlaylist
         setupPlaybackObserver()
     }
     

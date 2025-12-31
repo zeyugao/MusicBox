@@ -919,6 +919,7 @@ class SongTableViewController: NSViewController {
 
     weak var userInfo: UserInfo?
     weak var playlistStatus: PlaylistStatus?
+    weak var playlistDetailModel: PlaylistDetailModel?
     var playlistMetadata: PlaylistMetadata?
     var onSortChange: (([KeyPathComparator<CloudMusicApi.Song>]) -> Void)?
     var selectedSongToAdd: ((CloudMusicApi.Song) -> Void)?
@@ -1253,19 +1254,110 @@ class SongTableViewController: NSViewController {
         }
     }
 
+    private static func makePlaylistItem(
+        from song: CloudMusicApi.Song,
+        sourcePlaylist: PlaybackSourcePlaylist?
+    ) -> PlaylistItem {
+        let item = loadItem(song: song)
+        item.sourcePlaylist = sourcePlaylist
+        return item
+    }
+
+    private static func makePlaylistItems(
+        from songs: [CloudMusicApi.Song],
+        sourcePlaylist: PlaybackSourcePlaylist?
+    ) -> [PlaylistItem] {
+        songs.map { makePlaylistItem(from: $0, sourcePlaylist: sourcePlaylist) }
+    }
+
+    private func playByAppendingSingleSong(_ song: CloudMusicApi.Song) async {
+        guard let playlistStatus else { return }
+
+        let sourcePlaylist = playbackSourcePlaylist
+        playlistStatus.clearPlayNext()
+        let newItem = Self.makePlaylistItem(from: song, sourcePlaylist: sourcePlaylist)
+        let _ = await playlistStatus.addItemAndSeekTo(newItem, shouldPlay: true)
+    }
+
+    private func playByReplacingPlaylist(clickedSong: CloudMusicApi.Song, clickedRow: Int) async {
+        guard let playlistStatus else { return }
+        guard let playlistDetailModel else {
+            await playByAppendingSingleSong(clickedSong)
+            return
+        }
+
+        let sourcePlaylist = playbackSourcePlaylist
+        let hasActiveFilters = await MainActor.run { playlistDetailModel.hasActiveFilters }
+        if hasActiveFilters {
+            let songsToPlay = await playlistDetailModel.songsForPlayback(loadEntirePlaylist: true)
+            guard let startIndex = songsToPlay.firstIndex(where: { $0.id == clickedSong.id }) else { return }
+
+            let newItems = Self.makePlaylistItems(from: songsToPlay, sourcePlaylist: sourcePlaylist)
+            guard !newItems.isEmpty else { return }
+
+            await playlistStatus.replacePlaylist(
+                newItems,
+                continuePlaying: true,
+                shouldSaveState: true,
+                startIndex: startIndex
+            )
+            return
+        }
+
+        let totalCount = await playlistDetailModel.totalTrackCount()
+        if totalCount == 0 {
+            let songsToPlay = await playlistDetailModel.songsForPlayback(loadEntirePlaylist: true)
+            guard let startIndex = songsToPlay.firstIndex(where: { $0.id == clickedSong.id }) else { return }
+
+            let newItems = Self.makePlaylistItems(from: songsToPlay, sourcePlaylist: sourcePlaylist)
+            guard !newItems.isEmpty else { return }
+
+            await playlistStatus.replacePlaylist(
+                newItems,
+                continuePlaying: true,
+                shouldSaveState: true,
+                startIndex: startIndex
+            )
+            return
+        }
+
+        let songStream = playlistDetailModel.streamSongsForPlayback(loadEntirePlaylist: true)
+        let itemStream = AsyncStream<[PlaylistItem]> { continuation in
+            let streamTask = Task {
+                for await chunk in songStream {
+                    continuation.yield(Self.makePlaylistItems(from: chunk, sourcePlaylist: sourcePlaylist))
+                }
+                continuation.finish()
+            }
+
+            continuation.onTermination = { _ in
+                streamTask.cancel()
+            }
+        }
+
+        await playlistStatus.replacePlaylistStreaming(
+            totalCount: totalCount,
+            startIndex: clickedRow,
+            continuePlaying: true,
+            shouldSaveState: true,
+            itemStream: itemStream
+        )
+    }
+
     @objc private func handleDoubleClick(_ sender: NSTableView) {
         let clickedRow = sender.clickedRow
         guard clickedRow >= 0, let songs = songs, clickedRow < songs.count else { return }
 
         let song = songs[clickedRow]
 
-        // 播放选中的歌曲
-        Task { @MainActor in
-            // Clear play next items when playing immediately
-            playlistStatus?.clearPlayNext()
-            let newItem = loadItem(song: song)
-            newItem.sourcePlaylist = playbackSourcePlaylist
-            let _ = await playlistStatus?.addItemAndSeekTo(newItem, shouldPlay: true)
+        Task {
+            let action = await MainActor.run { AppSettings.shared.doubleClickPlayAction }
+            switch action {
+            case .replacePlaylistWithSongList:
+                await playByReplacingPlaylist(clickedSong: song, clickedRow: clickedRow)
+            case .appendSongToPlaylist:
+                await playByAppendingSingleSong(song)
+            }
         }
     }
 }
@@ -1738,6 +1830,7 @@ extension SongTableViewController {
 
 struct SongTableView: NSViewControllerRepresentable {
     let songs: [CloudMusicApi.Song]?
+    let model: PlaylistDetailModel
     @Binding var selectedItem: CloudMusicApi.Song.ID?
     let scrollTargetSongId: CloudMusicApi.Song.ID?
     @Binding var sortOrder: [KeyPathComparator<CloudMusicApi.Song>]
@@ -1756,6 +1849,7 @@ struct SongTableView: NSViewControllerRepresentable {
         let controller = SongTableViewController()
         controller.userInfo = userInfo
         controller.playlistStatus = playlistStatus
+        controller.playlistDetailModel = model
         controller.playlistMetadata = playlistMetadata
         controller.onSortChange = onSortChange
         controller.selectedSongToAdd = { song in
@@ -1769,6 +1863,7 @@ struct SongTableView: NSViewControllerRepresentable {
 
     func updateNSViewController(_ nsViewController: SongTableViewController, context: Context) {
         nsViewController.songs = songs
+        nsViewController.playlistDetailModel = model
         nsViewController.selectedItem = selectedItem
         nsViewController.scrollTargetSongId = scrollTargetSongId
         nsViewController.sortOrder = sortOrder
@@ -2389,6 +2484,7 @@ struct PlayListView: View {
         ZStack {
             SongTableView(
                 songs: model.songs,
+                model: model,
                 selectedItem: $selectedItem,
                 scrollTargetSongId: scrollTargetSongId,
                 sortOrder: $sortOrder,

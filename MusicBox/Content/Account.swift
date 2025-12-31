@@ -402,6 +402,12 @@ struct SettingsView: View {
 
                     Divider()
 
+                    // Playlist Settings Section
+                    PlaylistSettingsSection()
+                        .environmentObject(appSettings)
+
+                    Divider()
+
                     // Storage & Cache Section
                     StorageCacheSection()
 
@@ -535,6 +541,41 @@ struct GeneralSettingsSection: View {
                 )
 
             }
+            .padding(16)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(12)
+        }
+    }
+}
+
+struct PlaylistSettingsSection: View {
+    @EnvironmentObject private var appSettings: AppSettings
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Image(systemName: "music.note.list")
+                    .foregroundColor(.accentColor)
+                    .font(.title2)
+                Text("播放列表")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Picker(selection: $appSettings.doubleClickPlayAction, label: EmptyView()) {
+                    Text("双击播放单曲时，用当前单曲所在的歌曲列表替换播放列表")
+                        .fixedSize(horizontal: false, vertical: true)
+                        .tag(DoubleClickPlayAction.replacePlaylistWithSongList)
+                    Text("双击播放单曲时，仅把当前单曲添加到播放列表")
+                        .fixedSize(horizontal: false, vertical: true)
+                        .tag(DoubleClickPlayAction.appendSongToPlaylist)
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(12)
