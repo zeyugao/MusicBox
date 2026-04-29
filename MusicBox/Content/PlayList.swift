@@ -922,7 +922,7 @@ class SongTableViewController: NSViewController {
     weak var playlistDetailModel: PlaylistDetailModel?
     var playlistMetadata: PlaylistMetadata?
     var onSortChange: (([KeyPathComparator<CloudMusicApi.Song>]) -> Void)?
-    var selectedSongToAdd: ((CloudMusicApi.Song) -> Void)?
+    var selectedSongsToAdd: (([CloudMusicApi.Song]) -> Void)?
     var onDeleteFromPlaylist: ((CloudMusicApi.Song) -> Void)?
     var onUploadToCloud: ((CloudMusicApi.Song, URL) -> Void)?
 
@@ -972,7 +972,7 @@ class SongTableViewController: NSViewController {
         tableView.dataSource = self
         tableView.delegate = self
         tableView.allowsColumnSelection = false
-        tableView.allowsMultipleSelection = false
+        tableView.allowsMultipleSelection = true
         tableView.allowsColumnReordering = false
         tableView.usesAlternatingRowBackgroundColors = true
         tableView.rowSizeStyle = .default
@@ -1551,15 +1551,6 @@ extension SongTableViewController: NSTableViewDelegate {
         }
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) {
-        let selectedRow = tableView.selectedRow
-        if selectedRow >= 0, let songs = songs, selectedRow < songs.count {
-            selectedItem = songs[selectedRow].id
-        } else {
-            selectedItem = nil
-        }
-    }
-
     func tableView(
         _ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]
     ) {
@@ -1659,18 +1650,36 @@ extension SongTableViewController {
 
         guard row >= 0, let songs = songs, row < songs.count else { return }
 
-        // Select the row if it's not already selected
         if !tableView.selectedRowIndexes.contains(row) {
             tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
         }
 
         let song = songs[row]
-        let menu = createContextMenu(for: song)
+        let selectedSongs = selectedSongsForContextMenu(clickedRow: row)
+        let menu = createContextMenu(for: song, selectedSongs: selectedSongs)
 
         NSMenu.popUpContextMenu(menu, with: event, for: tableView)
     }
 
-    private func createContextMenu(for song: CloudMusicApi.Song) -> NSMenu {
+    private func selectedSongsForContextMenu(clickedRow: Int) -> [CloudMusicApi.Song] {
+        guard let songs else { return [] }
+
+        let selectedSongs = tableView.selectedRowIndexes.compactMap { row -> CloudMusicApi.Song? in
+            guard row >= 0, row < songs.count else { return nil }
+            return songs[row]
+        }
+
+        if selectedSongs.isEmpty, clickedRow >= 0, clickedRow < songs.count {
+            return [songs[clickedRow]]
+        }
+
+        return selectedSongs
+    }
+
+    private func createContextMenu(
+        for song: CloudMusicApi.Song,
+        selectedSongs: [CloudMusicApi.Song]
+    ) -> NSMenu {
         let menu = NSMenu()
         let makeIcon: (String, String) -> NSImage? = { systemName, description in
             guard #available(macOS 11.0, *) else { return nil }
@@ -1701,10 +1710,16 @@ extension SongTableViewController {
         menu.addItem(addToNowPlayingItem)
 
         // Add to Playlist
+        let addToPlaylistTitle: String
+        if selectedSongs.count > 1 {
+            addToPlaylistTitle = "Add \(selectedSongs.count) Songs to Playlist"
+        } else {
+            addToPlaylistTitle = "Add to Playlist"
+        }
         let addToPlaylistItem = NSMenuItem(
-            title: "Add to Playlist", action: #selector(addToPlaylist(_:)), keyEquivalent: "")
+            title: addToPlaylistTitle, action: #selector(addToPlaylist(_:)), keyEquivalent: "")
         addToPlaylistItem.target = self
-        addToPlaylistItem.representedObject = song
+        addToPlaylistItem.representedObject = selectedSongs.isEmpty ? [song] : selectedSongs
         addToPlaylistItem.image = makeIcon("plus.rectangle.on.rectangle", "Add to playlist")
         menu.addItem(addToPlaylistItem)
 
@@ -1784,8 +1799,11 @@ extension SongTableViewController {
     }
 
     @objc private func addToPlaylist(_ sender: NSMenuItem) {
-        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
-        selectedSongToAdd?(song)
+        if let songs = sender.representedObject as? [CloudMusicApi.Song], !songs.isEmpty {
+            selectedSongsToAdd?(songs)
+        } else if let song = sender.representedObject as? CloudMusicApi.Song {
+            selectedSongsToAdd?([song])
+        }
     }
 
     @objc private func deleteFromPlaylist(_ sender: NSMenuItem) {
@@ -1838,7 +1856,7 @@ struct SongTableView: NSViewControllerRepresentable {
     let playlistStatus: PlaylistStatus
     let playlistMetadata: PlaylistMetadata?
     let onSortChange: ([KeyPathComparator<CloudMusicApi.Song>]) -> Void
-    @Binding var selectedSongToAdd: CloudMusicApi.Song?
+    @Binding var selectedSongsToAdd: [CloudMusicApi.Song]
     let onDeleteFromPlaylist: (CloudMusicApi.Song) -> Void
     let onUploadToCloud: (CloudMusicApi.Song, URL) -> Void
     let onLoadMore: () -> Void
@@ -1852,8 +1870,8 @@ struct SongTableView: NSViewControllerRepresentable {
         controller.playlistDetailModel = model
         controller.playlistMetadata = playlistMetadata
         controller.onSortChange = onSortChange
-        controller.selectedSongToAdd = { song in
-            selectedSongToAdd = song
+        controller.selectedSongsToAdd = { songs in
+            selectedSongsToAdd = songs
         }
         controller.onDeleteFromPlaylist = onDeleteFromPlaylist
         controller.onUploadToCloud = onUploadToCloud
@@ -1864,7 +1882,9 @@ struct SongTableView: NSViewControllerRepresentable {
     func updateNSViewController(_ nsViewController: SongTableViewController, context: Context) {
         nsViewController.songs = songs
         nsViewController.playlistDetailModel = model
-        nsViewController.selectedItem = selectedItem
+        if nsViewController.selectedItem != selectedItem {
+            nsViewController.selectedItem = selectedItem
+        }
         nsViewController.scrollTargetSongId = scrollTargetSongId
         nsViewController.sortOrder = sortOrder
         nsViewController.playlistMetadata = playlistMetadata
@@ -2458,7 +2478,7 @@ struct PlayListView: View {
 
     @State private var searchText = ""
     @State private var searchDebounceTask: Task<Void, Never>? = nil
-    @State private var selectedSongToAdd: CloudMusicApi.Song?
+    @State private var selectedSongsToAdd: [CloudMusicApi.Song] = []
     @State private var lastHandledLocateRequestId: UUID?
     @State private var locateTask: Task<Void, Never>?
 
@@ -2492,7 +2512,7 @@ struct PlayListView: View {
                 playlistStatus: playlistStatus,
                 playlistMetadata: playlistMetadata,
                 onSortChange: handleSortChange,
-                selectedSongToAdd: $selectedSongToAdd,
+                selectedSongsToAdd: $selectedSongsToAdd,
                 onDeleteFromPlaylist: { song in
                     Task {
                         if case .netease(let songId, _) = playlistMetadata {
@@ -2550,17 +2570,18 @@ struct PlayListView: View {
             }
             .sheet(
                 isPresented: Binding<Bool>(
-                    get: { selectedSongToAdd != nil },
-                    set: { if !$0 { selectedSongToAdd = nil } }
+                    get: { !selectedSongsToAdd.isEmpty },
+                    set: { if !$0 { selectedSongsToAdd = [] } }
                 )
             ) {
-                if let selectedSong = selectedSongToAdd {
+                if !selectedSongsToAdd.isEmpty {
                     ListPlaylistDialogView { selectedPlaylist in
+                        let trackIds = selectedSongsToAdd.map(\.id)
                         Task {
                             do {
                                 try await CloudMusicApi(cacheTtl: 0).playlist_tracks(
                                     op: .add, playlistId: selectedPlaylist.id,
-                                    trackIds: [selectedSong.id])
+                                    trackIds: trackIds)
 
                                 if playlistMetadata?.id == selectedPlaylist.id {
                                     NotificationCenter.default.post(
