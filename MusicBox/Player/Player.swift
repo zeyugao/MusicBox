@@ -1788,6 +1788,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                         return
                     }
 
+                    if currentIndex < playlist.count && playlist[currentIndex].id == item.id {
+                        return
+                    }
+
                     // Check if item already exists in playlist
                     if let existingIndex = playlist.firstIndex(where: { $0.id == item.id }) {
                         let wasPlayNextItem =

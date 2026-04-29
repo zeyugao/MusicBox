@@ -923,7 +923,7 @@ class SongTableViewController: NSViewController {
     var playlistMetadata: PlaylistMetadata?
     var onSortChange: (([KeyPathComparator<CloudMusicApi.Song>]) -> Void)?
     var selectedSongsToAdd: (([CloudMusicApi.Song]) -> Void)?
-    var onDeleteFromPlaylist: ((CloudMusicApi.Song) -> Void)?
+    var onDeleteFromPlaylist: (([CloudMusicApi.Song]) -> Void)?
     var onUploadToCloud: ((CloudMusicApi.Song, URL) -> Void)?
 
     // Incremental loading related properties
@@ -1268,6 +1268,10 @@ class SongTableViewController: NSViewController {
         sourcePlaylist: PlaybackSourcePlaylist?
     ) -> [PlaylistItem] {
         songs.map { makePlaylistItem(from: $0, sourcePlaylist: sourcePlaylist) }
+    }
+
+    private func makePlaylistItems(from songs: [CloudMusicApi.Song]) -> [PlaylistItem] {
+        Self.makePlaylistItems(from: songs, sourcePlaylist: playbackSourcePlaylist)
     }
 
     private func playByAppendingSingleSong(_ song: CloudMusicApi.Song) async {
@@ -1681,31 +1685,40 @@ extension SongTableViewController {
         selectedSongs: [CloudMusicApi.Song]
     ) -> NSMenu {
         let menu = NSMenu()
+        let isMultiSelection = selectedSongs.count > 1
         let makeIcon: (String, String) -> NSImage? = { systemName, description in
             guard #available(macOS 11.0, *) else { return nil }
             let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
             let image = NSImage(systemSymbolName: systemName, accessibilityDescription: description)
             return image?.withSymbolConfiguration(configuration)
         }
+
+        let representedSongs = selectedSongs.isEmpty ? [song] : selectedSongs
+
         // Play
-        let playItem = NSMenuItem(title: "Play", action: #selector(playSong(_:)), keyEquivalent: "")
-        playItem.target = self
-        playItem.representedObject = song
-        playItem.image = makeIcon("play.fill", "Play song")
-        menu.addItem(playItem)
+        if !isMultiSelection {
+            let playItem = NSMenuItem(title: "Play", action: #selector(playSong(_:)), keyEquivalent: "")
+            playItem.target = self
+            playItem.representedObject = song
+            playItem.image = makeIcon("play.fill", "Play song")
+            menu.addItem(playItem)
+        }
 
         // Play Next
-        let playNextItem = NSMenuItem(title: "Play Next", action: #selector(playNext(_:)), keyEquivalent: "")
+        let playNextTitle = isMultiSelection ? "Play \(selectedSongs.count) Songs Next" : "Play Next"
+        let playNextItem = NSMenuItem(title: playNextTitle, action: #selector(playNext(_:)), keyEquivalent: "")
         playNextItem.target = self
-        playNextItem.representedObject = song
+        playNextItem.representedObject = representedSongs
         playNextItem.image = makeIcon("text.badge.plus", "Play next")
         menu.addItem(playNextItem)
 
         // Add to Now Playing
+        let addToNowPlayingTitle =
+            isMultiSelection ? "Add \(selectedSongs.count) Songs to Now Playing" : "Add to Now Playing"
         let addToNowPlayingItem = NSMenuItem(
-            title: "Add to Now Playing", action: #selector(addToNowPlaying(_:)), keyEquivalent: "")
+            title: addToNowPlayingTitle, action: #selector(addToNowPlaying(_:)), keyEquivalent: "")
         addToNowPlayingItem.target = self
-        addToNowPlayingItem.representedObject = song
+        addToNowPlayingItem.representedObject = representedSongs
         addToNowPlayingItem.image = makeIcon("music.note.list", "Add to now playing queue")
         menu.addItem(addToNowPlayingItem)
 
@@ -1719,52 +1732,56 @@ extension SongTableViewController {
         let addToPlaylistItem = NSMenuItem(
             title: addToPlaylistTitle, action: #selector(addToPlaylist(_:)), keyEquivalent: "")
         addToPlaylistItem.target = self
-        addToPlaylistItem.representedObject = selectedSongs.isEmpty ? [song] : selectedSongs
+        addToPlaylistItem.representedObject = representedSongs
         addToPlaylistItem.image = makeIcon("plus.rectangle.on.rectangle", "Add to playlist")
         menu.addItem(addToPlaylistItem)
 
         // Delete from Playlist (if applicable)
         if case .netease = playlistMetadata {
+            let deleteTitle =
+                isMultiSelection ? "Delete \(selectedSongs.count) Songs from Playlist" : "Delete from Playlist"
             let deleteItem = NSMenuItem(
-                title: "Delete from Playlist", action: #selector(deleteFromPlaylist(_:)),
+                title: deleteTitle, action: #selector(deleteFromPlaylist(_:)),
                 keyEquivalent: "")
             deleteItem.target = self
-            deleteItem.representedObject = song
+            deleteItem.representedObject = representedSongs
             deleteItem.image = makeIcon("trash", "Delete from playlist")
             menu.addItem(deleteItem)
         }
 
-        // Upload to Cloud
-        let uploadItem = NSMenuItem(
-            title: "Upload to Cloud", action: #selector(uploadToCloud(_:)), keyEquivalent: "")
-        uploadItem.target = self
-        uploadItem.representedObject = song
-        uploadItem.image = makeIcon("icloud.and.arrow.up", "Upload to cloud")
-        menu.addItem(uploadItem)
+        if !isMultiSelection {
+            // Upload to Cloud
+            let uploadItem = NSMenuItem(
+                title: "Upload to Cloud", action: #selector(uploadToCloud(_:)), keyEquivalent: "")
+            uploadItem.target = self
+            uploadItem.representedObject = song
+            uploadItem.image = makeIcon("icloud.and.arrow.up", "Upload to cloud")
+            menu.addItem(uploadItem)
 
-        // Copy Title
-        let copyTitleItem = NSMenuItem(
-            title: "Copy Title", action: #selector(copyTitle(_:)), keyEquivalent: "")
-        copyTitleItem.target = self
-        copyTitleItem.representedObject = song
-        copyTitleItem.image = makeIcon("doc.on.doc", "Copy title")
-        menu.addItem(copyTitleItem)
+            // Copy Title
+            let copyTitleItem = NSMenuItem(
+                title: "Copy Title", action: #selector(copyTitle(_:)), keyEquivalent: "")
+            copyTitleItem.target = self
+            copyTitleItem.representedObject = song
+            copyTitleItem.image = makeIcon("doc.on.doc", "Copy title")
+            menu.addItem(copyTitleItem)
 
-        // Copy Link
-        let copyLinkItem = NSMenuItem(
-            title: "Copy Link", action: #selector(copyLink(_:)), keyEquivalent: "")
-        copyLinkItem.target = self
-        copyLinkItem.representedObject = song
-        copyLinkItem.image = makeIcon("link", "Copy link")
-        menu.addItem(copyLinkItem)
+            // Copy Link
+            let copyLinkItem = NSMenuItem(
+                title: "Copy Link", action: #selector(copyLink(_:)), keyEquivalent: "")
+            copyLinkItem.target = self
+            copyLinkItem.representedObject = song
+            copyLinkItem.image = makeIcon("link", "Copy link")
+            menu.addItem(copyLinkItem)
 
-        // View Comments
-        let viewCommentsItem = NSMenuItem(
-            title: "查看评论", action: #selector(viewComments(_:)), keyEquivalent: "")
-        viewCommentsItem.target = self
-        viewCommentsItem.representedObject = song
-        viewCommentsItem.image = makeIcon("text.bubble", "View comments")
-        menu.addItem(viewCommentsItem)
+            // View Comments
+            let viewCommentsItem = NSMenuItem(
+                title: "查看评论", action: #selector(viewComments(_:)), keyEquivalent: "")
+            viewCommentsItem.target = self
+            viewCommentsItem.representedObject = song
+            viewCommentsItem.image = makeIcon("text.bubble", "View comments")
+            menu.addItem(viewCommentsItem)
+        }
 
         return menu
     }
@@ -1781,34 +1798,46 @@ extension SongTableViewController {
     }
     
     @objc private func playNext(_ sender: NSMenuItem) {
-        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        let songs = songs(from: sender)
+        guard !songs.isEmpty else { return }
         Task {
-            let newItem = loadItem(song: song)
-            newItem.sourcePlaylist = playbackSourcePlaylist
-            await playlistStatus?.addToPlayNext(newItem)
+            await playlistStatus?.addItemsToPlayNext(makePlaylistItems(from: songs))
         }
     }
 
     @objc private func addToNowPlaying(_ sender: NSMenuItem) {
-        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        let songs = songs(from: sender)
+        guard !songs.isEmpty else { return }
         Task {
-            let newItem = loadItem(song: song)
-            newItem.sourcePlaylist = playbackSourcePlaylist
-            await playlistStatus?.addToPlayNext(newItem)
+            await playlistStatus?.addItemsToPlaylist(
+                makePlaylistItems(from: songs),
+                continuePlaying: false,
+                shouldSaveState: true
+            )
         }
     }
 
     @objc private func addToPlaylist(_ sender: NSMenuItem) {
-        if let songs = sender.representedObject as? [CloudMusicApi.Song], !songs.isEmpty {
+        let songs = songs(from: sender)
+        if !songs.isEmpty {
             selectedSongsToAdd?(songs)
-        } else if let song = sender.representedObject as? CloudMusicApi.Song {
-            selectedSongsToAdd?([song])
         }
     }
 
     @objc private func deleteFromPlaylist(_ sender: NSMenuItem) {
-        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
-        onDeleteFromPlaylist?(song)
+        let songs = songs(from: sender)
+        guard !songs.isEmpty else { return }
+        onDeleteFromPlaylist?(songs)
+    }
+
+    private func songs(from sender: NSMenuItem) -> [CloudMusicApi.Song] {
+        if let songs = sender.representedObject as? [CloudMusicApi.Song] {
+            return songs
+        }
+        if let song = sender.representedObject as? CloudMusicApi.Song {
+            return [song]
+        }
+        return []
     }
 
     @objc private func uploadToCloud(_ sender: NSMenuItem) {
@@ -1857,7 +1886,7 @@ struct SongTableView: NSViewControllerRepresentable {
     let playlistMetadata: PlaylistMetadata?
     let onSortChange: ([KeyPathComparator<CloudMusicApi.Song>]) -> Void
     @Binding var selectedSongsToAdd: [CloudMusicApi.Song]
-    let onDeleteFromPlaylist: (CloudMusicApi.Song) -> Void
+    let onDeleteFromPlaylist: ([CloudMusicApi.Song]) -> Void
     let onUploadToCloud: (CloudMusicApi.Song, URL) -> Void
     let onLoadMore: () -> Void
     let isLoadingMore: Bool
@@ -2513,13 +2542,15 @@ struct PlayListView: View {
                 playlistMetadata: playlistMetadata,
                 onSortChange: handleSortChange,
                 selectedSongsToAdd: $selectedSongsToAdd,
-                onDeleteFromPlaylist: { song in
+                onDeleteFromPlaylist: { songs in
+                    guard !songs.isEmpty else { return }
                     Task {
                         if case .netease(let songId, _) = playlistMetadata {
                             do {
+                                let trackIds = songs.map(\.id)
                                 try await CloudMusicApi(cacheTtl: 0).playlist_tracks(
                                     op: .del, playlistId: songId,
-                                    trackIds: [song.id])
+                                    trackIds: trackIds)
                                 NotificationCenter.default.post(
                                     name: .refreshPlaylist,
                                     object: nil,
