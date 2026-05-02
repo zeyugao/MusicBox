@@ -1958,10 +1958,11 @@ struct PlaylistToolbar: ToolbarContent {
                 Menu {
                     Button(action: {
                         Task {
+                            let sourcePlaylist = await MainActor.run { playbackSourcePlaylist }
+
                             func playUsingPrefetchedSongs(_ songs: [CloudMusicApi.Song]) async {
                                 guard !songs.isEmpty else { return }
 
-                                let sourcePlaylist = playbackSourcePlaylist
                                 let newItems = songs.map { song in
                                     let item = loadItem(song: song)
                                     item.sourcePlaylist = sourcePlaylist
@@ -2008,7 +2009,6 @@ struct PlaylistToolbar: ToolbarContent {
                                 let itemStream = AsyncStream<[PlaylistItem]> { continuation in
                                     let streamTask = Task {
                                         for await chunk in songStream {
-                                            let sourcePlaylist = playbackSourcePlaylist
                                             let items = chunk.map { song in
                                                 let item = loadItem(song: song)
                                                 item.sourcePlaylist = sourcePlaylist
@@ -2039,10 +2039,10 @@ struct PlaylistToolbar: ToolbarContent {
 
                     Button(action: {
                         Task {
+                            let sourcePlaylist = await MainActor.run { playbackSourcePlaylist }
                             let songsToAdd = await model.songsForPlayback(loadEntirePlaylist: true)
                             guard !songsToAdd.isEmpty else { return }
 
-                            let sourcePlaylist = playbackSourcePlaylist
                             let newItems = songsToAdd.map { song in
                                 let item = loadItem(song: song)
                                 item.sourcePlaylist = sourcePlaylist
