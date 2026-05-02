@@ -1766,14 +1766,6 @@ extension SongTableViewController {
             copyTitleItem.image = makeIcon("doc.on.doc", "Copy title")
             menu.addItem(copyTitleItem)
 
-            // Copy Link
-            let copyLinkItem = NSMenuItem(
-                title: "Copy Link", action: #selector(copyLink(_:)), keyEquivalent: "")
-            copyLinkItem.target = self
-            copyLinkItem.representedObject = song
-            copyLinkItem.image = makeIcon("link", "Copy link")
-            menu.addItem(copyLinkItem)
-
             // View Comments
             let viewCommentsItem = NSMenuItem(
                 title: "查看评论", action: #selector(viewComments(_:)), keyEquivalent: "")
@@ -1782,6 +1774,15 @@ extension SongTableViewController {
             viewCommentsItem.image = makeIcon("text.bubble", "View comments")
             menu.addItem(viewCommentsItem)
         }
+
+        // Copy Link
+        let copyLinkTitle = isMultiSelection ? "Copy \(selectedSongs.count) Links" : "Copy Link"
+        let copyLinkItem = NSMenuItem(
+            title: copyLinkTitle, action: #selector(copyLink(_:)), keyEquivalent: "")
+        copyLinkItem.target = self
+        copyLinkItem.representedObject = representedSongs
+        copyLinkItem.image = makeIcon("link", "Copy link")
+        menu.addItem(copyLinkItem)
 
         return menu
     }
@@ -1856,10 +1857,15 @@ extension SongTableViewController {
     }
 
     @objc private func copyLink(_ sender: NSMenuItem) {
-        guard let song = sender.representedObject as? CloudMusicApi.Song else { return }
+        let songs = songs(from: sender)
+        guard !songs.isEmpty else { return }
+        let links = songs.map { songLink(for: $0) }.joined(separator: "\n")
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(
-            "https://music.163.com/#/song?id=\(song.id)", forType: .string)
+        NSPasteboard.general.setString(links, forType: .string)
+    }
+
+    private func songLink(for song: CloudMusicApi.Song) -> String {
+        "https://music.163.com/#/song?id=\(song.id)"
     }
 
     @objc private func viewComments(_ sender: NSMenuItem) {
