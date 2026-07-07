@@ -726,6 +726,26 @@ struct MatchWithModalView: View {
     @State private var playlistSongs: [CloudMusicApi.Song] = []
     @State private var isLoadingPlaylist = false
     @State private var selectedSongForMatch: CloudMusicApi.Song?
+    @State private var playlistSearchText = ""
+    @State private var playlistSongSearchText = ""
+
+    private var filteredPlaylists: [CloudMusicApi.PlayListItem] {
+        let query = playlistSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return userInfo.playlists }
+
+        return userInfo.playlists.filter { playlist in
+            playlist.name.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    private var filteredPlaylistSongs: [CloudMusicApi.Song] {
+        let query = playlistSongSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return playlistSongs }
+
+        return playlistSongs.filter { song in
+            song.name.localizedCaseInsensitiveContains(query)
+        }
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -745,18 +765,50 @@ struct MatchWithModalView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .navigationTitle("Select Playlist")
             } else {
-                List(userInfo.playlists, id: \.id, selection: $selectedPlaylist) { playlist in
-                    PlaylistRowView(playlist: playlist)
-                        .tag(playlist)
+                VStack(spacing: 0) {
+                    TextField("Search playlists", text: $playlistSearchText)
+                        .textFieldStyle(.roundedBorder)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+
+                    if filteredPlaylists.isEmpty {
+                        VStack {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 36))
+                                .foregroundColor(.secondary)
+                            Text("No matching playlists")
+                                .foregroundColor(.secondary)
+                                .padding(.top, 8)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        List(filteredPlaylists, id: \.id, selection: $selectedPlaylist) {
+                            playlist in
+                            PlaylistRowView(playlist: playlist)
+                                .tag(playlist)
+                        }
+                        .listStyle(SidebarListStyle())
+                    }
                 }
-                .listStyle(SidebarListStyle())
                 .navigationTitle("Select Playlist")
                 .onChange(of: selectedPlaylist) { _, newPlaylist in
                     if let playlist = newPlaylist {
+                        selectedSongForMatch = nil
+                        playlistSongSearchText = ""
                         Task {
                             await loadPlaylistSongs(playlist: playlist)
                         }
+                    } else {
+                        playlistSongs = []
+                        selectedSongForMatch = nil
                     }
+                }
+                .onChange(of: playlistSearchText) { _, _ in
+                    guard let selectedPlaylist,
+                        !filteredPlaylists.contains(where: { $0.id == selectedPlaylist.id })
+                    else { return }
+
+                    self.selectedPlaylist = nil
                 }
             }
         } detail: {
@@ -773,38 +825,72 @@ struct MatchWithModalView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .navigationTitle(selectedPlaylist.name)
                 } else {
-                    List(playlistSongs, id: \.id) { song in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(song.name)
-                                    .font(.body)
-                                    .lineLimit(1)
-                                Text(song.ar.compactMap(\.name).joined(separator: ", "))
-                                   .font(.caption)
-                                   .foregroundColor(.secondary)
-                                   .lineLimit(1)
-                            }
+                    VStack(spacing: 0) {
+                        TextField("Search songs", text: $playlistSongSearchText)
+                            .textFieldStyle(.roundedBorder)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
 
-                            Spacer()
-
-                            let duration = song.parseDuration()
-                            Text(String(format: "%02d:%02d", duration.minute, duration.second))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }.contentShape(Rectangle())
-                            .padding(.vertical, 2)
-                            .padding(.horizontal, 8)
-                            .background(
-                                selectedSongForMatch?.id == song.id
-                                    ? Color.blue.opacity(0.2) : Color.clear
-                            )
-                            .cornerRadius(8)
-                            .onTapGesture {
-                                selectedSongForMatch = song
+                        if filteredPlaylistSongs.isEmpty {
+                            VStack {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 36))
+                                    .foregroundColor(.secondary)
+                                Text(
+                                    playlistSongSearchText
+                                        .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                        ? "No songs" : "No matching songs"
+                                )
+                                    .foregroundColor(.secondary)
+                                    .padding(.top, 8)
                             }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            List(filteredPlaylistSongs, id: \.id) { song in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(song.name)
+                                            .font(.body)
+                                            .lineLimit(1)
+                                        Text(song.ar.compactMap(\.name).joined(separator: ", "))
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                    }
+
+                                    Spacer()
+
+                                    let duration = song.parseDuration()
+                                    Text(
+                                        String(format: "%02d:%02d", duration.minute, duration.second)
+                                    )
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                }.contentShape(Rectangle())
+                                    .padding(.vertical, 2)
+                                    .padding(.horizontal, 8)
+                                    .background(
+                                        selectedSongForMatch?.id == song.id
+                                            ? Color.blue.opacity(0.2) : Color.clear
+                                    )
+                                    .cornerRadius(8)
+                                    .onTapGesture {
+                                        selectedSongForMatch = song
+                                    }
+                            }
+                            .listStyle(PlainListStyle())
+                        }
                     }
-                    .listStyle(PlainListStyle())
                     .navigationTitle(selectedPlaylist.name)
+                    .onChange(of: playlistSongSearchText) { _, _ in
+                        guard let selectedSongForMatch,
+                            !filteredPlaylistSongs.contains(where: {
+                                $0.id == selectedSongForMatch.id
+                            })
+                        else { return }
+
+                        self.selectedSongForMatch = nil
+                    }
                 }
             } else {
                 VStack {
