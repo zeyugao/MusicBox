@@ -1,3 +1,5 @@
+
+
 # MusicBox
 
 用 SwiftUI 实现的网易云播放器，为 macOS 26 的 Liquid Glass 提供了专门的支持，在旧版本的系统上面的显示可能会出问题。
@@ -100,10 +102,12 @@
 
 ## Installation
 
-没有签名，用这个脚本会自动从 Release 下面下载最新的版本，也可以用这个来进行更新。会自动处理签名的问题。
+下载 `nightly` 版本中的 `MusicBox.tar.gz`，解压后在终端中进入该目录并运行 `install.sh`。该脚本会自动移除文件的隔离属性并进行代码签名。
 
 ```bash
-curl -sfL https://raw.githubusercontent.com/zeyugao/MusicBox/refs/heads/main/.github/update.sh | sh
+tar -xzf MusicBox.tar.gz
+cd MusicBox
+./install.sh
 ```
 
 ## Acknowledgment
@@ -113,4 +117,3 @@ curl -sfL https://raw.githubusercontent.com/zeyugao/MusicBox/refs/heads/main/.gi
 - [AudioStreaming](https://github.com/dimitris-c/AudioStreaming)
 - [iOSAACStreamPlayer](https://github.com/UFOooX/iOSAACStreamPlayer)
 - [YesPlayMusic](https://github.com/qier222/YesPlayMusic): Logo
-
