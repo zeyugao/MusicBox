@@ -113,6 +113,7 @@ struct ContentView: View {
                 .navigationTitle("My Cloud Files")
         case .playlist(let destination):
             PlaylistFeatureScreen(destination: destination, repository: app.repository)
+                .id(destination.id)
                 .navigationTitle(destination.name)
         }
     }
