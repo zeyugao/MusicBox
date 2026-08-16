@@ -93,7 +93,6 @@ struct PlayerCapsuleView: View {
         Button(action: action) {
             Image(systemName: icon)
                 .resizable()
-                .scaledToFit()
                 .frame(width: size, height: size)
         }
         .buttonStyle(PlayerControlButtonStyle())
