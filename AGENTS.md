@@ -35,6 +35,7 @@ MusicBox/
 ├── App/                     # Composition root, navigation, account, settings, alerts
 ├── Features/                # Explore, playlist, cloud, login, settings, comments models/views
 ├── Playback/                # Queue state machine, store, engine, lyrics, player UI
+│   └── Presentation/        # Floating player, queue, lyrics, presentation adapter
 ├── Services/                # Repository facade and playback reporting/relay coordinator
 ├── Shared/                  # Cross-cutting view and Foundation helpers
 ├── Api/                     # Concrete NetEase HTTP, EAPI, Dawn and relay transports
@@ -56,6 +57,15 @@ MusicBox/
 - Features use `@MainActor @Observable` models. Views call model commands and
   render state; they do not call `CloudMusicApi`, `AVPlayer`, or global
   notifications directly.
+- Keep each feature model beside its screen under `Features/Explore`,
+  `Features/Playlist`, `Features/CloudFiles`, or `Features/Comments`; do not
+  rebuild a shared, monolithic feature-model file.
+- Account login is web-only. `WebLoginFeatureModel` accepts authenticated web
+  cookies through `AccountRepository`; QR and phone login must not be exposed
+  through the feature or repository layer.
+- AppKit table controllers own rendering, selection, drag and drop, and menu
+  presentation only. All business actions, including clipboard commands, are
+  emitted through typed callbacks to the feature view/model.
 - `MusicRepository` is a composition of capability protocols:
   `AccountRepository`, `CatalogRepository`, `CloudRepository`,
   `CommentsRepository`, and `PlaybackResourceServing`. Add endpoints through

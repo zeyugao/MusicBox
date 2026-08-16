@@ -29,9 +29,10 @@
 		A20000000000000000000001 /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* AppShellView.swift */; };
 		A20000000000000000000002 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* AppModel.swift */; };
 		A20000000000000000000003 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* AppSettings.swift */; };
-		A20000000000000000000004 /* FeatureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* FeatureModels.swift */; };
-		A20000000000000000000005 /* FeatureViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* FeatureViews.swift */; };
-		A20000000000000000000006 /* CommentsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000006 /* CommentsWindow.swift */; };
+		A20000000000000000000016 /* ExploreFeatureModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* ExploreFeatureModel.swift */; };
+		A20000000000000000000017 /* PlaylistFeatureModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* PlaylistFeatureModel.swift */; };
+		A20000000000000000000018 /* CloudFilesFeatureModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* CloudFilesFeatureModel.swift */; };
+		A20000000000000000000019 /* CommentsFeatureModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* CommentsFeatureModel.swift */; };
 		A20000000000000000000007 /* PlaybackQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* PlaybackQueue.swift */; };
 		A20000000000000000000008 /* PlaybackStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000008 /* PlaybackStore.swift */; };
 		A20000000000000000000009 /* LyricsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000009 /* LyricsController.swift */; };
@@ -41,6 +42,12 @@
 		A2000000000000000000000D /* PlayerOverlayMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000D /* PlayerOverlayMetrics.swift */; };
 		A2000000000000000000000E /* FoundationExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000E /* FoundationExtensions.swift */; };
 		A2000000000000000000000F /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000F /* Localizable.xcstrings */; };
+		A20000000000000000000010 /* PlaybackPresentationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* PlaybackPresentationModel.swift */; };
+		A20000000000000000000011 /* AccountFeatureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* AccountFeatureScreen.swift */; };
+		A20000000000000000000012 /* ExploreFeatureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* ExploreFeatureScreen.swift */; };
+		A20000000000000000000013 /* PlaylistFeatureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* PlaylistFeatureScreen.swift */; };
+		A20000000000000000000014 /* CloudFilesFeatureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* CloudFilesFeatureScreen.swift */; };
+		A20000000000000000000015 /* CommentsFeatureWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* CommentsFeatureWindow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -69,9 +76,10 @@
 		A10000000000000000000001 /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
 		A10000000000000000000002 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
-		A10000000000000000000004 /* FeatureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureModels.swift; sourceTree = "<group>"; };
-		A10000000000000000000005 /* FeatureViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureViews.swift; sourceTree = "<group>"; };
-		A10000000000000000000006 /* CommentsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsWindow.swift; sourceTree = "<group>"; };
+		A10000000000000000000016 /* ExploreFeatureModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreFeatureModel.swift; sourceTree = "<group>"; };
+		A10000000000000000000017 /* PlaylistFeatureModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistFeatureModel.swift; sourceTree = "<group>"; };
+		A10000000000000000000018 /* CloudFilesFeatureModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudFilesFeatureModel.swift; sourceTree = "<group>"; };
+		A10000000000000000000019 /* CommentsFeatureModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsFeatureModel.swift; sourceTree = "<group>"; };
 		A10000000000000000000007 /* PlaybackQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackQueue.swift; sourceTree = "<group>"; };
 		A10000000000000000000008 /* PlaybackStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackStore.swift; sourceTree = "<group>"; };
 		A10000000000000000000009 /* LyricsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsController.swift; sourceTree = "<group>"; };
@@ -81,6 +89,12 @@
 		A1000000000000000000000D /* PlayerOverlayMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerOverlayMetrics.swift; sourceTree = "<group>"; };
 		A1000000000000000000000E /* FoundationExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationExtensions.swift; sourceTree = "<group>"; };
 		A1000000000000000000000F /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		A10000000000000000000010 /* PlaybackPresentationModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackPresentationModel.swift; sourceTree = "<group>"; };
+		A10000000000000000000011 /* AccountFeatureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountFeatureScreen.swift; sourceTree = "<group>"; };
+		A10000000000000000000012 /* ExploreFeatureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreFeatureScreen.swift; sourceTree = "<group>"; };
+		A10000000000000000000013 /* PlaylistFeatureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistFeatureScreen.swift; sourceTree = "<group>"; };
+		A10000000000000000000014 /* CloudFilesFeatureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudFilesFeatureScreen.swift; sourceTree = "<group>"; };
+		A10000000000000000000015 /* CommentsFeatureWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsFeatureWindow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -195,11 +209,57 @@
 		A30000000000000000000002 /* Features */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000004 /* FeatureModels.swift */,
-				A10000000000000000000005 /* FeatureViews.swift */,
-				A10000000000000000000006 /* CommentsWindow.swift */,
+				A30000000000000000000006 /* Account */,
+				A30000000000000000000007 /* Explore */,
+				A30000000000000000000008 /* Playlist */,
+				A30000000000000000000009 /* CloudFiles */,
+				A3000000000000000000000A /* Comments */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		A30000000000000000000006 /* Account */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000011 /* AccountFeatureScreen.swift */,
+			);
+			path = Account;
+			sourceTree = "<group>";
+		};
+		A30000000000000000000007 /* Explore */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000016 /* ExploreFeatureModel.swift */,
+				A10000000000000000000012 /* ExploreFeatureScreen.swift */,
+			);
+			path = Explore;
+			sourceTree = "<group>";
+		};
+		A30000000000000000000008 /* Playlist */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000017 /* PlaylistFeatureModel.swift */,
+				A10000000000000000000013 /* PlaylistFeatureScreen.swift */,
+			);
+			path = Playlist;
+			sourceTree = "<group>";
+		};
+		A30000000000000000000009 /* CloudFiles */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000018 /* CloudFilesFeatureModel.swift */,
+				A10000000000000000000014 /* CloudFilesFeatureScreen.swift */,
+			);
+			path = CloudFiles;
+			sourceTree = "<group>";
+		};
+		A3000000000000000000000A /* Comments */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000019 /* CommentsFeatureModel.swift */,
+				A10000000000000000000015 /* CommentsFeatureWindow.swift */,
+			);
+			path = Comments;
 			sourceTree = "<group>";
 		};
 		A30000000000000000000003 /* Playback */ = {
@@ -210,9 +270,18 @@
 				A10000000000000000000008 /* PlaybackStore.swift */,
 				A10000000000000000000009 /* LyricsController.swift */,
 				A1000000000000000000000A /* SystemPlaybackBridge.swift */,
-				A1000000000000000000000B /* PlayerViews.swift */,
+				A3000000000000000000000B /* Presentation */,
 			);
 			path = Playback;
+			sourceTree = "<group>";
+		};
+		A3000000000000000000000B /* Presentation */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000010 /* PlaybackPresentationModel.swift */,
+				A1000000000000000000000B /* PlayerViews.swift */,
+			);
+			path = Presentation;
 			sourceTree = "<group>";
 		};
 		A30000000000000000000004 /* Services */ = {
@@ -377,14 +446,21 @@
 				A20000000000000000000001 /* AppShellView.swift in Sources */,
 				A20000000000000000000002 /* AppModel.swift in Sources */,
 				A20000000000000000000003 /* AppSettings.swift in Sources */,
-				A20000000000000000000004 /* FeatureModels.swift in Sources */,
-				A20000000000000000000005 /* FeatureViews.swift in Sources */,
-				A20000000000000000000006 /* CommentsWindow.swift in Sources */,
+				A20000000000000000000016 /* ExploreFeatureModel.swift in Sources */,
+				A20000000000000000000017 /* PlaylistFeatureModel.swift in Sources */,
+				A20000000000000000000018 /* CloudFilesFeatureModel.swift in Sources */,
+				A20000000000000000000019 /* CommentsFeatureModel.swift in Sources */,
 				A20000000000000000000007 /* PlaybackQueue.swift in Sources */,
 				A20000000000000000000008 /* PlaybackStore.swift in Sources */,
 				A20000000000000000000009 /* LyricsController.swift in Sources */,
 				A2000000000000000000000A /* SystemPlaybackBridge.swift in Sources */,
 				A2000000000000000000000B /* PlayerViews.swift in Sources */,
+				A20000000000000000000010 /* PlaybackPresentationModel.swift in Sources */,
+				A20000000000000000000011 /* AccountFeatureScreen.swift in Sources */,
+				A20000000000000000000012 /* ExploreFeatureScreen.swift in Sources */,
+				A20000000000000000000013 /* PlaylistFeatureScreen.swift in Sources */,
+				A20000000000000000000014 /* CloudFilesFeatureScreen.swift in Sources */,
+				A20000000000000000000015 /* CommentsFeatureWindow.swift in Sources */,
 				A2000000000000000000000C /* MusicRepository.swift in Sources */,
 				A2000000000000000000000D /* PlayerOverlayMetrics.swift in Sources */,
 				A2000000000000000000000E /* FoundationExtensions.swift in Sources */,

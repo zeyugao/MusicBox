@@ -10,10 +10,6 @@ protocol AccountRepository: AnyObject {
     func setCookie(_ cookie: String)
     func currentCookie() -> String?
     func logout() async
-    func requestQRCodeKey() async throws -> String
-    func qrCodeURL(for key: String) async throws -> String
-    func checkQRCode(_ key: String) async throws -> (code: Int, message: String, cookie: String?, redirectURL: String?)
-    func login(phone: String, countryCode: Int, password: String) async -> String?
 }
 
 @MainActor
@@ -63,6 +59,7 @@ protocol PlaybackResourceServing: AnyObject {
 }
 
 typealias MusicRepository = AccountRepository & CatalogRepository & CloudRepository & CommentsRepository & PlaybackResourceServing
+typealias PlaylistRepository = CatalogRepository & CloudRepository & PlaybackResourceServing
 
 @MainActor
 final class NeteaseMusicRepository: MusicRepository {
@@ -92,23 +89,6 @@ final class NeteaseMusicRepository: MusicRepository {
 
     func logout() async {
         await api().logout()
-    }
-
-    func requestQRCodeKey() async throws -> String {
-        try await api().login_qr_key()
-    }
-
-    func qrCodeURL(for key: String) async throws -> String {
-        try await api().login_qr_create(key: key)
-    }
-
-    func checkQRCode(_ key: String) async throws -> (code: Int, message: String, cookie: String?, redirectURL: String?) {
-        let result = try await api().login_qr_check(key: key)
-        return (result.code, result.message, result.cookie, result.redirectUrl)
-    }
-
-    func login(phone: String, countryCode: Int, password: String) async -> String? {
-        await api().login_cellphone(phone: phone, countrycode: countryCode, password: password)
     }
 
     func recommendedResources() async -> [CloudMusicApi.RecommandPlaylistItem]? {
@@ -303,6 +283,21 @@ final class AudioSourceResolver {
         }
         let fileExtension = data.type.isEmpty ? data.encodeType : data.type
         return try source(for: url, item: item, fallbackExtension: fileExtension)
+    }
+
+    func download(_ item: PlaylistItem) async throws -> URL {
+        switch try await resolve(item) {
+        case .local(let url):
+            return url
+        case .remote(let url, let cacheURL, _):
+            let (temporaryURL, _) = try await URLSession.shared.download(from: url)
+            let fileManager = FileManager.default
+            if fileManager.fileExists(atPath: cacheURL.path) {
+                try fileManager.removeItem(at: cacheURL)
+            }
+            try fileManager.moveItem(at: temporaryURL, to: cacheURL)
+            return cacheURL
+        }
     }
 
     private func source(for url: URL, item: PlaylistItem, fallbackExtension: String?) throws -> ResolvedAudioSource {

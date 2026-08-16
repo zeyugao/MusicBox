@@ -1,8 +1,8 @@
 import SwiftUI
 
 enum PlayerOverlayMetrics {
-    static let height: CGFloat = 58
+    static let height: CGFloat = 52
     static let horizontalInset: CGFloat = 16
-    static let bottomInset: CGFloat = 16
-    static let contentClearance: CGFloat = height + bottomInset + 18
+    static let bottomInset: CGFloat = 20
+    static let contentClearance: CGFloat = 92
 }

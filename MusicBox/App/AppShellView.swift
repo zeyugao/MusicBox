@@ -22,13 +22,13 @@ struct ContentView: View {
             List(selection: routeBinding) {
                 Section(String(localized: "sidebar.general")) {
                     if app.account.profile != nil {
-                        Label(String(localized: "sidebar.explore"), systemImage: "music.house")
+                        SidebarLabel(String(localized: "sidebar.explore"), image: "music.house")
                             .tag(AppRoute.explore)
                     }
-                    Label(String(localized: "sidebar.settings"), systemImage: "gearshape.fill")
+                    SidebarLabel(String(localized: "sidebar.settings"), image: "gearshape.fill")
                         .tag(AppRoute.account)
                     if app.account.profile != nil {
-                        Label(String(localized: "sidebar.cloud_files"), systemImage: "icloud")
+                        SidebarLabel("My Cloud Files", image: "icloud")
                             .tag(AppRoute.cloudFiles)
                     }
                 }
@@ -53,7 +53,6 @@ struct ContentView: View {
         } detail: {
             ZStack(alignment: .bottom) {
                 routeContent
-                    .padding(.bottom, PlayerOverlayMetrics.contentClearance)
 
                 PlayerCapsuleView()
                     .padding(.horizontal, PlayerOverlayMetrics.horizontalInset)
@@ -62,7 +61,6 @@ struct ContentView: View {
         }
         .inspector(isPresented: $router.isLyricsPresented) {
             LyricsInspectorView()
-                .inspectorColumnWidth(min: 300, ideal: 380, max: 520)
         }
         .task {
             await app.start()
@@ -105,17 +103,36 @@ struct ContentView: View {
         let route = app.account.profile == nil ? AppRoute.account : app.router.selectedRoute
         switch route {
         case .account:
-            AccountFeatureView()
-                .navigationTitle(String(localized: "sidebar.settings"))
+            AccountFeatureScreen()
+                .navigationTitle("Settings")
         case .explore:
-            ExploreFeatureView(repository: app.repository)
-                .navigationTitle(String(localized: "sidebar.explore"))
+            ExploreFeatureScreen(repository: app.repository)
+                .navigationTitle("Explore")
         case .cloudFiles:
-            CloudFilesFeatureView(repository: app.repository)
-                .navigationTitle(String(localized: "sidebar.cloud_files"))
+            CloudFilesFeatureScreen(repository: app.repository)
+                .navigationTitle("My Cloud Files")
         case .playlist(let destination):
-            PlaylistFeatureView(destination: destination, repository: app.repository)
+            PlaylistFeatureScreen(destination: destination, repository: app.repository)
                 .navigationTitle(destination.name)
+        }
+    }
+}
+
+private struct SidebarLabel: View {
+    let text: String
+    let image: String
+
+    init(_ text: String, image: String) {
+        self.text = text
+        self.image = image
+    }
+
+    var body: some View {
+        HStack {
+            Image(systemName: image)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 16)
+            Text(text)
         }
     }
 }
@@ -124,15 +141,47 @@ private struct PlaylistSidebarRow: View {
     let playlist: CloudMusicApi.PlayListItem
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: playlist.privacy == 0 ? "music.note.list" : "lock.fill")
-                .foregroundStyle(.secondary)
+        HStack {
+            AsyncImage(url: URL(string: playlist.coverImgUrl.https)) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle().fill(Color.gray.opacity(0.3))
+            }
+            .frame(width: 36, height: 36)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+
             VStack(alignment: .leading, spacing: 1) {
-                Text(playlist.name)
-                    .lineLimit(1)
-                Text((playlist.trackCount ?? 0) + (playlist.cloudTrackCount ?? 0), format: .number)
+                HStack(spacing: 4) {
+                    if playlist.privacy != 0 {
+                        Image(systemName: "lock.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.body)
+                    }
+                    Text(playlist.name)
+                        .font(.body)
+                        .lineLimit(1)
+                }
+                Text("\((playlist.trackCount ?? 0) + (playlist.cloudTrackCount ?? 0))首 • \(playlist.creator.nickname)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 2)
+        .contextMenu {
+            Button {
+                CommentsWindowManager.shared.show(
+                    target: CommentsTarget(
+                        kind: .playlist,
+                        resourceID: playlist.id,
+                        name: playlist.name,
+                        subtitle: nil
+                    )
+                )
+            } label: {
+                Label("查看评论", systemImage: "text.bubble")
             }
         }
     }

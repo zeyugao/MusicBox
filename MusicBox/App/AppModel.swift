@@ -224,6 +224,7 @@ final class AppModel {
     let transfers: TransferCenter
     let settings: AppSettings
     let playback: PlaybackStore
+    let playbackPresentation: PlaybackPresentationModel
     let reporting: PlaybackReportingCoordinator
     private let systemPlayback: SystemPlaybackBridge
     private var playbackListener: UUID?
@@ -247,6 +248,7 @@ final class AppModel {
         transfers = TransferCenter()
         settings = appSettings
         playback = playbackStore
+        playbackPresentation = PlaybackPresentationModel(playback: playbackStore)
         reporting = reportingCoordinator
         systemPlayback = SystemPlaybackBridge(playback: playbackStore)
         CommentsWindowManager.shared.configure(repository: repository)

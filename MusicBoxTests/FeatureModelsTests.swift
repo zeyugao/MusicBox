@@ -29,6 +29,104 @@ final class FeatureModelsTests: XCTestCase {
         XCTAssertFalse(model.isSearching)
         XCTAssertEqual(model.errorMessage, String(localized: "search.failed"))
     }
+
+    @MainActor
+    func testPlaylistLoadsInitialPageThenRemainingTracks() async {
+        let repository = RecordingPlaylistRepository()
+        repository.detail = (tracks: [makeSong(id: 1)], trackIDs: [1, 2])
+        repository.songsByID = [2: makeSong(id: 2)]
+        let model = PlaylistFeatureModel(
+            destination: PlaylistDestination(id: 99, name: "Playlist"),
+            repository: repository
+        )
+
+        model.load()
+        await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.songs.map(\.id), [1])
+        XCTAssertTrue(model.hasMore)
+
+        model.loadMore()
+        await waitUntil { !model.isLoadingMore }
+        XCTAssertEqual(model.songs.map(\.id), [1, 2])
+        XCTAssertFalse(model.hasMore)
+    }
+
+    @MainActor
+    func testCloudSearchLoadsRemainingPagesBeforeFiltering() async {
+        let repository = RecordingCloudRepository()
+        repository.firstPage = (0..<100).map { makeCloudFile(id: UInt64($0), name: "file-\($0)") }
+        repository.secondPage = [makeCloudFile(id: 100, name: "needle.flac")]
+        let model = CloudFilesFeatureModel(repository: repository)
+
+        model.load()
+        await waitUntil { !model.isLoading }
+        model.updateQuery("needle")
+        await waitUntil { model.files.count == 101 }
+
+        XCTAssertEqual(model.filteredFiles.map(\.fileName), ["needle.flac"])
+        XCTAssertEqual(repository.offsets, [0, 100])
+    }
+
+    @MainActor
+    func testCommentsSortReloadsAndFloorRepliesStayInModel() async {
+        let repository = RecordingCommentsRepository()
+        let target = CommentsTarget(kind: .song, resourceID: 7, name: "Song", subtitle: nil)
+        let model = CommentsFeatureModel(target: target, repository: repository)
+
+        model.load()
+        await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.comments.map(\.commentId), [1])
+
+        model.changeSort(.time)
+        await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.comments.map(\.commentId), [2])
+        XCTAssertEqual(repository.sorts, [.hot, .time])
+
+        model.loadFloor(parentCommentID: 2)
+        await waitUntil { !model.floorLoadingIDs.contains(2) }
+        XCTAssertEqual(model.floorThreads[2]?.comments.map(\.commentId), [3])
+    }
+
+    @MainActor
+    func testWebLoginOnlyAcceptsAnAuthenticatedMusicCookie() {
+        let repository = RecordingAccountRepository()
+        let model = WebLoginFeatureModel(repository: repository)
+        let unauthenticated = makeCookie(name: "__csrf", value: "csrf")
+        let authenticated = makeCookie(name: "MUSIC_U", value: "token")
+
+        XCTAssertFalse(model.acceptLoginCookies([unauthenticated]))
+        XCTAssertNil(repository.cookie)
+        XCTAssertTrue(model.acceptLoginCookies([unauthenticated, authenticated]))
+        XCTAssertEqual(repository.cookie, "__csrf=csrf; MUSIC_U=token")
+        XCTAssertTrue(model.isLoggedIn)
+    }
+
+    @MainActor
+    func testSongTableControllerOnlyEmitsActivationForAValidRow() {
+        let controller = SongTableViewController()
+        controller.songs = [makeSong(id: 10), makeSong(id: 11)]
+        var activatedIDs: [UInt64] = []
+        controller.onActivate = { activatedIDs.append($0.id) }
+
+        controller.activateSong(at: -1)
+        controller.activateSong(at: 1)
+        controller.activateSong(at: 2)
+
+        XCTAssertEqual(activatedIDs, [11])
+    }
+
+    @MainActor
+    private func waitUntil(
+        timeout: Duration = .seconds(2),
+        _ condition: @escaping @MainActor () -> Bool
+    ) async {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while !condition(), clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(condition())
+    }
 }
 
 @MainActor
@@ -61,4 +159,155 @@ private final class RecordingCatalogRepository: CatalogRepository {
         playlistID _: UInt64,
         trackIDs _: [UInt64]
     ) async throws {}
+}
+
+@MainActor
+private final class RecordingAccountRepository: AccountRepository {
+    var cookie: String?
+
+    func loginStatus() async -> CloudMusicApi.Profile? { nil }
+    func userPlaylists(for _: UInt64) async throws -> [CloudMusicApi.PlayListItem]? { nil }
+    func likedSongIDs(for _: UInt64) async -> [UInt64]? { nil }
+    func setLiked(songID _: UInt64, liked _: Bool) async throws {}
+    func setCookie(_ cookie: String) { self.cookie = cookie }
+    func currentCookie() -> String? { cookie }
+    func logout() async { cookie = nil }
+}
+
+@MainActor
+private final class RecordingPlaylistRepository: PlaylistRepository {
+    var detail: (tracks: [CloudMusicApi.Song], trackIDs: [UInt64])?
+    var songsByID: [UInt64: CloudMusicApi.Song] = [:]
+
+    func recommendedResources() async -> [CloudMusicApi.RecommandPlaylistItem]? { nil }
+    func searchSuggestions(for _: String) async -> [CloudMusicApi.SearchResult.Song]? { nil }
+    func searchSongs(_: String, limit _: Int, offset _: Int) async -> [CloudMusicApi.SearchResult.Song]? { nil }
+    func playlistDetail(id _: UInt64) async -> (tracks: [CloudMusicApi.Song], trackIDs: [UInt64])? { detail }
+    func songs(ids: [UInt64]) async -> [CloudMusicApi.Song]? { ids.compactMap { songsByID[$0] } }
+    func updatePlaylistTracks(
+        _: CloudMusicApi.PlaylistTracksOp,
+        playlistID _: UInt64,
+        trackIDs _: [UInt64]
+    ) async throws {}
+    func cloudFiles(limit _: Int, offset _: Int) async -> [CloudMusicApi.CloudFile]? { nil }
+    func uploadCloudFile(_: URL, title _: String?, artist _: String?, album _: String?) async throws -> UInt64? { nil }
+    func matchCloudFile(userID _: UInt64, songID _: UInt64, adjustedSongID _: UInt64) async throws {}
+    func audioURL(for _: UInt64) async -> CloudMusicApi.SongData? { nil }
+    func lyrics(for _: UInt64) async -> CloudMusicApi.LyricNew? { nil }
+}
+
+@MainActor
+private final class RecordingCloudRepository: CloudRepository {
+    var firstPage: [CloudMusicApi.CloudFile] = []
+    var secondPage: [CloudMusicApi.CloudFile] = []
+    private(set) var offsets: [Int] = []
+
+    func cloudFiles(limit _: Int, offset: Int) async -> [CloudMusicApi.CloudFile]? {
+        offsets.append(offset)
+        return offset == 0 ? firstPage : secondPage
+    }
+
+    func uploadCloudFile(_: URL, title _: String?, artist _: String?, album _: String?) async throws -> UInt64? { nil }
+    func matchCloudFile(userID _: UInt64, songID _: UInt64, adjustedSongID _: UInt64) async throws {}
+}
+
+@MainActor
+private final class RecordingCommentsRepository: CommentsRepository {
+    private(set) var sorts: [CloudMusicApi.CommentNewSortType] = []
+
+    func comments(
+        type _: CloudMusicApi.CommentResourceType,
+        id _: UInt64,
+        page _: Int,
+        pageSize _: Int,
+        sort: CloudMusicApi.CommentNewSortType,
+        cursor _: Int64?
+    ) async throws -> CloudMusicApi.CommentNewPage.DataPayload {
+        sorts.append(sort)
+        let comment = makeComment(id: sort == .time ? 2 : 1)
+        return CloudMusicApi.CommentNewPage.DataPayload(
+            comments: [comment],
+            hasMore: false,
+            cursor: nil,
+            totalCount: 1,
+            sortType: sort.rawValue,
+            commentsTitle: nil
+        )
+    }
+
+    func commentFloor(
+        parentCommentID _: UInt64,
+        resourceID _: UInt64,
+        type _: CloudMusicApi.CommentResourceType,
+        limit _: Int,
+        time _: Int64?
+    ) async throws -> CloudMusicApi.FloorCommentsPage.DataPayload {
+        CloudMusicApi.FloorCommentsPage.DataPayload(
+            ownerComment: nil,
+            bestComments: nil,
+            comments: [makeComment(id: 3)],
+            hasMore: false,
+            time: nil,
+            totalCount: 1,
+            currentComment: nil
+        )
+    }
+}
+
+private func makeSong(id: UInt64) -> CloudMusicApi.Song {
+    CloudMusicApi.Song(
+        name: "Song \(id)",
+        id: id,
+        al: CloudMusicApi.Album(id: id, name: "Album", pic: 0, picUrl: "", tns: []),
+        ar: [CloudMusicApi.Artist(id: id, name: "Artist")],
+        alia: [],
+        tns: nil,
+        fee: .free,
+        originCoverType: 0,
+        mv: 0,
+        dt: 180_000,
+        hr: nil,
+        sq: nil,
+        h: nil,
+        m: nil,
+        l: nil,
+        publishTime: 0,
+        pc: nil
+    )
+}
+
+private func makeCloudFile(id: UInt64, name: String) -> CloudMusicApi.CloudFile {
+    CloudMusicApi.CloudFile(
+        fileName: name,
+        fileSize: 1,
+        matchType: "matched",
+        pcId: id,
+        privateCloud: .init(songId: id),
+        simpleSong: nil
+    )
+}
+
+private func makeComment(id: UInt64) -> CloudMusicApi.Comment {
+    CloudMusicApi.Comment(
+        commentId: id,
+        content: "Comment \(id)",
+        richContent: nil,
+        time: nil,
+        timeStr: nil,
+        likedCount: nil,
+        liked: nil,
+        ipLocation: nil,
+        user: CloudMusicApi.CommentUser(userId: id, nickname: "User", avatarUrl: nil),
+        beReplied: nil,
+        showFloorComment: nil
+    )
+}
+
+private func makeCookie(name: String, value: String) -> HTTPCookie {
+    HTTPCookie(properties: [
+        .domain: "music.163.com",
+        .path: "/",
+        .name: name,
+        .value: value,
+    ])!
 }
