@@ -307,14 +307,13 @@ final class NeteaseHTTPClientTests: XCTestCase {
         }
     }
 
-    func testTransferProgressDelegateReportsUploadAndDownloadBytes() {
+    func testUploadProgressDelegateReportsBytes() {
         let recorder = TransferProgressRecorder()
         let session = URLSession(configuration: .ephemeral)
         let request = URLRequest(url: URL(string: "https://example.test/file")!)
 
         let uploadDelegate = URLSessionTransferProgressDelegate(
             expectedTotalBytes: 100,
-            direction: .upload,
             progress: { recorder.record($0) }
         )
         let uploadTask = session.uploadTask(with: request, from: Data())
@@ -326,21 +325,7 @@ final class NeteaseHTTPClientTests: XCTestCase {
             totalBytesExpectedToSend: 100
         )
 
-        let downloadDelegate = URLSessionTransferProgressDelegate(
-            expectedTotalBytes: 200,
-            direction: .download,
-            progress: { recorder.record($0) }
-        )
-        let downloadTask = session.downloadTask(with: request)
-        downloadDelegate.urlSession(
-            session,
-            downloadTask: downloadTask,
-            didWriteData: 50,
-            totalBytesWritten: 50,
-            totalBytesExpectedToWrite: 200
-        )
-
-        XCTAssertEqual(recorder.snapshot().map(\.fraction), [0.4, 0.25])
+        XCTAssertEqual(recorder.snapshot().map(\.fraction), [0.4])
     }
 
     @MainActor
@@ -394,9 +379,15 @@ final class NeteaseHTTPClientTests: XCTestCase {
 
         XCTAssertEqual(result, destination)
         XCTAssertEqual(try Data(contentsOf: destination), fileData)
-        XCTAssertEqual(recorder.snapshot().first?.stage, .preparing)
-        XCTAssertEqual(recorder.snapshot().last?.stage, .finalizing)
-        XCTAssertEqual(recorder.snapshot().last?.fraction, 1)
+        let progressValues = recorder.snapshot()
+        XCTAssertEqual(progressValues.first?.stage, .preparing)
+        XCTAssertTrue(
+            progressValues.contains {
+                $0.stage == .transferring && ($0.fraction ?? 0) > 0 && ($0.fraction ?? 1) < 1
+            }
+        )
+        XCTAssertEqual(progressValues.last?.stage, .finalizing)
+        XCTAssertEqual(progressValues.last?.fraction, 1)
     }
 
     func testMigrationClearsLegacyAccountStateOnlyOnce() {
@@ -897,7 +888,14 @@ private final class MockURLProtocol: URLProtocol {
             let handler = try Self.handler(for: request)
             let (response, data) = try handler(request)
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: data)
+            if request.url?.host == "audio.example.test", data.count > 1 {
+                let midpoint = data.count / 2
+                client?.urlProtocol(self, didLoad: Data(data[..<midpoint]))
+                Thread.sleep(forTimeInterval: 0.05)
+                client?.urlProtocol(self, didLoad: Data(data[midpoint...]))
+            } else {
+                client?.urlProtocol(self, didLoad: data)
+            }
             client?.urlProtocolDidFinishLoading(self)
         } catch {
             client?.urlProtocol(self, didFailWithError: error)

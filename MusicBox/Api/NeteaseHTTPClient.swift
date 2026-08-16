@@ -655,7 +655,6 @@ final class NeteaseHTTPClient {
         )
         let delegate = URLSessionTransferProgressDelegate(
             expectedTotalBytes: contentLength,
-            direction: .upload,
             progress: progress
         )
         let (_, response) = try await session.upload(for: request, fromFile: fileURL, delegate: delegate)

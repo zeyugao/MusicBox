@@ -309,10 +309,14 @@ final class TransferCenter {
                 stage: .preparing
             )
 
-            let progress: TransferProgressHandler = { [weak self] value in
-                Task { @MainActor [weak self] in
+            let (progressStream, progressContinuation) = AsyncStream.makeStream(of: TransferProgress.self)
+            let progressConsumer = Task { @MainActor [weak self] in
+                for await value in progressStream {
                     self?.updateProgress(id: id, attempt: attempt, value: value)
                 }
+            }
+            let progress: TransferProgressHandler = { value in
+                progressContinuation.yield(value)
             }
 
             do {
@@ -322,12 +326,18 @@ final class TransferCenter {
                 case .download(let item):
                     try await downloadOperation(item, progress)
                 }
+                progressContinuation.finish()
+                await progressConsumer.value
                 try Task.checkCancellation()
                 finish(id: id, attempt: attempt, phase: .succeeded)
             } catch is CancellationError {
+                progressContinuation.finish()
+                await progressConsumer.value
                 finish(id: id, attempt: attempt, phase: .cancelled)
                 break
             } catch {
+                progressContinuation.finish()
+                await progressConsumer.value
                 if Task.isCancelled {
                     finish(id: id, attempt: attempt, phase: .cancelled)
                     break

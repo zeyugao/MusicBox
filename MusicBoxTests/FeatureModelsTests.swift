@@ -194,6 +194,28 @@ final class FeatureModelsTests: XCTestCase {
     }
 
     @MainActor
+    func testTransferCenterDrainsProgressBeforeMarkingAJobFinished() async {
+        let center = TransferCenter(
+            upload: { _, _, _, _, _ in },
+            download: { _, progress in
+                progress(
+                    TransferProgress(
+                        completedBytes: 50,
+                        totalBytes: 100,
+                        stage: .transferring
+                    )
+                )
+            }
+        )
+
+        center.enqueueDownloads([PlaylistItemFactory.make(song: makeSong(id: 1))])
+        await waitUntil { center.jobs.first?.phase == .succeeded }
+
+        XCTAssertEqual(center.jobs.first?.progress?.completedBytes, 50)
+        XCTAssertEqual(center.jobs.first?.progress?.stage, .transferring)
+    }
+
+    @MainActor
     private func makeTransferCenter(harness: TransferOperationHarness) -> TransferCenter {
         TransferCenter(
             upload: { fileURL, _, _, _, progress in

@@ -343,12 +343,17 @@ final class AudioSourceResolver {
                     stage: .preparing
                 )
             )
-            let delegate = URLSessionTransferProgressDelegate(
+            let stagingURL = cacheURL.deletingLastPathComponent()
+                .appendingPathComponent(".\(cacheURL.lastPathComponent).\(UUID().uuidString).download")
+            let downloader = URLSessionFileDownloader(
+                configuration: session.configuration,
+                destinationURL: stagingURL,
                 expectedTotalBytes: expectedSize,
-                direction: .download,
                 progress: progress
             )
-            let (temporaryURL, response) = try await session.download(from: url, delegate: delegate)
+            defer { try? FileManager.default.removeItem(at: stagingURL) }
+
+            let response = try await downloader.download(from: url)
             try Task.checkCancellation()
 
             let responseSize = response.expectedContentLength > 0 ? response.expectedContentLength : nil
@@ -362,10 +367,6 @@ final class AudioSourceResolver {
             )
 
             let fileManager = FileManager.default
-            let stagingURL = cacheURL.deletingLastPathComponent()
-                .appendingPathComponent(".\(cacheURL.lastPathComponent).\(UUID().uuidString).download")
-            defer { try? fileManager.removeItem(at: stagingURL) }
-            try fileManager.moveItem(at: temporaryURL, to: stagingURL)
             if fileManager.fileExists(atPath: cacheURL.path) {
                 _ = try fileManager.replaceItemAt(cacheURL, withItemAt: stagingURL)
             } else {
@@ -402,20 +403,143 @@ final class AudioSourceResolver {
     }
 }
 
-final class URLSessionTransferProgressDelegate: NSObject, URLSessionTaskDelegate, URLSessionDownloadDelegate,
-    @unchecked Sendable
-{
+final class URLSessionFileDownloader: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private let configuration: URLSessionConfiguration
+    private let destinationURL: URL
     private let expectedTotalBytes: Int64?
-    private let direction: TransferDirection
+    private let progress: TransferProgressHandler
+    private let lock = NSLock()
+
+    private var session: URLSession?
+    private var task: URLSessionDataTask?
+    private var continuation: CheckedContinuation<URLResponse, Error>?
+    private var response: URLResponse?
+    private var fileHandle: FileHandle?
+    private var completedBytes: Int64 = 0
+    private var terminalError: Error?
+    private var isCancelled = false
+    private var isCompleted = false
+
+    init(
+        configuration: URLSessionConfiguration,
+        destinationURL: URL,
+        expectedTotalBytes: Int64?,
+        progress: @escaping TransferProgressHandler
+    ) {
+        self.configuration = configuration
+        self.destinationURL = destinationURL
+        self.expectedTotalBytes = expectedTotalBytes
+        self.progress = progress
+    }
+
+    func download(from url: URL) async throws -> URLResponse {
+        guard FileManager.default.createFile(atPath: destinationURL.path, contents: nil) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        fileHandle = try FileHandle(forWritingTo: destinationURL)
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+                let task = session.dataTask(with: url)
+
+                lock.lock()
+                self.continuation = continuation
+                self.session = session
+                self.task = task
+                let shouldCancel = isCancelled
+                lock.unlock()
+
+                if shouldCancel {
+                    task.cancel()
+                } else {
+                    task.resume()
+                }
+            }
+        } onCancel: {
+            self.cancel()
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
+        self.response = response
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        do {
+            try fileHandle?.write(contentsOf: data)
+            completedBytes += Int64(data.count)
+            let responseTotal = response?.expectedContentLength ?? NSURLSessionTransferSizeUnknown
+            let totalBytes = expectedTotalBytes ?? (responseTotal > 0 ? responseTotal : nil)
+            progress(
+                TransferProgress(
+                    completedBytes: completedBytes,
+                    totalBytes: totalBytes,
+                    stage: .transferring
+                )
+            )
+        } catch {
+            terminalError = error
+            dataTask.cancel()
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let closeError: Error?
+        do {
+            try fileHandle?.close()
+            closeError = nil
+        } catch {
+            closeError = error
+        }
+        fileHandle = nil
+
+        lock.lock()
+        guard !isCompleted else {
+            lock.unlock()
+            return
+        }
+        isCompleted = true
+        let continuation = self.continuation
+        self.continuation = nil
+        let response = self.response
+        let terminalError = self.terminalError ?? error ?? closeError
+        lock.unlock()
+
+        session.finishTasksAndInvalidate()
+        if let terminalError {
+            continuation?.resume(throwing: terminalError)
+        } else if let response {
+            continuation?.resume(returning: response)
+        } else {
+            continuation?.resume(throwing: URLError(.badServerResponse))
+        }
+    }
+
+    private func cancel() {
+        lock.lock()
+        isCancelled = true
+        let task = self.task
+        lock.unlock()
+        task?.cancel()
+    }
+}
+
+final class URLSessionTransferProgressDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let expectedTotalBytes: Int64?
     private let progress: TransferProgressHandler
 
     init(
         expectedTotalBytes: Int64?,
-        direction: TransferDirection,
         progress: @escaping TransferProgressHandler
     ) {
         self.expectedTotalBytes = expectedTotalBytes
-        self.direction = direction
         self.progress = progress
     }
 
@@ -426,26 +550,8 @@ final class URLSessionTransferProgressDelegate: NSObject, URLSessionTaskDelegate
         totalBytesSent: Int64,
         totalBytesExpectedToSend: Int64
     ) {
-        guard direction == .upload else { return }
         report(completedBytes: totalBytesSent, reportedTotalBytes: totalBytesExpectedToSend)
     }
-
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didWriteData bytesWritten: Int64,
-        totalBytesWritten: Int64,
-        totalBytesExpectedToWrite: Int64
-    ) {
-        guard direction == .download else { return }
-        report(completedBytes: totalBytesWritten, reportedTotalBytes: totalBytesExpectedToWrite)
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didFinishDownloadingTo location: URL
-    ) {}
 
     private func report(completedBytes: Int64, reportedTotalBytes: Int64) {
         let totalBytes = reportedTotalBytes > 0 ? reportedTotalBytes : expectedTotalBytes
