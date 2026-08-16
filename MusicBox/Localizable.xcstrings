@@ -1,0 +1,480 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "action.cancel" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消" } }
+      }
+    },
+    "action.confirm" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Confirm" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "确认" } }
+      }
+    },
+    "action.ok" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "OK" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "好" } }
+      }
+    },
+    "action.refresh" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新" } }
+      }
+    },
+    "action.remove" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Remove" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "移除" } }
+      }
+    },
+    "action.retry" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Retry" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重试" } }
+      }
+    },
+    "alert.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "MusicBox" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "MusicBox" } }
+      }
+    },
+    "cloud.empty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No cloud files" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有云盘文件" } }
+      }
+    },
+    "cloud.load.failed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not load cloud files." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法加载云盘文件。" } }
+      }
+    },
+    "cloud.match" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Match song" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "匹配歌曲" } }
+      }
+    },
+    "cloud.match_song_id" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Song ID" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "歌曲 ID" } }
+      }
+    },
+    "cloud.search" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Filter cloud files" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "筛选云盘文件" } }
+      }
+    },
+    "comments.empty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No comments yet" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无评论" } }
+      }
+    },
+    "comments.hot" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hot" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "热门" } }
+      }
+    },
+    "comments.recommend" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recommended" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "推荐" } }
+      }
+    },
+    "comments.sort" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sort" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "排序" } }
+      }
+    },
+    "comments.time" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Newest" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最新" } }
+      }
+    },
+    "comments.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Comments" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "评论" } }
+      }
+    },
+    "explore.daily_recommendations" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Daily Recommendations" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每日推荐" } }
+      }
+    },
+    "explore.recommended" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recommended playlists" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "推荐歌单" } }
+      }
+    },
+    "explore.results" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search results" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索结果" } }
+      }
+    },
+    "explore.search" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search music" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索音乐" } }
+      }
+    },
+    "explore.suggestions" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Suggestions" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索建议" } }
+      }
+    },
+    "handoff.continue" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Continue here" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在此继续播放" } }
+      }
+    },
+    "handoff.message" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "A playback session is available." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "发现可继续的播放会话。" } }
+      }
+    },
+    "handoff.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Continue playback" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "继续播放" } }
+      }
+    },
+    "login.country_code" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Country code" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "国家/地区代码" } }
+      }
+    },
+    "login.country_code.invalid" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enter a valid country code." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请输入有效的国家/地区代码。" } }
+      }
+    },
+    "login.message" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sign in to access your library and cloud files." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "登录后可访问资料库和云盘文件。" } }
+      }
+    },
+    "login.open_qr" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open QR code" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开二维码" } }
+      }
+    },
+    "login.password" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Password" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "密码" } }
+      }
+    },
+    "login.phone" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Phone number" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "手机号" } }
+      }
+    },
+    "login.qr" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "QR sign in" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "二维码登录" } }
+      }
+    },
+    "login.submit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sign in" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "登录" } }
+      }
+    },
+    "lyrics.empty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No lyrics available" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无歌词" } }
+      }
+    },
+    "lyrics.load.failed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not load lyrics." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法加载歌词。" } }
+      }
+    },
+    "lyrics.unavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Lyrics unavailable" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "歌词不可用" } }
+      }
+    },
+    "menu.check_for_updates" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check for Updates..." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "检查更新..." } }
+      }
+    },
+    "menu.show_musicbox" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show MusicBox" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示 MusicBox" } }
+      }
+    },
+    "playback.failed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Playback failed." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放失败。" } }
+      }
+    },
+    "player.cycle_mode" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Change playback mode" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换播放模式" } }
+      }
+    },
+    "player.next" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下一首" } }
+      }
+    },
+    "player.nothing_playing" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Nothing playing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无播放" } }
+      }
+    },
+    "player.pause" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pause" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂停" } }
+      }
+    },
+    "player.play" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放" } }
+      }
+    },
+    "player.previous" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previous" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上一首" } }
+      }
+    },
+    "player.queue" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Queue" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放队列" } }
+      }
+    },
+    "player.seek" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Seek" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放进度" } }
+      }
+    },
+    "player.show_lyrics" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show lyrics" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示歌词" } }
+      }
+    },
+    "player.volume" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Volume" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "音量" } }
+      }
+    },
+    "playlist.load.failed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not load this playlist." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法加载这个歌单。" } }
+      }
+    },
+    "playlist.play_all" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play all" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放全部" } }
+      }
+    },
+    "queue.clear" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear queue" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清空播放队列" } }
+      }
+    },
+    "queue.empty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your queue is empty" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放队列为空" } }
+      }
+    },
+    "queue.play_next" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Play next" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下一首播放" } }
+      }
+    },
+    "queue.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Queue" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放队列" } }
+      }
+    },
+    "search.failed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search failed. Try again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索失败，请重试。" } }
+      }
+    },
+    "settings.account" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Account" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "账户" } }
+      }
+    },
+    "settings.cache_cleared" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Audio cache cleared." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "音频缓存已清除。" } }
+      }
+    },
+    "settings.clear_cache" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear audio cache" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除音频缓存" } }
+      }
+    },
+    "settings.double_click" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Song selection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "歌曲选择行为" } }
+      }
+    },
+    "settings.double_click.append" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Append the selected song" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅加入所选歌曲" } }
+      }
+    },
+    "settings.double_click.replace" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Replace with the source playlist" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用来源歌单替换队列" } }
+      }
+    },
+    "settings.logout" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sign out" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "退出登录" } }
+      }
+    },
+    "settings.playback" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Playback" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放" } }
+      }
+    },
+    "settings.prevent_sleep" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Prevent sleep while playing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "播放时阻止系统休眠" } }
+      }
+    },
+    "settings.relay" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Relay" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "接力播放" } }
+      }
+    },
+    "settings.relay_enabled" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enable relay playback" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启用接力播放" } }
+      }
+    },
+    "settings.show_roma" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show romanized lyrics" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示音译歌词" } }
+      }
+    },
+    "settings.show_timestamp" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show playback time" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示播放时间" } }
+      }
+    },
+    "settings.storage" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Storage" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存储" } }
+      }
+    },
+    "settings.user" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Signed in as" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前账户" } }
+      }
+    },
+    "sidebar.cloud_files" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cloud Files" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云盘文件" } }
+      }
+    },
+    "sidebar.created_playlists" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Created Playlists" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建的歌单" } }
+      }
+    },
+    "sidebar.explore" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Explore" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "发现音乐" } }
+      }
+    },
+    "sidebar.favored_playlists" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved Playlists" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "收藏的歌单" } }
+      }
+    },
+    "sidebar.general" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通用" } }
+      }
+    },
+    "sidebar.settings" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设置" } }
+      }
+    },
+    "state.error" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Something went wrong" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "发生错误" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

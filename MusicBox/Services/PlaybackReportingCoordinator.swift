@@ -7,31 +7,20 @@
 
 import AppKit
 import Foundation
-
-enum PlaybackEndReason {
-    case finished
-    case switched
-    case stopped
-    case failed
-
-    var dawnValue: String {
-        switch self {
-        case .finished, .stopped: return "playend"
-        case .switched: return "ui"
-        case .failed: return "exception"
-        }
-    }
-}
+import Observation
 
 @MainActor
-final class PlaybackReportingCoordinator: ObservableObject {
-    @Published private(set) var relayAvailable = false
-    @Published private(set) var relayEnabled = false
-    @Published private(set) var isUpdatingRelaySetting = false
-    @Published private(set) var handoffOffer: RelayHandoffOffer?
+@Observable
+final class PlaybackReportingCoordinator {
+    private(set) var relayAvailable = false
+    private(set) var relayEnabled = false
+    private(set) var isUpdatingRelaySetting = false
+    private(set) var handoffOffer: RelayHandoffOffer?
+    var onError: ((String) -> Void)?
 
     private let client: NeteasePlaybackClient
     private let store: PlaybackReportStore
+    private let repository: any CatalogRepository
     private var accountID: UInt64?
     private var relayConfig: RelayConfig?
     private var sourceState: RelaySourceState?
@@ -39,17 +28,28 @@ final class PlaybackReportingCoordinator: ObservableObject {
     private var outbox: [StoredDawnEvent] = []
     private var pendingRelay: StoredRelayState?
     private var isDrainingDawn = false
+    private var runtimeGeneration: UInt64 = 0
+    private var dawnDrainTask: Task<Void, Never>?
     private var dawnRetryTask: Task<Void, Never>?
     private var relayTask: Task<Void, Never>?
     private var relayRetryTask: Task<Void, Never>?
     private var offerExpiryTask: Task<Void, Never>?
 
-    init(
+    convenience init(
         client: NeteasePlaybackClient = .shared,
         storageURL: URL? = nil
     ) {
+        self.init(client: client, storageURL: storageURL, repository: NeteaseMusicRepository())
+    }
+
+    init(
+        client: NeteasePlaybackClient = .shared,
+        storageURL: URL? = nil,
+        repository: any CatalogRepository
+    ) {
         self.client = client
         self.store = PlaybackReportStore(url: storageURL)
+        self.repository = repository
     }
 
     func activate(accountID: UInt64) async {
@@ -66,6 +66,7 @@ final class PlaybackReportingCoordinator: ObservableObject {
         if self.accountID != nil {
             deactivateRuntime()
         }
+        runtimeGeneration &+= 1
         self.accountID = accountID
         let persisted = store.load()
         outbox = persisted.dawn.filter { $0.accountID == accountID }
@@ -78,7 +79,7 @@ final class PlaybackReportingCoordinator: ObservableObject {
         deactivateRuntime()
     }
 
-    func playbackQueueDidChange(items: [PlaylistItem], currentIndex: Int, loopMode: LoopMode) {
+    func playbackQueueDidChange(items: [PlaylistItem], currentIndex: Int, loopMode: PlaybackMode) {
         guard !items.isEmpty else {
             sourceState = nil
             pendingRelay = nil
@@ -101,7 +102,7 @@ final class PlaybackReportingCoordinator: ObservableObject {
         }
     }
 
-    func playbackModeDidChange(items: [PlaylistItem], currentIndex: Int, loopMode: LoopMode) {
+    func playbackModeDidChange(items: [PlaylistItem], currentIndex: Int, loopMode: PlaybackMode) {
         playbackQueueDidChange(items: items, currentIndex: currentIndex, loopMode: loopMode)
         guard let item = activeItem else { return }
         reportRelayState(for: item)
@@ -114,7 +115,7 @@ final class PlaybackReportingCoordinator: ObservableObject {
         enqueueDawn(makeDawnStartEvent(item: item))
 
         if sourceState == nil {
-            playbackQueueDidChange(items: [item], currentIndex: 0, loopMode: .sequence)
+            playbackQueueDidChange(items: [item], currentIndex: 0, loopMode: .repeatAll)
         }
         reportRelayState(for: item)
     }
@@ -158,11 +159,11 @@ final class PlaybackReportingCoordinator: ObservableObject {
                 dismissHandoffOffer()
             }
         } catch {
-            AlertModal.showAlert(error.localizedDescription)
+            onError?(error.localizedDescription)
         }
     }
 
-    func continueHandoff(using playlistStatus: PlaylistStatus) async {
+    func continueHandoff(using playback: PlaybackStore) async {
         guard let offer = handoffOffer else { return }
         dismissHandoffOffer()
         do {
@@ -178,23 +179,25 @@ final class PlaybackReportingCoordinator: ObservableObject {
                 throw RequestError.Request("The handoff did not contain playable songs")
             }
             let startIndex = restored.items.firstIndex { String($0.id) == pulled.currentResourceID } ?? 0
-            await playlistStatus.replacePlaylist(
+            playback.replaceSource(
                 restored.items,
-                continuePlaying: true,
-                shouldSaveState: true,
                 startIndex: startIndex,
-                startSecond: Double(pulled.progressMilliseconds) / 1_000
+                autoplay: true,
+                startPosition: Double(pulled.progressMilliseconds) / 1_000
             )
         } catch {
-            AlertModal.showAlert(error.localizedDescription)
+            onError?(error.localizedDescription)
         }
     }
 
     private func deactivateRuntime() {
+        runtimeGeneration &+= 1
+        dawnDrainTask?.cancel()
         dawnRetryTask?.cancel()
         relayTask?.cancel()
         relayRetryTask?.cancel()
         offerExpiryTask?.cancel()
+        dawnDrainTask = nil
         dawnRetryTask = nil
         relayTask = nil
         relayRetryTask = nil
@@ -252,23 +255,19 @@ final class PlaybackReportingCoordinator: ObservableObject {
         if pulled.sourceType?.lowercased() == "playlist",
             let sourceID = pulled.sourceID,
             let playlistID = UInt64(sourceID),
-            let detail = await CloudMusicApi().playlist_detail(id: playlistID)
+            let detail = await repository.playlistDetail(id: playlistID)
         {
             let source = PlaybackSourcePlaylist(id: playlistID, name: "")
-            let items = detail.tracks.map { song -> PlaylistItem in
-                let item = loadItem(song: song)
-                item.sourcePlaylist = source
-                return item
-            }
+            let items = detail.tracks.map { PlaylistItemFactory.make(song: $0, sourcePlaylist: source) }
             return (items, source)
         }
 
         let ids = pulled.resources.compactMap { UInt64($0.id) }
-        guard !ids.isEmpty, let songs = await CloudMusicApi().song_detail(ids: ids) else {
+        guard !ids.isEmpty, let songs = await repository.songs(ids: ids) else {
             throw RequestError.Request("Unable to load handoff songs")
         }
         let byID = Dictionary(uniqueKeysWithValues: songs.map { ($0.id, $0) })
-        let items = ids.compactMap { byID[$0] }.map(loadItem(song:))
+        let items = ids.compactMap { byID[$0] }.map { PlaylistItemFactory.make(song: $0) }
         return (items, nil)
     }
 
@@ -294,7 +293,7 @@ final class PlaybackReportingCoordinator: ObservableObject {
         }
     }
 
-    private func sourceSignature(items: [PlaylistItem], loopMode: LoopMode) -> String {
+    private func sourceSignature(items: [PlaylistItem], loopMode: PlaybackMode) -> String {
         let sourceID = sharedSourcePlaylist(in: items).map { String($0.id) } ?? "resources"
         return "\(sourceID)|\(relayPlayMode(loopMode))|\(items.map { String($0.id) }.joined(separator: ","))"
     }
@@ -302,7 +301,7 @@ final class PlaybackReportingCoordinator: ObservableObject {
     private func makeSourceState(
         items: [PlaylistItem],
         currentIndex: Int,
-        loopMode: LoopMode,
+        loopMode: PlaybackMode,
         retransmit: Bool
     ) -> RelaySourceState {
         let initialItem = items[currentIndex]
@@ -469,32 +468,42 @@ final class PlaybackReportingCoordinator: ObservableObject {
 
     private func drainDawnOutbox() {
         guard !isDrainingDawn, accountID != nil else { return }
+        let expectedGeneration = runtimeGeneration
         isDrainingDawn = true
-        Task { [weak self] in
+        dawnDrainTask = Task { [weak self] in
             guard let self else { return }
-            defer { self.isDrainingDawn = false }
-            while let event = self.outbox.first,
+            defer {
+                if self.runtimeGeneration == expectedGeneration {
+                    self.isDrainingDawn = false
+                    self.dawnDrainTask = nil
+                }
+            }
+            while !Task.isCancelled,
+                self.runtimeGeneration == expectedGeneration,
+                let event = self.outbox.first,
                 event.accountID == self.accountID
             {
                 do {
                     try await self.client.uploadDawn(events: [event.event], sequence: event.sequence)
+                    guard !Task.isCancelled, self.runtimeGeneration == expectedGeneration else { return }
                     guard self.outbox.first?.event.id == event.event.id else { continue }
                     self.outbox.removeFirst()
                     self.persist()
                 } catch {
+                    guard !Task.isCancelled, self.runtimeGeneration == expectedGeneration else { return }
                     print("[Dawn] upload failed: \(error)")
-                    self.scheduleDawnRetry()
+                    self.scheduleDawnRetry(expectedGeneration: expectedGeneration)
                     return
                 }
             }
         }
     }
 
-    private func scheduleDawnRetry() {
+    private func scheduleDawnRetry(expectedGeneration: UInt64) {
         dawnRetryTask?.cancel()
         dawnRetryTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 5_000_000_000)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, self?.runtimeGeneration == expectedGeneration else { return }
             self?.drainDawnOutbox()
         }
     }
@@ -567,19 +576,15 @@ final class PlaybackReportingCoordinator: ObservableObject {
         ]
     }
 
-    private func relayPlayMode(_ mode: LoopMode) -> String {
-        switch mode {
-        case .once: return "single_loop"
-        case .shuffle: return "random"
-        case .sequence: return "list_loop"
-        }
+    private func relayPlayMode(_ mode: PlaybackMode) -> String {
+        mode.relayValue
     }
 
-    private func loopMode(from relayMode: String) -> LoopMode {
+    private func loopMode(from relayMode: String) -> PlaybackMode {
         switch relayMode {
-        case "single_loop": return .once
+        case "single_loop": return .repeatOne
         case "random": return .shuffle
-        default: return .sequence
+        default: return .repeatAll
         }
     }
 
@@ -594,7 +599,7 @@ private struct RelaySourceState {
     var request: RelaySongListRequest
     var items: [PlaylistItem]
     var currentIndex: Int
-    var loopMode: LoopMode
+    var loopMode: PlaybackMode
     var submitted: Bool
 }
 

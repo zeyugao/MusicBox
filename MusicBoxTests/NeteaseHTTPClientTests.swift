@@ -538,9 +538,10 @@ final class NeteaseHTTPClientTests: XCTestCase {
         }
 
         let coordinator = PlaybackReportingCoordinator(client: client, storageURL: storeURL)
+        defer { coordinator.deactivate() }
         await coordinator.activate(accountID: 42)
         let items = [playbackItem(1), playbackItem(2), playbackItem(3)]
-        coordinator.playbackQueueDidChange(items: items, currentIndex: 1, loopMode: .sequence)
+        coordinator.playbackQueueDidChange(items: items, currentIndex: 1, loopMode: .repeatAll)
         coordinator.playbackDidStart(item: items[1])
 
         await fulfillment(of: [stateSubmitted], timeout: 2)
@@ -588,6 +589,7 @@ final class NeteaseHTTPClientTests: XCTestCase {
         }
 
         let coordinator = PlaybackReportingCoordinator(client: client, storageURL: storeURL)
+        defer { coordinator.deactivate() }
         await coordinator.activate(accountID: 42)
         let item = playbackItem(7)
         coordinator.playbackDidStart(item: item)
@@ -609,7 +611,6 @@ final class NeteaseHTTPClientTests: XCTestCase {
         XCTAssertNil(decodedEvents[0].payload["end"])
         XCTAssertEqual(decodedEvents[1].payload["end"] as? String, "ui")
         XCTAssertEqual(decodedEvents[1].payload["time"] as? Double, 12)
-        coordinator.deactivate()
     }
 
     private func makeClient() -> NeteaseHTTPClient {
@@ -654,6 +655,7 @@ final class NeteaseHTTPClientTests: XCTestCase {
 
 private enum TestError: Error {
     case unexpectedRequest(String)
+    case invalidRequest(String)
     case missingRequestBody
     case failedToReadRequestBody
 }
@@ -743,7 +745,10 @@ private final class MockURLProtocol: URLProtocol {
         recordedRequests.append(request)
         let handler = requestHandler
         lock.unlock()
-        return try XCTUnwrap(handler)
+        guard let handler else {
+            throw TestError.unexpectedRequest("No handler for \(request.url?.absoluteString ?? "missing URL")")
+        }
+        return handler
     }
 }
 
@@ -758,8 +763,12 @@ private func response(for request: URLRequest, headers: [String: String] = [:]) 
 
 private func formFields(from request: URLRequest) throws -> [String: String] {
     let body = try requestBody(from: request)
-    let query = try XCTUnwrap(String(data: body, encoding: .utf8))
-    let components = try XCTUnwrap(URLComponents(string: "https://example.invalid/?\(query)"))
+    guard let query = String(data: body, encoding: .utf8) else {
+        throw TestError.invalidRequest("Request body is not UTF-8")
+    }
+    guard let components = URLComponents(string: "https://example.invalid/?\(query)") else {
+        throw TestError.invalidRequest("Request body is not a form query")
+    }
     return Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
 }
 
@@ -807,18 +816,27 @@ private struct DecodedEAPIRequest {
 
 private func decodeEAPIRequest(_ request: URLRequest) throws -> DecodedEAPIRequest {
     let form = try formFields(from: request)
-    let params = try XCTUnwrap(form["params"])
-    let encrypted = try XCTUnwrap(Data(hexEncoded: params))
+    guard let params = form["params"], let encrypted = Data(hexEncoded: params) else {
+        throw TestError.invalidRequest("Missing EAPI params")
+    }
     let plaintext = try eapiAES(encrypted, operation: CCOperation(kCCDecrypt))
-    let signed = try XCTUnwrap(String(data: plaintext, encoding: .utf8))
+    guard let signed = String(data: plaintext, encoding: .utf8) else {
+        throw TestError.invalidRequest("Invalid EAPI plaintext")
+    }
     let separator = "-36cd479b6b5-"
     let components = signed.components(separatedBy: separator)
     guard components.count == 3 else {
         throw TestError.unexpectedRequest("Malformed EAPI signing payload")
     }
-    let payload = try XCTUnwrap(
-        JSONSerialization.jsonObject(with: Data(components[1].utf8)) as? [String: Any]
-    )
+    let json: Any
+    do {
+        json = try JSONSerialization.jsonObject(with: Data(components[1].utf8))
+    } catch {
+        throw TestError.invalidRequest("Invalid EAPI payload")
+    }
+    guard let payload = json as? [String: Any] else {
+        throw TestError.invalidRequest("Invalid EAPI payload")
+    }
     return DecodedEAPIRequest(
         path: components[0],
         requestJSON: components[1],

@@ -1,112 +1,148 @@
 # AGENTS.md
 
-This guide explains how automation or coding assistants should work inside the MusicBox repository. It expands on high-level architecture with concrete implementation details so agents can navigate code confidently and make safe changes.
+This guide describes the current MusicBox architecture and the boundaries that
+must be preserved when changing the application.
 
 ## Project Overview
-- MusicBox is a macOS 14+ SwiftUI application that layers native playback, lyrics, and caching on top of the NetEase Cloud Music ecosystem.
-- `MusicBoxApp.swift` bootstraps the app, wires Sparkle’s `SPUStandardUpdaterController`, and manages the main window lifecycle.
-- `Api/CloudMusicApi.swift` is a Swift facade over `Api/NeteaseHTTPClient.swift`, while `Api/NeteasePlaybackClient.swift` owns the desktop EAPI and encrypted dawn-log protocols used for playback reporting and relay handoff.
-- Progressive audio caching, smart lyric timing, and remote control integration differentiate the player from web wrappers.
+
+- MusicBox is a macOS 26+ SwiftUI application for NetEase Cloud Music.
+- `MusicBox/MusicBoxApp.swift` starts Sparkle, owns the main-window lifecycle,
+  and injects one `AppModel` into the application shell.
+- The app uses SwiftUI, Observation, and Swift Concurrency. Do not introduce a
+  second state-management framework without a concrete integration need.
+- `CloudMusicApi`, `NeteaseHTTPClient`, `NeteasePlaybackClient`, and
+  `CachingPlayerItem` retain their native protocol behavior behind the new
+  service and playback boundaries.
 
 ## Development Workflow
-- Open `MusicBox.xcodeproj` with Xcode 15 or newer, then build (`⌘B`) or run (`⌘R`) the `MusicBox` target.
-- Sparkle update signing is already configured for development; make sure the updater controller remains initialized in `MusicBoxApp` when altering startup code.
-- The project has no external C++ bridge or sibling-repository build dependency.
-- For CLI validation, run `xcodebuild -project MusicBox.xcodeproj -scheme MusicBox -configuration Debug test CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM=""`.
 
-## Architecture Overview
-- SwiftUI + Combine form the UI layer, backed by observable models for player, navigation, and user state.
-- `Player/Player.swift` encapsulates playback orchestration, queue management, and smart lyric synchronization.
-- `Player/PlaybackReportingCoordinator.swift` translates real playback lifecycle events into dawn uploads and relay handoff state without blocking playback.
-- `Api/CloudMusicApi.swift` preserves the existing Swift-facing API, while `Api/NeteaseHTTPClient.swift` owns request encoding, cookies, caching, and concrete endpoint methods.
-- `CachingPlayerItem` applies a custom `AVAssetResourceLoader` delegate to cache streams while playback continues.
-- `Models/AppSettings.swift` centralizes persisted preferences and macOS-specific behaviors like sleep prevention.
+- Open `MusicBox.xcodeproj` in Xcode 17 or newer, then build with `Cmd-B` or
+  run with `Cmd-R`.
+- Keep `SPUStandardUpdaterController` initialized in `MusicBoxApp` when
+  touching startup code.
+- Run the complete test suite with:
+
+  ```sh
+  xcodebuild -project MusicBox.xcodeproj -scheme MusicBox -configuration Debug test CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM=""
+  ```
+
+- The project has no sibling-repository or external C++ build dependency.
 
 ## Directory Map
+
 ```
 MusicBox/
-├── Api/                     # NetEase Music API integration
-├── Player/                  # Audio playback engine and queue logic
-├── CachingPlayerItem/       # Progressive download implementation
-├── Component/               # Reusable SwiftUI components
-├── Content/                 # Major user-facing views
-├── Models/                  # Persisted settings and metadata
-└── General/                 # Cross-cutting extensions/utilities
+├── App/                     # Composition root, navigation, account, settings, alerts
+├── Features/                # Explore, playlist, cloud, login, settings, comments models/views
+├── Playback/                # Queue state machine, store, engine, lyrics, player UI
+├── Services/                # Repository facade and playback reporting/relay coordinator
+├── Shared/                  # Cross-cutting view and Foundation helpers
+├── Api/                     # Concrete NetEase HTTP, EAPI, Dawn and relay transports
+├── CachingPlayerItem/       # Progressive AVAssetResourceLoader cache implementation
+└── Localizable.xcstrings    # English and Simplified Chinese UI strings
 ```
 
-## Implementation Hotspots
+## Application Architecture
 
-### Application Bootstrap (`MusicBox/MusicBoxApp.swift`)
-- `AppDelegate` keeps a static `mainWindow`, overrides `applicationShouldTerminateAfterLastWindowClosed`, and ensures the app stays resident after closing.
-- `AppDelegate.setupGlobalKeyMonitor()` intercepts space-bar presses, but bypasses NSText-based responders so typing still works.
-- `WindowDelegate.windowShouldClose` hides the primary window instead of tearing down state, mirroring native macOS media apps.
-- `CheckForUpdatesViewModel` observes `SPUUpdater.canCheckForUpdates` through Combine and enables the Sparkle “Check for Updates…” menu item.
-- `MusicBoxApp` adjusts window dimensions via `setContentSize` on appear and injects custom command groups for Sparkle and a “Show MusicBox” shortcut.
+- `AppModel` is the sole composition root. It owns `AccountStore`, `AppRouter`,
+  `AlertCenter`, `TransferCenter`, `AppSettings`, `PlaybackStore`,
+  `PlaybackReportingCoordinator`, and `SystemPlaybackBridge`.
+- `ContentView` lives in `App/AppShellView.swift`. It only renders the
+  navigation shell, one floating player capsule, the lyrics inspector, and
+  application alerts.
+- `AppRouter`, `AlertCenter`, and `TransferCenter` replace app-internal
+  `NotificationCenter` communication. Keep `NotificationCenter` only for
+  system lifecycle and AVFoundation item notifications.
+- Features use `@MainActor @Observable` models. Views call model commands and
+  render state; they do not call `CloudMusicApi`, `AVPlayer`, or global
+  notifications directly.
+- `MusicRepository` is a composition of capability protocols:
+  `AccountRepository`, `CatalogRepository`, `CloudRepository`,
+  `CommentsRepository`, and `PlaybackResourceServing`. Add endpoints through
+  the narrow capability that owns them, then implement it in
+  `NeteaseMusicRepository`.
+- `PlayerOverlayMetrics` provides the bottom clearance for all shell content.
+  Do not add fake table rows, duplicated players, or ad hoc bottom spacers.
 
-### Navigation & State (`MusicBox/ContentView.swift`, `MusicBox/Content/*`)
-- `ContentView` owns a `NavigationSplitView` and serializes `NavigationScreen` selections so the sidebar restores across launches.
-- `JSONUtils` wraps encoding/decoding helpers for any state persisted via `UserDefaults`, including navigation stacks and queue snapshots.
-- `PlayingDetailModel` exposes `@MainActor` toggles that animate the full-screen player overlay.
-- `AlertModal` listens for `AlertModal.showAlertName` notifications and renders global alerts with optional callback hooks.
-- `UserInfo` caches `CloudMusicApi.Profile`, playlist metadata, and like sets to avoid redundant network calls when the sidebar refreshes.
+## Playback Architecture
 
-### Audio Engine (`MusicBox/Player/Player.swift`)
-- `PlayStatus` owns the shared `AVPlayer`, serializes `Storage` into `UserDefaults`, and publishes `.playbackStateChanged` notifications for other components.
-- `LyricStatus` keeps lyric timestamps at 0.1-second granularity, using a binary search in `findLyricIndex` for O(log n) lookups.
-- `SmartLyricSynchronizer` runs a `Timer` on the main loop, schedules callbacks from `getNextLyricChangeTime`, and restarts cleanly on seek or view changes.
-- `PlaylistStatus` implements `RemoteCommandHandler`, managing loop modes, “Play Next” queues, and remote command routing through `RemoteCommandCenter`.
-- `PlayStatus.controlPlayerObserver` reacts to commands like `.switchItem`, cancelling stale seek tasks before calling `seekToItem` to guarantee consistent transitions.
-- `PlayStatus` emits playback start, end, failure, and stop events to `PlaybackReportingCoordinator`; pauses and same-track seeks do not end a dawn record.
-- `PlaylistStatus` reports source replacement, track switches, and loop-mode changes so relay state can retain a session for the same queue and create a new one for a new source.
+- UI and system integrations depend on `PlaybackStore`, not `AVPlayer`.
+  `PlaybackState` is read-only to consumers; command methods include
+  `replaceSource`, `playNow`, `enqueueNext`, `next`, `previous`, `seek`,
+  `removeEntry`, `clearQueue`, and `cycleMode`.
+- `AVPlaybackEngine` exclusively owns `AVPlayer`, KVO, seeks, resource changes,
+  and `CachingPlayerItemDelegate`. Engine callbacks carry a generation; the
+  store discards callbacks from stale requests.
+- `AudioSourceResolver` owns local-cache lookup, remote URL resolution, and
+  cache destinations. `PlaylistItem` is only a Codable data value and must not
+  perform networking or filesystem operations.
+- `PlaybackQueue` is a pure state machine. Each `PlaybackQueueEntry` has an
+  independent UUID so repeated songs remain distinct.
+- The queue keeps source entries, current entry, explicit next entries, real
+  history, and shuffle order separately. Explicit next entries are LIFO; a
+  batch retains its internal order and is inserted ahead of older next entries.
+- Playback modes cycle `repeatAll -> shuffle -> repeatOne -> repeatAll` and
+  map to relay values `list_loop`, `random`, and `single_loop`. Natural end in
+  repeat-one replays the current entry; manual next still advances.
+- Previous uses true playback history first, then the source-list predecessor.
+  Never implement a three-second replay shortcut.
+- `LyricsController` owns lyric loading, binary timestamp lookup, and precise
+  rescheduling. Lyrics views render `LyricsState` only.
+- `SystemPlaybackBridge` consumes `PlaybackEvent` for media keys and Now
+  Playing metadata. `AppSettings` and `PlaybackReportingCoordinator` also
+  subscribe to playback events; they must not inject commands through static
+  notifications.
 
-### Progressive Cache (`MusicBox/CachingPlayerItem/*`)
-- `CachingPlayerItem` rewrites media URLs to a custom `cachingPlayerItemScheme`, letting `AVAssetResourceLoader` redirect requests to a delegate.
-- `ResourceLoaderDelegate` streams bytes via `URLSession`, persists chunks with `MediaFileHandle`, and fulfills range requests directly from disk cache.
-- `ResourceLoaderDelegate.verifyResponse()` enforces HTTP status, expected size, and minimum file thresholds before marking downloads complete.
-- `CachingPlayerItemDelegate` callbacks report download progress and readiness back to the owning player controller.
-- `CachingPlayerItemConfiguration` centralizes buffer thresholds, read limits, and verification flags so tweaks stay consistent.
+## Persistence and Reporting
 
-### API Layer (`MusicBox/Api/CloudMusicApi.swift`)
-- `CloudMusicApi` decodes native HTTP responses into the existing strongly typed models.
-- `NeteaseHTTPClient` sends form-encoded raw `/api` requests to `interface.music.163.com`, with the iPhone user agent and the request cookie shape used by the former implementation.
-- The native client deliberately supports only the endpoint names consumed by MusicBox. Add an endpoint only alongside an application call site and a focused `URLProtocol` test.
-- `SharedCacheManager` MD5-hashes request payloads, tracks TTL-expiring values, and purges stale entries on a repeating `Timer`.
-- `NeteaseHTTPClient` centralizes transient RST and NetEase-specific result-code mapping while `CloudMusicApi` decodes each endpoint's response into its existing models.
-- `NeteasePlaybackClient` is intentionally separate from raw `/api`: its concrete methods own EAPI AES/MD5 transport, the persisted MusicBox desktop identity, relay endpoints, and NCBL dawn multipart uploads. Do not add dynamic endpoint dispatch to either client.
-- `DawnLogEncoder` writes a NCBL v3 envelope with a raw Zstd frame, IETF ChaCha20, and fixed-key RSA_NO_PADDING wrapping using only system frameworks and Swift code.
-- `RequestError` and `ServerError` provide localized messaging including custom handling for NetEase-specific result codes (for example `-462`).
-- `IntOrString` gracefully decodes IDs that the API returns inconsistently as numbers or strings.
+- `PlaybackSessionSnapshot` persists the full queue snapshot, playback
+  position, and volume under `PlaybackSession.v2`.
+- On first run without that key, `PlaybackStore` migrates the old
+  `PlaylistStatus` and `PlayStatus` payloads, separating legacy explicit-next
+  items and mapping legacy loop modes. Keep the old keys readable for this
+  migration only; do not write them.
+- `PlaybackReportingCoordinator` owns Dawn outbox delivery, account isolation,
+  relay state, handoff offers, retries, and progress restoration. Playback must
+  remain responsive if reporting fails.
+- Replacing the source, clearing the queue, signing out, or accepting a relay
+  handoff clears obsolete queue context before loading the new source.
 
-### Probing New NetEase APIs
-When a raw application endpoint is required, add a concrete method in `NeteaseHTTPClient`, retain a narrow facade method in `CloudMusicApi`, and cover the path, form fields, and response behavior with `URLProtocol` in `MusicBoxTests`. Desktop relay and dawn endpoints belong in a concrete `NeteasePlaybackClient` method, with the EAPI or NCBL behavior covered by the same style of test. Preserve the current raw `/api` behavior unless a deliberate protocol change is approved.
+## API and Cache Boundaries
 
-## State Persistence & Settings
-- `Models/AppSettings.swift` loads preferences on init, uses `@Published` setters to write back to `UserDefaults`, and registers for `.playbackStateChanged`.
-- `AppSettings` toggles IOKit sleep assertions through `IOPMAssertionCreateWithName`, preventing idle sleep only while music is playing.
-- `PlayStatus.loadState()` and `PlaylistStatus` persistence helpers restore the current item, queue, and timing data after relaunch.
-- `ContentView` saves sidebar selection and navigation snapshots via `JSONUtils.saveEncodableState`, keeping UI context intact across restarts.
+- `CloudMusicApi` remains the Swift-facing facade for raw NetEase `/api`
+  endpoints. `NeteaseHTTPClient` owns form encoding, cookies, caching, retry
+  behavior, and concrete paths.
+- Desktop EAPI, relay, and Dawn protocols belong to `NeteasePlaybackClient`.
+  Add explicit methods, never dynamic endpoint dispatch.
+- `CachingPlayerItem` rewrites stream URLs into its resource-loader scheme;
+  `ResourceLoaderDelegate` streams and verifies cached ranges. Always clear a
+  discarded caching item's delegate.
 
-## System Integration
-- Sparkle’s updater menu is injected in `MusicBoxApp.commands`, while the controller starts automatically from the app initializer.
-- `NowPlayingCenter.handleItemChange` populates `MPNowPlayingInfoCenter` metadata, including async artwork loading through `ImageLoader`.
-- `NowPlayingCenter.handlePlaybackChange` and `.handleSetPlaybackState` keep playback positions and rates synchronized with macOS media controls.
-- `RemoteCommandCenter.handleRemoteCommands` registers callbacks with `MPRemoteCommandCenter` and delegates execution to the current `PlaylistStatus`.
-- `Notification.Name.spaceKeyPressed` and `.playbackStateChanged` serve as the cross-component messaging backbone for shortcuts and sleep control.
+## Localization and UI
 
-## Agent Playbook
-- Extend `PlayStatus` for new playback behaviors and invoke `updateCurrentPlaybackInfo()` after mutating state to keep metadata fresh.
-- When adding NetEase endpoints, introduce Swift wrappers in `CloudMusicApi`, define deterministic cache keys, and invalidate related entries with `SharedCacheManager`.
-- Keep playback telemetry in `PlaybackReportingCoordinator`: queue mutations provide relay source state, while only real start/end lifecycle events create `_plv`/`_pld` records. Store failed dawn events under their account ID and never upload them after another account becomes active.
-- Integrate new UI flows by adding `NavigationScreen` cases and persisting state through `JSONUtils` to preserve navigation on relaunch.
-- Reuse `AlertModal` notifications for global messaging instead of new global publishers to keep UX consistent.
-- Always nil out `CachingPlayerItem.delegate` before discarding a player item to prevent retain cycles and lingering downloads.
+- Add visible UI text, AppKit window/table labels, menu items, tooltips,
+  alerts, errors, and count formatting to `Localizable.xcstrings` in both
+  English and Simplified Chinese.
+- Use system colors, compact spacing, icons for familiar controls, and corner
+  radii of 8 pt or less. Preserve the floating player capsule as one shell-level
+  instance.
+- Test narrow windows at 980 x 600 as well as a wide layout. Check English and
+  Simplified Chinese for clipped labels, overlay clearance, and inspector or
+  popover overlap.
 
 ## Testing Checklist
-- Exercise login, playlist fetch, lyric sync, and progressive caching flows with and without network connectivity.
-- Exercise dawn `_plv`/`_pld` delivery on start, switching, natural end, failure, and sign-out; verify pauses do not add an end record.
-- Exercise relay settings, a same-queue switch, `10001` retransmission, and a remote handoff accept/cancel path with an account that has relay enabled.
-- Verify window hide/restore behavior, Sparkle update menu availability, and the global space-bar shortcut on macOS 14 or later.
-- Confirm queue persistence by quitting and relaunching after changing loop modes and the “Play Next” stack.
-- Profile memory and disk usage while skipping tracks rapidly to ensure `ResourceLoaderDelegate` sessions close and cached files finalize cleanly.
 
-This documentation should be updated as the codebase evolves to capture new patterns and architectural decisions.
+- Keep `PlaybackQueueTests` deterministic: modes, natural/manual progression,
+  explicit-next ordering, history, duplicate tracks, removal, and shuffle.
+- Keep `PlaybackStoreTests` independent of network and AVFoundation using the
+  injectable resolver, lyrics loader, engine, and `UserDefaults` suite.
+  Cover snapshots, legacy migration, stale callbacks, delayed resolution, and
+  lyric boundaries.
+- Keep feature-model tests focused on loading, retry/error state, pagination,
+  debounce, and cancellation with lightweight protocol fakes.
+- Keep raw HTTP, Dawn, relay, and handoff tests in
+  `NeteaseHTTPClientTests`; verify no pause or same-track seek creates an
+  incorrect playback-end record.
+- Manually smoke test login, remote/local cache playback, rapid skips, media
+  keys, sleep prevention, queue restore, relay handoff, and window hide/restore
+  on a macOS 26 host.
