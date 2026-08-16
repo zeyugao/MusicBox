@@ -15,6 +15,13 @@ struct ExploreFeatureScreen: View {
         _model = State(initialValue: ExploreFeatureModel(repository: repository))
     }
 
+    private var searchText: Binding<String> {
+        Binding(
+            get: { model.query },
+            set: { model.updateQuery($0) }
+        )
+    }
+
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
@@ -39,20 +46,10 @@ struct ExploreFeatureScreen: View {
                 }
                 .contentMargins(.bottom, PlayerOverlayMetrics.contentClearance, for: .scrollContent)
                 .searchable(
-                    text: Binding(
-                        get: { model.query },
-                        set: { model.updateQuery($0) }
-                    ),
+                    text: searchText,
                     suggestions: {
                         ForEach(model.suggestions, id: \.id) { suggestion in
-                            let albumName = suggestion.album.name.isEmpty
-                                ? "Unknown Album"
-                                : suggestion.album.name
-                            let displayName = suggestion.name + " - " + albumName
-                            let completion = "##%%ID" + String(suggestion.id)
-                            Text(displayName)
-                            .lineLimit(1)
-                            .searchCompletion(completion)
+                            SearchSuggestionRow(suggestion: suggestion)
                         }
                     }
                 )
@@ -89,6 +86,20 @@ struct ExploreFeatureScreen: View {
             searchResults[id] = songs
             navigationPath.append(ExploreRoute.searchResult(id))
         }
+    }
+}
+
+private struct SearchSuggestionRow: View {
+    let suggestion: CloudMusicApi.SearchResult.Song
+
+    private var albumName: String {
+        suggestion.album.name.isEmpty ? "Unknown Album" : suggestion.album.name
+    }
+
+    var body: some View {
+        Text(suggestion.name + " - " + albumName)
+            .lineLimit(1)
+            .searchCompletion("##%%ID" + String(suggestion.id))
     }
 }
 
