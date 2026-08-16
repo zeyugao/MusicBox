@@ -1,6 +1,41 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+
+    },
+    "· %@" : {
+
+    },
+    "%@ / %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ / %2$@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld playlists" : {
+
+    },
+    "%lld%%" : {
+
+    },
+    "%llu首 • %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$llu首 • %2$@"
+          }
+        }
+      }
+    },
     "action.cancel" : {
       "localizations" : {
         "en" : {
@@ -18,6 +53,7 @@
       }
     },
     "action.confirm" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -50,6 +86,7 @@
       }
     },
     "action.refresh" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -66,6 +103,7 @@
       }
     },
     "action.remove" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -82,6 +120,7 @@
       }
     },
     "action.retry" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -96,6 +135,12 @@
           }
         }
       }
+    },
+    "Add All to Playlist" : {
+
+    },
+    "Add to Playlist" : {
+
     },
     "alert.title" : {
       "localizations" : {
@@ -113,7 +158,17 @@
         }
       }
     },
+    "Cancel" : {
+
+    },
+    "Clean" : {
+
+    },
+    "Clear All" : {
+
+    },
     "cloud.empty" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -146,6 +201,7 @@
       }
     },
     "cloud.match" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -162,6 +218,7 @@
       }
     },
     "cloud.match_song_id" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -178,6 +235,7 @@
       }
     },
     "cloud.search" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -194,6 +252,7 @@
       }
     },
     "comments.empty" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -210,6 +269,7 @@
       }
     },
     "comments.hot" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -226,6 +286,7 @@
       }
     },
     "comments.recommend" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -242,6 +303,7 @@
       }
     },
     "comments.sort" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -258,6 +320,7 @@
       }
     },
     "comments.time" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -274,6 +337,7 @@
       }
     },
     "comments.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -289,7 +353,23 @@
         }
       }
     },
+    "Copy" : {
+
+    },
+    "Done" : {
+
+    },
+    "Download All" : {
+
+    },
+    "Downloading" : {
+
+    },
+    "Explore" : {
+
+    },
     "explore.daily_recommendations" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -306,6 +386,7 @@
       }
     },
     "explore.recommended" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -322,6 +403,7 @@
       }
     },
     "explore.results" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -338,6 +420,7 @@
       }
     },
     "explore.search" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -354,6 +437,7 @@
       }
     },
     "explore.suggestions" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -368,6 +452,9 @@
           }
         }
       }
+    },
+    "Favor" : {
+
     },
     "handoff.continue" : {
       "localizations" : {
@@ -416,6 +503,12 @@
           }
         }
       }
+    },
+    "Hide Lyrics" : {
+
+    },
+    "Loading Error" : {
+
     },
     "login.close" : {
       "localizations" : {
@@ -530,6 +623,7 @@
       }
     },
     "lyrics.empty" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -562,6 +656,7 @@
       }
     },
     "lyrics.unavailable" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -576,6 +671,12 @@
           }
         }
       }
+    },
+    "Match" : {
+
+    },
+    "Match %@" : {
+
     },
     "menu.check_for_updates" : {
       "localizations" : {
@@ -608,6 +709,30 @@
           }
         }
       }
+    },
+    "More Actions" : {
+
+    },
+    "My Cloud Files" : {
+
+    },
+    "Next %lld" : {
+
+    },
+    "No matching playlists" : {
+
+    },
+    "No songs in playlist" : {
+
+    },
+    "Now Playing" : {
+
+    },
+    "Play All" : {
+
+    },
+    "Play Next" : {
+
     },
     "playback.failed" : {
       "localizations" : {
@@ -660,6 +785,7 @@
       }
     },
     "player.nothing_playing" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -727,6 +853,7 @@
       }
     },
     "player.queue" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -743,6 +870,7 @@
       }
     },
     "player.seek" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -759,6 +887,7 @@
       }
     },
     "player.show_lyrics" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -775,6 +904,7 @@
       }
     },
     "player.volume" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -807,6 +937,7 @@
       }
     },
     "playlist.play_all" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -823,6 +954,7 @@
       }
     },
     "queue.clear" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -839,6 +971,7 @@
       }
     },
     "queue.empty" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -855,6 +988,7 @@
       }
     },
     "queue.play_next" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -871,6 +1005,7 @@
       }
     },
     "queue.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -885,6 +1020,30 @@
           }
         }
       }
+    },
+    "Refresh Playlist" : {
+
+    },
+    "Remove" : {
+
+    },
+    "Retry" : {
+
+    },
+    "Scroll to Current" : {
+
+    },
+    "Search by file name or song name" : {
+
+    },
+    "Search in Playlist" : {
+
+    },
+    "Search playlists" : {
+
+    },
+    "Search songs" : {
+
     },
     "search.failed" : {
       "localizations" : {
@@ -902,7 +1061,20 @@
         }
       }
     },
+    "Select a playlist" : {
+
+    },
+    "Select Audio Output Device" : {
+
+    },
+    "Select Playlist" : {
+
+    },
+    "Settings" : {
+
+    },
     "settings.account" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -919,6 +1091,7 @@
       }
     },
     "settings.cache_cleared" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -935,6 +1108,7 @@
       }
     },
     "settings.clear_cache" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -951,6 +1125,7 @@
       }
     },
     "settings.double_click" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -967,6 +1142,7 @@
       }
     },
     "settings.double_click.append" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -983,6 +1159,7 @@
       }
     },
     "settings.double_click.replace" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -999,6 +1176,7 @@
       }
     },
     "settings.logout" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1015,6 +1193,7 @@
       }
     },
     "settings.playback" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1031,6 +1210,7 @@
       }
     },
     "settings.prevent_sleep" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1047,6 +1227,7 @@
       }
     },
     "settings.relay" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1063,6 +1244,7 @@
       }
     },
     "settings.relay_enabled" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1079,6 +1261,7 @@
       }
     },
     "settings.show_roma" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1095,6 +1278,7 @@
       }
     },
     "settings.show_timestamp" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1111,6 +1295,7 @@
       }
     },
     "settings.storage" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1127,6 +1312,7 @@
       }
     },
     "settings.user" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1142,7 +1328,11 @@
         }
       }
     },
+    "Show Lyrics" : {
+
+    },
     "sidebar.cloud_files" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1238,7 +1428,11 @@
         }
       }
     },
+    "Sign Out" : {
+
+    },
     "state.error" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1253,6 +1447,69 @@
           }
         }
       }
+    },
+    "Unable to load playlist" : {
+
+    },
+    "Unfavor" : {
+
+    },
+    "Upload to Cloud" : {
+
+    },
+    "User ID: %llu" : {
+
+    },
+    "Volume" : {
+
+    },
+    "刷新" : {
+
+    },
+    "加载更多评论" : {
+
+    },
+    "双击播放单曲时，仅把当前单曲添加到播放列表" : {
+
+    },
+    "双击播放单曲时，用当前单曲所在的歌曲列表替换播放列表" : {
+
+    },
+    "定位到歌单" : {
+
+    },
+    "展开回复 (%lld)" : {
+
+    },
+    "推荐" : {
+
+    },
+    "搜索结果" : {
+
+    },
+    "收起回复" : {
+
+    },
+    "时间" : {
+
+    },
+    "暂无回复" : {
+
+    },
+    "暂无评论" : {
+
+    },
+    "更多" : {
+
+    },
+    "查看评论" : {
+
+    },
+    "热门" : {
+
+    },
+    "还没有歌词" : {
+
     }
   },
   "version" : "1.0"
