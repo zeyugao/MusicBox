@@ -29,8 +29,31 @@ protocol CatalogRepository: AnyObject {
 @MainActor
 protocol CloudRepository: AnyObject {
     func cloudFiles(limit: Int, offset: Int) async -> [CloudMusicApi.CloudFile]?
-    func uploadCloudFile(_ fileURL: URL, title: String?, artist: String?, album: String?) async throws -> UInt64?
+    func uploadCloudFile(
+        _ fileURL: URL,
+        title: String?,
+        artist: String?,
+        album: String?,
+        progress: @escaping TransferProgressHandler
+    ) async throws -> UInt64?
     func matchCloudFile(userID: UInt64, songID: UInt64, adjustedSongID: UInt64) async throws
+}
+
+extension CloudRepository {
+    func uploadCloudFile(
+        _ fileURL: URL,
+        title: String?,
+        artist: String?,
+        album: String?
+    ) async throws -> UInt64? {
+        try await uploadCloudFile(
+            fileURL,
+            title: title,
+            artist: artist,
+            album: album,
+            progress: { _ in }
+        )
+    }
 }
 
 @MainActor
@@ -128,8 +151,20 @@ final class NeteaseMusicRepository: MusicRepository {
         await api().user_cloud(limit: limit, offset: offset)
     }
 
-    func uploadCloudFile(_ fileURL: URL, title: String?, artist: String?, album: String?) async throws -> UInt64? {
-        try await api().cloud(filePath: fileURL, songName: title, artist: artist, album: album)
+    func uploadCloudFile(
+        _ fileURL: URL,
+        title: String?,
+        artist: String?,
+        album: String?,
+        progress: @escaping TransferProgressHandler
+    ) async throws -> UInt64? {
+        try await api().cloud(
+            filePath: fileURL,
+            songName: title,
+            artist: artist,
+            album: album,
+            progress: progress
+        )
     }
 
     func matchCloudFile(userID: UInt64, songID: UInt64, adjustedSongID: UInt64) async throws {
@@ -247,21 +282,24 @@ enum MusicLibraryCache {
 
 enum ResolvedAudioSource {
     case local(URL)
-    case remote(url: URL, cacheURL: URL, fileExtension: String)
+    case remote(url: URL, cacheURL: URL, fileExtension: String, expectedSize: Int64?)
 }
 
 @MainActor
 final class AudioSourceResolver {
     private let repository: (any PlaybackResourceServing)?
     private let override: ((PlaylistItem) async throws -> ResolvedAudioSource)?
+    private let session: URLSession
 
-    init(repository: any PlaybackResourceServing) {
+    init(repository: any PlaybackResourceServing, session: URLSession = .shared) {
         self.repository = repository
+        self.session = session
         override = nil
     }
 
     init(resolve: @escaping (PlaylistItem) async throws -> ResolvedAudioSource) {
         repository = nil
+        session = .shared
         override = resolve
     }
 
@@ -273,7 +311,7 @@ final class AudioSourceResolver {
             return .local(cached)
         }
         if let url = item.url {
-            return try source(for: url, item: item, fallbackExtension: item.ext)
+            return try source(for: url, item: item, fallbackExtension: item.ext, expectedSize: nil)
         }
         guard let repository,
             let data = await repository.audioURL(for: item.id),
@@ -282,25 +320,67 @@ final class AudioSourceResolver {
             throw RequestError.Request("Unable to resolve an audio source")
         }
         let fileExtension = data.type.isEmpty ? data.encodeType : data.type
-        return try source(for: url, item: item, fallbackExtension: fileExtension)
+        return try source(
+            for: url,
+            item: item,
+            fallbackExtension: fileExtension,
+            expectedSize: Int64(exactly: data.size)
+        )
     }
 
-    func download(_ item: PlaylistItem) async throws -> URL {
+    func download(
+        _ item: PlaylistItem,
+        progress: @escaping TransferProgressHandler = { _ in }
+    ) async throws -> URL {
         switch try await resolve(item) {
         case .local(let url):
             return url
-        case .remote(let url, let cacheURL, _):
-            let (temporaryURL, _) = try await URLSession.shared.download(from: url)
+        case .remote(let url, let cacheURL, _, let expectedSize):
+            progress(
+                TransferProgress(
+                    completedBytes: 0,
+                    totalBytes: expectedSize,
+                    stage: .preparing
+                )
+            )
+            let delegate = URLSessionTransferProgressDelegate(
+                expectedTotalBytes: expectedSize,
+                direction: .download,
+                progress: progress
+            )
+            let (temporaryURL, response) = try await session.download(from: url, delegate: delegate)
+            try Task.checkCancellation()
+
+            let responseSize = response.expectedContentLength > 0 ? response.expectedContentLength : nil
+            let totalBytes = expectedSize ?? responseSize
+            progress(
+                TransferProgress(
+                    completedBytes: totalBytes ?? 0,
+                    totalBytes: totalBytes,
+                    stage: .finalizing
+                )
+            )
+
             let fileManager = FileManager.default
+            let stagingURL = cacheURL.deletingLastPathComponent()
+                .appendingPathComponent(".\(cacheURL.lastPathComponent).\(UUID().uuidString).download")
+            defer { try? fileManager.removeItem(at: stagingURL) }
+            try fileManager.moveItem(at: temporaryURL, to: stagingURL)
             if fileManager.fileExists(atPath: cacheURL.path) {
-                try fileManager.removeItem(at: cacheURL)
+                _ = try fileManager.replaceItemAt(cacheURL, withItemAt: stagingURL)
+            } else {
+                try fileManager.moveItem(at: stagingURL, to: cacheURL)
             }
-            try fileManager.moveItem(at: temporaryURL, to: cacheURL)
             return cacheURL
         }
     }
 
-    private func source(for url: URL, item: PlaylistItem, fallbackExtension: String?) throws -> ResolvedAudioSource {
+    private func source(
+        for url: URL,
+        item: PlaylistItem,
+        fallbackExtension: String?,
+        expectedSize: Int64?
+    ) throws -> ResolvedAudioSource {
         if url.isFileURL {
             return .local(url)
         }
@@ -308,11 +388,73 @@ final class AudioSourceResolver {
         guard let cacheURL = MusicLibraryCache.destination(for: item.id, fileExtension: fileExtension) else {
             throw RequestError.Request("Unable to create the music cache directory")
         }
-        return .remote(url: url, cacheURL: cacheURL, fileExtension: fileExtension)
+        return .remote(
+            url: url,
+            cacheURL: cacheURL,
+            fileExtension: fileExtension,
+            expectedSize: expectedSize
+        )
     }
 
     private func nonEmptyExtension(_ value: String?) -> String? {
         guard let value, !value.isEmpty else { return nil }
         return value
+    }
+}
+
+final class URLSessionTransferProgressDelegate: NSObject, URLSessionTaskDelegate, URLSessionDownloadDelegate,
+    @unchecked Sendable
+{
+    private let expectedTotalBytes: Int64?
+    private let direction: TransferDirection
+    private let progress: TransferProgressHandler
+
+    init(
+        expectedTotalBytes: Int64?,
+        direction: TransferDirection,
+        progress: @escaping TransferProgressHandler
+    ) {
+        self.expectedTotalBytes = expectedTotalBytes
+        self.direction = direction
+        self.progress = progress
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64,
+        totalBytesExpectedToSend: Int64
+    ) {
+        guard direction == .upload else { return }
+        report(completedBytes: totalBytesSent, reportedTotalBytes: totalBytesExpectedToSend)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        guard direction == .download else { return }
+        report(completedBytes: totalBytesWritten, reportedTotalBytes: totalBytesExpectedToWrite)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {}
+
+    private func report(completedBytes: Int64, reportedTotalBytes: Int64) {
+        let totalBytes = reportedTotalBytes > 0 ? reportedTotalBytes : expectedTotalBytes
+        progress(
+            TransferProgress(
+                completedBytes: completedBytes,
+                totalBytes: totalBytes,
+                stage: .transferring
+            )
+        )
     }
 }

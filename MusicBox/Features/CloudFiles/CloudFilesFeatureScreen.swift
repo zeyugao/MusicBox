@@ -49,12 +49,9 @@ struct CloudFilesFeatureScreen: View {
 
     private func match(_ file: CloudMusicApi.CloudFile, to songID: UInt64) async {
         guard let userID = app.account.profile?.userId else { return }
-        let job = app.transfers.begin(name: file.fileName)
         do {
             try await model.match(file, to: songID, userID: userID)
-            app.transfers.complete(job)
         } catch {
-            app.transfers.fail(job, message: error.localizedDescription)
             app.alerts.show(error.localizedDescription)
         }
     }

@@ -11,10 +11,8 @@ final class PlaylistFeatureModel {
     private var loadTask: Task<Void, Never>?
     private var moreTask: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
-    private var downloadTask: Task<Void, Never>?
     private let usesInitialSongs: Bool
     private let playbackSource: PlaybackSourcePlaylist?
-    private let resolver: AudioSourceResolver
 
     var songs: [CloudMusicApi.Song] = []
     var query = ""
@@ -23,9 +21,6 @@ final class PlaylistFeatureModel {
     var isLoadingMore = false
     var hasMore = false
     var errorMessage: String?
-    var isUploading = false
-    var isDownloading = false
-    var downloadProgress = 0.0
 
     init(
         destination: PlaylistDestination,
@@ -35,7 +30,6 @@ final class PlaylistFeatureModel {
     ) {
         self.destination = destination
         self.repository = repository
-        resolver = AudioSourceResolver(repository: repository)
         usesInitialSongs = initialSongs != nil
         songs = initialSongs ?? []
         playbackSource = sourcePlaylist ?? (initialSongs == nil
@@ -159,52 +153,6 @@ final class PlaylistFeatureModel {
         )
     }
 
-    func upload(_ fileURL: URL, matching song: CloudMusicApi.Song? = nil) async throws {
-        isUploading = true
-        defer { isUploading = false }
-        _ = try await repository.uploadCloudFile(
-            fileURL,
-            title: song?.name,
-            artist: song.map { $0.ar.compactMap(\.name).joined(separator: ", ") },
-            album: song?.albumName
-        )
-    }
-
-    func downloadAll() {
-        guard !isDownloading else { return }
-        let items = items
-        guard !items.isEmpty else { return }
-        downloadTask?.cancel()
-        isDownloading = true
-        downloadProgress = 0
-        errorMessage = nil
-        downloadTask = Task { [weak self, resolver] in
-            guard let self else { return }
-            defer {
-                if !Task.isCancelled {
-                    self.isDownloading = false
-                }
-            }
-            do {
-                for (offset, item) in items.enumerated() {
-                    try Task.checkCancellation()
-                    _ = try await resolver.download(item)
-                    self.downloadProgress = Double(offset + 1) / Double(items.count)
-                }
-            } catch is CancellationError {
-                self.isDownloading = false
-            } catch {
-                self.isDownloading = false
-                self.errorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    func cancelDownload() {
-        downloadTask?.cancel()
-        downloadTask = nil
-        isDownloading = false
-    }
 }
 
 enum PlaylistSongSortColumn: String, CaseIterable, Identifiable {

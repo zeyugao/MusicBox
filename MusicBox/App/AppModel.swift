@@ -84,40 +84,311 @@ final class AlertCenter {
     }
 }
 
+enum TransferDirection: String, CaseIterable, Equatable, Sendable {
+    case upload
+    case download
+}
+
+enum TransferStage: Equatable, Sendable {
+    case preparing
+    case transferring
+    case finalizing
+}
+
+struct TransferProgress: Equatable, Sendable {
+    let completedBytes: Int64
+    let totalBytes: Int64?
+    let stage: TransferStage
+
+    var fraction: Double? {
+        guard let totalBytes, totalBytes > 0 else { return nil }
+        return min(max(Double(completedBytes) / Double(totalBytes), 0), 1)
+    }
+}
+
+typealias TransferProgressHandler = @Sendable (TransferProgress) -> Void
+
 enum TransferPhase: Equatable {
+    case waiting
     case running
     case succeeded
     case failed(String)
+    case cancelled
+
+    var isFinished: Bool {
+        switch self {
+        case .succeeded, .failed, .cancelled:
+            true
+        case .waiting, .running:
+            false
+        }
+    }
 }
 
 struct TransferJob: Identifiable, Equatable {
     let id: UUID
+    let direction: TransferDirection
     let name: String
     var phase: TransferPhase
+    var progress: TransferProgress?
+    fileprivate var attempt: Int
 }
 
 @MainActor
 @Observable
 final class TransferCenter {
+    typealias UploadOperation = @MainActor (
+        _ fileURL: URL,
+        _ title: String?,
+        _ artist: String?,
+        _ album: String?,
+        _ progress: @escaping TransferProgressHandler
+    ) async throws -> Void
+    typealias DownloadOperation = @MainActor (
+        _ item: PlaylistItem,
+        _ progress: @escaping TransferProgressHandler
+    ) async throws -> Void
+
+    private enum Payload {
+        case upload(fileURL: URL, title: String?, artist: String?, album: String?)
+        case download(PlaylistItem)
+    }
+
+    private let uploadOperation: UploadOperation
+    private let downloadOperation: DownloadOperation
+    private var payloads: [UUID: Payload] = [:]
+    private var uploadWorker: Task<Void, Never>?
+    private var downloadWorker: Task<Void, Never>?
+
     private(set) var jobs: [TransferJob] = []
 
-    func begin(name: String) -> UUID {
+    init(repository: any PlaylistRepository) {
+        let resolver = AudioSourceResolver(repository: repository)
+        uploadOperation = { fileURL, title, artist, album, progress in
+            _ = try await repository.uploadCloudFile(
+                fileURL,
+                title: title,
+                artist: artist,
+                album: album,
+                progress: progress
+            )
+        }
+        downloadOperation = { item, progress in
+            _ = try await resolver.download(item, progress: progress)
+        }
+    }
+
+    init(
+        upload: @escaping UploadOperation,
+        download: @escaping DownloadOperation
+    ) {
+        uploadOperation = upload
+        downloadOperation = download
+    }
+
+    var hasJobs: Bool { !jobs.isEmpty }
+
+    func hasPendingJobs(in direction: TransferDirection) -> Bool {
+        jobs.contains { $0.direction == direction && !$0.phase.isFinished }
+    }
+
+    func enqueueUpload(
+        fileURL: URL,
+        title: String?,
+        artist: String?,
+        album: String?
+    ) {
         let id = UUID()
-        jobs.append(TransferJob(id: id, name: name, phase: .running))
-        return id
+        jobs.append(
+            TransferJob(
+                id: id,
+                direction: .upload,
+                name: fileURL.lastPathComponent,
+                phase: .waiting,
+                progress: nil,
+                attempt: 0
+            )
+        )
+        payloads[id] = .upload(
+            fileURL: fileURL,
+            title: title,
+            artist: artist,
+            album: album
+        )
+        startWorker(for: .upload)
     }
 
-    func complete(_ id: UUID) {
-        update(id, phase: .succeeded)
+    func enqueueDownloads(_ items: [PlaylistItem]) {
+        for item in items {
+            let id = UUID()
+            jobs.append(
+                TransferJob(
+                    id: id,
+                    direction: .download,
+                    name: item.title,
+                    phase: .waiting,
+                    progress: nil,
+                    attempt: 0
+                )
+            )
+            payloads[id] = .download(item)
+        }
+        startWorker(for: .download)
     }
 
-    func fail(_ id: UUID, message: String) {
-        update(id, phase: .failed(message))
+    func cancel(_ direction: TransferDirection) {
+        worker(for: direction)?.cancel()
+        for index in jobs.indices where jobs[index].direction == direction {
+            if jobs[index].phase == .waiting {
+                jobs[index].phase = .cancelled
+            }
+        }
     }
 
-    private func update(_ id: UUID, phase: TransferPhase) {
-        guard let index = jobs.firstIndex(where: { $0.id == id }) else { return }
+    func retry(_ id: UUID) {
+        guard payloads[id] != nil,
+            let index = jobs.firstIndex(where: { $0.id == id }),
+            jobs[index].phase.isFinished
+        else { return }
+        jobs[index].attempt += 1
+        jobs[index].phase = .waiting
+        jobs[index].progress = nil
+        startWorker(for: jobs[index].direction)
+    }
+
+    func clearFinished() {
+        let removedIDs = Set(jobs.filter { $0.phase.isFinished }.map(\.id))
+        jobs.removeAll { removedIDs.contains($0.id) }
+        for id in removedIDs {
+            payloads[id] = nil
+        }
+    }
+
+    func clearFinished(in direction: TransferDirection) {
+        let removedIDs = Set(
+            jobs.filter { $0.direction == direction && $0.phase.isFinished }.map(\.id)
+        )
+        jobs.removeAll { removedIDs.contains($0.id) }
+        for id in removedIDs {
+            payloads[id] = nil
+        }
+    }
+
+    private func startWorker(for direction: TransferDirection) {
+        guard worker(for: direction) == nil,
+            jobs.contains(where: { $0.direction == direction && $0.phase == .waiting })
+        else { return }
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.processQueue(direction)
+        }
+        setWorker(task, for: direction)
+    }
+
+    private func processQueue(_ direction: TransferDirection) async {
+        defer {
+            setWorker(nil, for: direction)
+            startWorker(for: direction)
+        }
+
+        while !Task.isCancelled,
+            let index = jobs.firstIndex(where: { $0.direction == direction && $0.phase == .waiting })
+        {
+            let id = jobs[index].id
+            let attempt = jobs[index].attempt
+            guard let payload = payloads[id] else {
+                jobs[index].phase = .failed(String(localized: "transfer.error.missing_operation"))
+                continue
+            }
+
+            jobs[index].phase = .running
+            jobs[index].progress = TransferProgress(
+                completedBytes: 0,
+                totalBytes: initialTotalBytes(for: payload),
+                stage: .preparing
+            )
+
+            let progress: TransferProgressHandler = { [weak self] value in
+                Task { @MainActor [weak self] in
+                    self?.updateProgress(id: id, attempt: attempt, value: value)
+                }
+            }
+
+            do {
+                switch payload {
+                case .upload(let fileURL, let title, let artist, let album):
+                    try await uploadOperation(fileURL, title, artist, album, progress)
+                case .download(let item):
+                    try await downloadOperation(item, progress)
+                }
+                try Task.checkCancellation()
+                finish(id: id, attempt: attempt, phase: .succeeded)
+            } catch is CancellationError {
+                finish(id: id, attempt: attempt, phase: .cancelled)
+                break
+            } catch {
+                if Task.isCancelled {
+                    finish(id: id, attempt: attempt, phase: .cancelled)
+                    break
+                }
+                finish(id: id, attempt: attempt, phase: .failed(error.localizedDescription))
+            }
+        }
+    }
+
+    private func updateProgress(id: UUID, attempt: Int, value: TransferProgress) {
+        guard let index = jobs.firstIndex(where: { $0.id == id }),
+            jobs[index].attempt == attempt,
+            jobs[index].phase == .running
+        else { return }
+
+        let previous = jobs[index].progress
+        let total = value.totalBytes.flatMap { $0 > 0 ? $0 : nil } ?? previous?.totalBytes
+        let completed = min(
+            max(value.completedBytes, previous?.completedBytes ?? 0),
+            total ?? Int64.max
+        )
+        let stage = stageRank(value.stage) >= stageRank(previous?.stage)
+            ? value.stage
+            : previous?.stage ?? value.stage
+        jobs[index].progress = TransferProgress(
+            completedBytes: completed,
+            totalBytes: total,
+            stage: stage
+        )
+    }
+
+    private func finish(id: UUID, attempt: Int, phase: TransferPhase) {
+        guard let index = jobs.firstIndex(where: { $0.id == id }), jobs[index].attempt == attempt else { return }
         jobs[index].phase = phase
+    }
+
+    private func initialTotalBytes(for payload: Payload) -> Int64? {
+        guard case .upload(let fileURL, _, _, _) = payload else { return nil }
+        return try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize.map(Int64.init)
+    }
+
+    private func stageRank(_ stage: TransferStage?) -> Int {
+        switch stage {
+        case .preparing, nil: 0
+        case .transferring: 1
+        case .finalizing: 2
+        }
+    }
+
+    private func worker(for direction: TransferDirection) -> Task<Void, Never>? {
+        switch direction {
+        case .upload: uploadWorker
+        case .download: downloadWorker
+        }
+    }
+
+    private func setWorker(_ task: Task<Void, Never>?, for direction: TransferDirection) {
+        switch direction {
+        case .upload: uploadWorker = task
+        case .download: downloadWorker = task
+        }
     }
 }
 
@@ -245,7 +516,7 @@ final class AppModel {
         account = AccountStore(repository: repository)
         router = AppRouter()
         alerts = alertCenter
-        transfers = TransferCenter()
+        transfers = TransferCenter(repository: repository)
         settings = appSettings
         playback = playbackStore
         playbackPresentation = PlaybackPresentationModel(playback: playbackStore)

@@ -214,38 +214,46 @@ final class NeteaseHTTPClientTests: XCTestCase {
     func testCloudUploadStreamsFileThroughNos() async throws {
         let client = makeClient()
         let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("MusicBox-cloud-upload-\(UUID().uuidString).mp3")
+            .appendingPathComponent("MusicBox-cloud-upload-\(UUID().uuidString).flac")
         let fileData = Data("cloud upload audio body".utf8)
         try fileData.write(to: fileURL)
         defer { try? FileManager.default.removeItem(at: fileURL) }
+        let progressRecorder = TransferProgressRecorder()
+        let checkedSongID = String(repeating: "a", count: 128)
 
         MockURLProtocol.configure { request in
             switch (request.url?.host, request.url?.path) {
             case ("interface.music.163.com", "/api/cloud/upload/check"):
-                return (response(for: request), Data(#"{"code":200,"needUpload":true,"songId":42}"#.utf8))
+                return (
+                    response(for: request),
+                    Data("{\"code\":\"200\",\"needUpload\":true,\"songId\":\"\(checkedSongID)\"}".utf8)
+                )
             case ("interface.music.163.com", "/api/nos/token/alloc"):
                 let form = try formFields(from: request)
                 if form["bucket"] == "" {
-                    return (response(for: request), Data(#"{"code":200,"result":{"resourceId":7}}"#.utf8))
+                    return (response(for: request), Data(#"{"code":"200","result":{"resourceId":"7"}}"#.utf8))
                 }
                 XCTAssertEqual(form["bucket"], "jd-musicrep-privatecloud-audio-public")
                 return (
                     response(for: request),
-                    Data(#"{"code":200,"result":{"token":"nos-token","objectKey":"folder/object.mp3"}}"#.utf8)
+                    Data(#"{"code":"200","result":{"token":"nos-token","objectKey":"folder/object.flac"}}"#.utf8)
                 )
             case ("wanproxy.127.net", "/lbs"):
-                return (response(for: request), Data(#"{"upload":["https://upload.example.test"]}"#.utf8))
+                return (response(for: request), Data(#"{"upload":["http://upload.example.test"]}"#.utf8))
             case ("upload.example.test", _):
                 XCTAssertEqual(request.httpMethod, "POST")
+                XCTAssertEqual(request.url?.scheme, "https")
                 XCTAssertEqual(request.value(forHTTPHeaderField: "x-nos-token"), "nos-token")
                 XCTAssertEqual(request.value(forHTTPHeaderField: "Content-MD5"), md5(fileData))
-                XCTAssertTrue(request.url?.absoluteString.contains("folder%2Fobject.mp3") == true)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "audio/flac")
+                XCTAssertTrue(request.url?.absoluteString.contains("folder%2Fobject.flac") == true)
                 XCTAssertEqual(try requestBody(from: request), fileData)
                 return (response(for: request), Data())
             case ("interface.music.163.com", "/api/upload/cloud/info/v2"):
-                return (response(for: request), Data(#"{"code":200,"songId":42}"#.utf8))
+                XCTAssertEqual(try formFields(from: request)["songid"], checkedSongID)
+                return (response(for: request), Data(#"{"code":"200","songId":"42"}"#.utf8))
             case ("interface.music.163.com", "/api/cloud/pub/v2"):
-                return (response(for: request), Data(#"{"code":200,"privateCloud":{"songId":42}}"#.utf8))
+                return (response(for: request), Data(#"{"code":"200","privateCloud":{"songId":"42"}}"#.utf8))
             default:
                 throw TestError.unexpectedRequest(request.url?.absoluteString ?? "missing URL")
             }
@@ -255,11 +263,140 @@ final class NeteaseHTTPClientTests: XCTestCase {
             fileURL: fileURL,
             songName: nil,
             artist: nil,
-            album: nil
+            album: nil,
+            progress: { progressRecorder.record($0) }
         )
 
         XCTAssertEqual(songID, 42)
         XCTAssertEqual(MockURLProtocol.requests().count, 7)
+        let progress = progressRecorder.snapshot()
+        XCTAssertEqual(progress.first?.stage, .preparing)
+        XCTAssertTrue(progress.contains { $0.stage == .transferring })
+        XCTAssertEqual(progress.last?.stage, .finalizing)
+        XCTAssertEqual(progress.last?.fraction, 1)
+    }
+
+    func testCloudUploadDecodeErrorNamesEndpointAndOnlyReportsShape() async throws {
+        let client = makeClient()
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MusicBox-cloud-invalid-\(UUID().uuidString).flac")
+        try Data("audio".utf8).write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        MockURLProtocol.configure { request in
+            XCTAssertEqual(request.url?.path, "/api/cloud/upload/check")
+            return (
+                response(for: request),
+                Data(#"{"code":200,"needUpload":true,"songId":{"secret":"do-not-echo"}}"#.utf8)
+            )
+        }
+
+        do {
+            _ = try await client.uploadCloudFile(
+                fileURL: fileURL,
+                songName: nil,
+                artist: nil,
+                album: nil
+            )
+            XCTFail("Expected decoding to fail")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("/api/cloud/upload/check"))
+            XCTAssertTrue(error.localizedDescription.contains("songId"))
+            XCTAssertTrue(error.localizedDescription.contains("shape="))
+            XCTAssertFalse(error.localizedDescription.contains("do-not-echo"))
+        }
+    }
+
+    func testTransferProgressDelegateReportsUploadAndDownloadBytes() {
+        let recorder = TransferProgressRecorder()
+        let session = URLSession(configuration: .ephemeral)
+        let request = URLRequest(url: URL(string: "https://example.test/file")!)
+
+        let uploadDelegate = URLSessionTransferProgressDelegate(
+            expectedTotalBytes: 100,
+            direction: .upload,
+            progress: { recorder.record($0) }
+        )
+        let uploadTask = session.uploadTask(with: request, from: Data())
+        uploadDelegate.urlSession(
+            session,
+            task: uploadTask,
+            didSendBodyData: 40,
+            totalBytesSent: 40,
+            totalBytesExpectedToSend: 100
+        )
+
+        let downloadDelegate = URLSessionTransferProgressDelegate(
+            expectedTotalBytes: 200,
+            direction: .download,
+            progress: { recorder.record($0) }
+        )
+        let downloadTask = session.downloadTask(with: request)
+        downloadDelegate.urlSession(
+            session,
+            downloadTask: downloadTask,
+            didWriteData: 50,
+            totalBytesWritten: 50,
+            totalBytesExpectedToWrite: 200
+        )
+
+        XCTAssertEqual(recorder.snapshot().map(\.fraction), [0.4, 0.25])
+    }
+
+    @MainActor
+    func testAudioResolverDownloadsWithByteProgressAndStoresCompleteFile() async throws {
+        let fileData = Data(repeating: 0x5A, count: 16_384)
+        let songID = UInt64.max - 10_000
+        let repository = AudioResourceRepository(
+            data: CloudMusicApi.SongData(
+                br: 999_000,
+                encodeType: "flac",
+                id: songID,
+                level: "lossless",
+                size: UInt64(fileData.count),
+                time: 1_000,
+                type: "flac",
+                url: "https://audio.example.test/song.flac"
+            )
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let resolver = AudioSourceResolver(
+            repository: repository,
+            session: URLSession(configuration: configuration)
+        )
+        let destination = try XCTUnwrap(MusicLibraryCache.destination(for: songID, fileExtension: "flac"))
+        defer { try? FileManager.default.removeItem(at: destination) }
+        let recorder = TransferProgressRecorder()
+
+        MockURLProtocol.configure { request in
+            XCTAssertEqual(request.url?.host, "audio.example.test")
+            return (
+                response(for: request, headers: ["Content-Length": String(fileData.count)]),
+                fileData
+            )
+        }
+
+        let result = try await resolver.download(
+            PlaylistItem(
+                id: songID,
+                url: nil,
+                title: "Download Test",
+                artist: "Artist",
+                albumId: 0,
+                ext: "flac",
+                duration: .zero,
+                artworkUrl: nil,
+                nsSong: nil
+            ),
+            progress: { recorder.record($0) }
+        )
+
+        XCTAssertEqual(result, destination)
+        XCTAssertEqual(try Data(contentsOf: destination), fileData)
+        XCTAssertEqual(recorder.snapshot().first?.stage, .preparing)
+        XCTAssertEqual(recorder.snapshot().last?.stage, .finalizing)
+        XCTAssertEqual(recorder.snapshot().last?.fraction, 1)
     }
 
     func testMigrationClearsLegacyAccountStateOnlyOnce() {
@@ -660,6 +797,35 @@ private enum TestError: Error {
     case failedToReadRequestBody
 }
 
+private final class TransferProgressRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [TransferProgress] = []
+
+    func record(_ progress: TransferProgress) {
+        lock.lock()
+        values.append(progress)
+        lock.unlock()
+    }
+
+    func snapshot() -> [TransferProgress] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values
+    }
+}
+
+@MainActor
+private final class AudioResourceRepository: PlaybackResourceServing {
+    let data: CloudMusicApi.SongData
+
+    init(data: CloudMusicApi.SongData) {
+        self.data = data
+    }
+
+    func audioURL(for _: UInt64) async -> CloudMusicApi.SongData? { data }
+    func lyrics(for _: UInt64) async -> CloudMusicApi.LyricNew? { nil }
+}
+
 private final class RelaySubmissionRecorder {
     private let lock = NSLock()
     private var songLists: [RelaySongListRequest] = []
@@ -714,7 +880,7 @@ private final class MockURLProtocol: URLProtocol {
 
     override class func canInit(with request: URLRequest) -> Bool {
         switch request.url?.host {
-        case "interface.music.163.com", "wanproxy.127.net", "upload.example.test",
+        case "interface.music.163.com", "wanproxy.127.net", "upload.example.test", "audio.example.test",
             "clientlog3.music.163.com", "music.163.com":
             return true
         default:

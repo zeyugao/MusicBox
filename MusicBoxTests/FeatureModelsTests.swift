@@ -120,6 +120,92 @@ final class FeatureModelsTests: XCTestCase {
     }
 
     @MainActor
+    func testTransferCenterSerializesEachDirectionAndRunsDirectionsConcurrently() async {
+        let harness = TransferOperationHarness()
+        let center = makeTransferCenter(harness: harness)
+        let firstUpload = URL(fileURLWithPath: "/tmp/first.flac")
+        let secondUpload = URL(fileURLWithPath: "/tmp/second.flac")
+
+        center.enqueueUpload(fileURL: firstUpload, title: nil, artist: nil, album: nil)
+        center.enqueueUpload(fileURL: secondUpload, title: nil, artist: nil, album: nil)
+        center.enqueueDownloads([
+            PlaylistItemFactory.make(song: makeSong(id: 1)),
+            PlaylistItemFactory.make(song: makeSong(id: 2)),
+        ])
+
+        await waitUntil { harness.uploadNames == ["first.flac"] && harness.downloadNames == ["Song 1"] }
+        XCTAssertEqual(center.jobs.filter { $0.phase == .running }.count, 2)
+        XCTAssertEqual(center.jobs.filter { $0.phase == .waiting }.count, 2)
+
+        harness.reportUpload(completed: 40, total: 100)
+        await waitUntil { center.jobs.first?.progress?.fraction == 0.4 }
+        harness.finishUpload()
+        harness.finishDownload()
+
+        await waitUntil { harness.uploadNames.count == 2 && harness.downloadNames.count == 2 }
+        harness.finishUpload()
+        harness.finishDownload()
+        await waitUntil { center.jobs.allSatisfy { $0.phase == .succeeded } }
+
+        center.clearFinished(in: .upload)
+        XCTAssertEqual(center.jobs.map(\.direction), [.download, .download])
+    }
+
+    @MainActor
+    func testTransferCenterClampsProgressCancelsAndIgnoresStaleAttempts() async {
+        let harness = TransferOperationHarness()
+        let center = makeTransferCenter(harness: harness)
+        center.enqueueUpload(
+            fileURL: URL(fileURLWithPath: "/tmp/retry.flac"),
+            title: nil,
+            artist: nil,
+            album: nil
+        )
+        center.enqueueUpload(
+            fileURL: URL(fileURLWithPath: "/tmp/waiting.flac"),
+            title: nil,
+            artist: nil,
+            album: nil
+        )
+        await waitUntil { harness.uploadProgressHandlers.count == 1 }
+
+        let staleProgress = harness.uploadProgressHandlers[0]
+        harness.reportUpload(completed: 80, total: 100)
+        harness.reportUpload(completed: 30, total: 100)
+        await waitUntil { center.jobs[0].progress?.fraction == 0.8 }
+
+        center.cancel(.upload)
+        harness.finishUpload()
+        await waitUntil { center.jobs.allSatisfy { $0.phase == .cancelled } }
+
+        let firstID = center.jobs[0].id
+        center.retry(firstID)
+        await waitUntil { harness.uploadProgressHandlers.count == 2 }
+        staleProgress(TransferProgress(completedBytes: 100, totalBytes: 100, stage: .transferring))
+        try? await Task.sleep(for: .milliseconds(20))
+        XCTAssertEqual(center.jobs[0].progress?.completedBytes, 0)
+
+        harness.reportUpload(completed: 150, total: 100)
+        await waitUntil { center.jobs[0].progress?.fraction == 1 }
+        harness.finishUpload()
+        await waitUntil { center.jobs[0].phase == .succeeded }
+        center.clearFinished()
+        XCTAssertTrue(center.jobs.isEmpty)
+    }
+
+    @MainActor
+    private func makeTransferCenter(harness: TransferOperationHarness) -> TransferCenter {
+        TransferCenter(
+            upload: { fileURL, _, _, _, progress in
+                try await harness.upload(fileURL, progress: progress)
+            },
+            download: { item, progress in
+                try await harness.download(item, progress: progress)
+            }
+        )
+    }
+
+    @MainActor
     private func waitUntil(
         timeout: Duration = .seconds(2),
         _ condition: @escaping @MainActor () -> Bool
@@ -130,6 +216,44 @@ final class FeatureModelsTests: XCTestCase {
             try? await Task.sleep(for: .milliseconds(10))
         }
         XCTAssertTrue(condition())
+    }
+}
+
+@MainActor
+private final class TransferOperationHarness {
+    private var uploadContinuations: [CheckedContinuation<Void, Never>] = []
+    private var downloadContinuations: [CheckedContinuation<Void, Never>] = []
+    private(set) var uploadNames: [String] = []
+    private(set) var downloadNames: [String] = []
+    private(set) var uploadProgressHandlers: [TransferProgressHandler] = []
+
+    func upload(_ fileURL: URL, progress: @escaping TransferProgressHandler) async throws {
+        uploadNames.append(fileURL.lastPathComponent)
+        uploadProgressHandlers.append(progress)
+        await withCheckedContinuation { uploadContinuations.append($0) }
+    }
+
+    func download(_ item: PlaylistItem, progress: @escaping TransferProgressHandler) async throws {
+        downloadNames.append(item.title)
+        await withCheckedContinuation { downloadContinuations.append($0) }
+    }
+
+    func reportUpload(completed: Int64, total: Int64) {
+        uploadProgressHandlers.last?(
+            TransferProgress(
+                completedBytes: completed,
+                totalBytes: total,
+                stage: .transferring
+            )
+        )
+    }
+
+    func finishUpload() {
+        uploadContinuations.removeFirst().resume()
+    }
+
+    func finishDownload() {
+        downloadContinuations.removeFirst().resume()
     }
 }
 
@@ -194,7 +318,13 @@ private final class RecordingPlaylistRepository: PlaylistRepository {
         trackIDs _: [UInt64]
     ) async throws {}
     func cloudFiles(limit _: Int, offset _: Int) async -> [CloudMusicApi.CloudFile]? { nil }
-    func uploadCloudFile(_: URL, title _: String?, artist _: String?, album _: String?) async throws -> UInt64? { nil }
+    func uploadCloudFile(
+        _: URL,
+        title _: String?,
+        artist _: String?,
+        album _: String?,
+        progress _: @escaping TransferProgressHandler
+    ) async throws -> UInt64? { nil }
     func matchCloudFile(userID _: UInt64, songID _: UInt64, adjustedSongID _: UInt64) async throws {}
     func audioURL(for _: UInt64) async -> CloudMusicApi.SongData? { nil }
     func lyrics(for _: UInt64) async -> CloudMusicApi.LyricNew? { nil }
@@ -211,7 +341,13 @@ private final class RecordingCloudRepository: CloudRepository {
         return offset == 0 ? firstPage : secondPage
     }
 
-    func uploadCloudFile(_: URL, title _: String?, artist _: String?, album _: String?) async throws -> UInt64? { nil }
+    func uploadCloudFile(
+        _: URL,
+        title _: String?,
+        artist _: String?,
+        album _: String?,
+        progress _: @escaping TransferProgressHandler
+    ) async throws -> UInt64? { nil }
     func matchCloudFile(userID _: UInt64, songID _: UInt64, adjustedSongID _: UInt64) async throws {}
 }
 

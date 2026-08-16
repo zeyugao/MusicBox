@@ -819,14 +819,21 @@ class CloudMusicApi {
         }
     }
 
-    func cloud(filePath: URL, songName: String?, artist: String?, album: String?) async throws
+    func cloud(
+        filePath: URL,
+        songName: String?,
+        artist: String?,
+        album: String?,
+        progress: @escaping TransferProgressHandler = { _ in }
+    ) async throws
         -> UInt64?
     {
         try await client.uploadCloudFile(
             fileURL: filePath,
             songName: songName,
             artist: artist,
-            album: album
+            album: album,
+            progress: progress
         )
     }
 

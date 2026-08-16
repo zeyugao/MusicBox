@@ -439,12 +439,20 @@ final class NeteaseHTTPClient {
         fileURL: URL,
         songName: String?,
         artist: String?,
-        album: String?
+        album: String?,
+        progress: @escaping TransferProgressHandler = { _ in }
     ) async throws -> UInt64? {
         let values = try fileMetadata(at: fileURL)
         let fileName = fileURL.lastPathComponent
         let ext = fileURL.pathExtension.lowercased() == "flac" ? "flac" : "mp3"
         let normalizedName = Self.normalizedUploadName(fileName, ext: ext)
+        progress(
+            TransferProgress(
+                completedBytes: 0,
+                totalBytes: values.size,
+                stage: .preparing
+            )
+        )
 
         let checkResponse = try await post(
             path: "/api/cloud/upload/check",
@@ -458,9 +466,13 @@ final class NeteaseHTTPClient {
             ]
         )
         mergeCookies(from: checkResponse.response)
-        let check = try decode(CloudUploadCheck.self, from: checkResponse.data)
-        try requireSuccess(check.code, data: checkResponse.data)
-        let checkedSongID = try required(check.songId, message: "Missing cloud upload song ID")
+        let check = try decode(
+            CloudUploadCheck.self,
+            from: checkResponse.data,
+            endpoint: "/api/cloud/upload/check"
+        )
+        try requireSuccess(check.code?.value, data: checkResponse.data)
+        let checkedSongID = try required(check.songId?.value, message: "Missing cloud upload song ID")
 
         let resourceTokenResponse = try await post(
             path: "/api/nos/token/alloc",
@@ -475,8 +487,12 @@ final class NeteaseHTTPClient {
             ]
         )
         mergeCookies(from: resourceTokenResponse.response)
-        let resourceToken = try decode(NosTokenResponse.self, from: resourceTokenResponse.data)
-        try requireSuccess(resourceToken.code, data: resourceTokenResponse.data)
+        let resourceToken = try decode(
+            NosTokenResponse.self,
+            from: resourceTokenResponse.data,
+            endpoint: "/api/nos/token/alloc (resource)"
+        )
+        try requireSuccess(resourceToken.code?.value, data: resourceTokenResponse.data)
 
         if check.needUpload == true {
             let uploadTokenResponse = try await post(
@@ -492,16 +508,30 @@ final class NeteaseHTTPClient {
                 ]
             )
             mergeCookies(from: uploadTokenResponse.response)
-            let uploadToken = try decode(NosTokenResponse.self, from: uploadTokenResponse.data)
-            try requireSuccess(uploadToken.code, data: uploadTokenResponse.data)
+            let uploadToken = try decode(
+                NosTokenResponse.self,
+                from: uploadTokenResponse.data,
+                endpoint: "/api/nos/token/alloc (upload)"
+            )
+            try requireSuccess(uploadToken.code?.value, data: uploadTokenResponse.data)
             try await upload(
                 fileURL: fileURL,
                 contentLength: values.size,
+                fileExtension: ext,
                 md5: values.md5,
                 token: try required(uploadToken.result?.token, message: "Missing NOS upload token"),
-                objectKey: try required(uploadToken.result?.objectKey, message: "Missing NOS object key")
+                objectKey: try required(uploadToken.result?.objectKey, message: "Missing NOS object key"),
+                progress: progress
             )
         }
+
+        progress(
+            TransferProgress(
+                completedBytes: values.size,
+                totalBytes: values.size,
+                stage: .finalizing
+            )
+        )
 
         let infoResponse = try await post(
             path: "/api/upload/cloud/info/v2",
@@ -513,21 +543,29 @@ final class NeteaseHTTPClient {
                 "album": album?.isEmpty == false ? album! : "未知专辑",
                 "artist": artist?.isEmpty == false ? artist! : "未知艺术家",
                 "bitrate": "999000",
-                "resourceId": try required(resourceToken.result?.resourceId, message: "Missing NOS resource ID"),
+                "resourceId": try required(resourceToken.result?.resourceId?.value, message: "Missing NOS resource ID"),
             ]
         )
         mergeCookies(from: infoResponse.response)
-        let info = try decode(CloudUploadInfo.self, from: infoResponse.data)
-        try requireSuccess(info.code, data: infoResponse.data)
+        let info = try decode(
+            CloudUploadInfo.self,
+            from: infoResponse.data,
+            endpoint: "/api/upload/cloud/info/v2"
+        )
+        try requireSuccess(info.code?.value, data: infoResponse.data)
 
         let publishResponse = try await post(
             path: "/api/cloud/pub/v2",
-            fields: ["songid": try required(info.songId, message: "Missing uploaded song ID")]
+            fields: ["songid": try required(info.songId?.value, message: "Missing uploaded song ID")]
         )
         mergeCookies(from: publishResponse.response)
-        let published = try decode(CloudPublishResponse.self, from: publishResponse.data)
-        try requireSuccess(published.code, data: publishResponse.data)
-        return published.privateCloud?.songId
+        let published = try decode(
+            CloudPublishResponse.self,
+            from: publishResponse.data,
+            endpoint: "/api/cloud/pub/v2"
+        )
+        try requireSuccess(published.code?.value, data: publishResponse.data)
+        return published.privateCloud?.songId.value
     }
 
     private func post(path: String, fields: [String: Any]) async throws -> (data: Data, response: HTTPURLResponse) {
@@ -553,9 +591,11 @@ final class NeteaseHTTPClient {
     private func upload(
         fileURL: URL,
         contentLength: Int64,
+        fileExtension: String,
         md5: String,
         token: String,
-        objectKey: String
+        objectKey: String,
+        progress: @escaping TransferProgressHandler
     ) async throws {
         let lbsURL = URL(string: "https://wanproxy.127.net/lbs?version=1.0&bucketname=jd-musicrep-privatecloud-audio-public")!
         var lbsRequest = URLRequest(url: lbsURL)
@@ -569,12 +609,29 @@ final class NeteaseHTTPClient {
             throw RequestError.Request("NOS LBS request failed with HTTP \(lbsHTTPResponse.statusCode)")
         }
 
-        let lbs = try decode(NosLbsResponse.self, from: lbsData)
+        let lbs = try decode(
+            NosLbsResponse.self,
+            from: lbsData,
+            endpoint: "NOS LBS"
+        )
         let host = try required(lbs.upload.first, message: "NOS LBS returned no upload host")
         let encodedObjectKey = objectKey.replacingOccurrences(of: "/", with: "%2F")
-        guard let uploadURL = URL(
-            string: "\(host)/jd-musicrep-privatecloud-audio-public/\(encodedObjectKey)?offset=0&complete=true&version=1.0"
-        ) else {
+        guard var uploadComponents = URLComponents(string: host), uploadComponents.host != nil else {
+            throw RequestError.Request("NOS returned an invalid upload URL")
+        }
+        uploadComponents.scheme = "https"
+        let basePath = uploadComponents.percentEncodedPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        uploadComponents.percentEncodedPath = "/" + [
+            basePath,
+            "jd-musicrep-privatecloud-audio-public",
+            encodedObjectKey,
+        ].filter { !$0.isEmpty }.joined(separator: "/")
+        uploadComponents.queryItems = [
+            URLQueryItem(name: "offset", value: "0"),
+            URLQueryItem(name: "complete", value: "true"),
+            URLQueryItem(name: "version", value: "1.0"),
+        ]
+        guard let uploadURL = uploadComponents.url else {
             throw RequestError.Request("NOS returned an invalid upload URL")
         }
 
@@ -583,10 +640,25 @@ final class NeteaseHTTPClient {
         request.httpShouldHandleCookies = false
         request.setValue(token, forHTTPHeaderField: "x-nos-token")
         request.setValue(md5, forHTTPHeaderField: "Content-MD5")
-        request.setValue("audio/mpeg", forHTTPHeaderField: "Content-Type")
+        request.setValue(
+            fileExtension == "flac" ? "audio/flac" : "audio/mpeg",
+            forHTTPHeaderField: "Content-Type"
+        )
         request.setValue(String(contentLength), forHTTPHeaderField: "Content-Length")
 
-        let (_, response) = try await session.upload(for: request, fromFile: fileURL)
+        progress(
+            TransferProgress(
+                completedBytes: 0,
+                totalBytes: contentLength,
+                stage: .transferring
+            )
+        )
+        let delegate = URLSessionTransferProgressDelegate(
+            expectedTotalBytes: contentLength,
+            direction: .upload,
+            progress: progress
+        )
+        let (_, response) = try await session.upload(for: request, fromFile: fileURL, delegate: delegate)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw RequestError.Request("NOS upload returned a non-HTTP response")
         }
@@ -716,11 +788,14 @@ final class NeteaseHTTPClient {
         }
     }
 
-    private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+    private func decode<T: Decodable>(_ type: T.Type, from data: Data, endpoint: String) throws -> T {
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {
-            throw RequestError.Request("Failed to decode NetEase response: \(error.localizedDescription)")
+            throw RequestError.Request(
+                "Failed to decode NetEase response from \(endpoint): \(Self.decodingSummary(error)); "
+                    + "shape=\(Self.responseShape(data))"
+            )
         }
     }
 
@@ -797,22 +872,154 @@ final class NeteaseHTTPClient {
             .components(separatedBy: .whitespacesAndNewlines).joined()
             .replacingOccurrences(of: ".", with: "_")
     }
+
+    private static func decodingSummary(_ error: Error) -> String {
+        guard let error = error as? DecodingError else { return error.localizedDescription }
+        let context: DecodingError.Context
+        switch error {
+        case .typeMismatch(_, let value), .valueNotFound(_, let value),
+            .keyNotFound(_, let value), .dataCorrupted(let value):
+            context = value
+        @unknown default:
+            return error.localizedDescription
+        }
+        let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+        return path.isEmpty ? context.debugDescription : "\(path): \(context.debugDescription)"
+    }
+
+    private static func responseShape(_ data: Data) -> String {
+        guard let object = try? JSONSerialization.jsonObject(with: data) else {
+            return "non-JSON(\(data.count) bytes)"
+        }
+        return shape(of: object, depth: 0)
+    }
+
+    private static func shape(of value: Any, depth: Int) -> String {
+        guard depth < 3 else { return "..." }
+        if let dictionary = value as? [String: Any] {
+            return "{" + dictionary.keys.sorted().map { key in
+                "\(key):\(shape(of: dictionary[key] ?? NSNull(), depth: depth + 1))"
+            }.joined(separator: ",") + "}"
+        }
+        if let array = value as? [Any] {
+            return "[\(array.first.map { shape(of: $0, depth: depth + 1) } ?? "empty")]"
+        }
+        switch value {
+        case is String: return "string"
+        case is NSNumber: return "number"
+        case is NSNull: return "null"
+        default: return "unknown"
+        }
+    }
+}
+
+private struct FlexibleInt: Decodable {
+    let value: Int
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(Int.self) {
+            self.value = value
+        } else if let string = try? container.decode(String.self) {
+            let normalized = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let value = Int(normalized) else {
+                throw DecodingError.typeMismatch(
+                    Int.self,
+                    DecodingError.Context(
+                        codingPath: decoder.codingPath,
+                        debugDescription: Self.invalidStringDescription(normalized)
+                    )
+                )
+            }
+            self.value = value
+        } else {
+            throw DecodingError.typeMismatch(
+                Int.self,
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Expected an integer or decimal integer string"
+                )
+            )
+        }
+    }
+
+    private static func invalidStringDescription(_ value: String) -> String {
+        let isDecimal = !value.isEmpty && value.allSatisfy(\.isNumber)
+        return "Expected a decimal integer string; length=\(value.count), decimalDigitsOnly=\(isDecimal)"
+    }
+}
+
+private struct FlexibleUInt64: Decodable {
+    let value: UInt64
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(UInt64.self) {
+            self.value = value
+        } else if let string = try? container.decode(String.self) {
+            let normalized = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let value = UInt64(normalized) else {
+                throw DecodingError.typeMismatch(
+                    UInt64.self,
+                    DecodingError.Context(
+                        codingPath: decoder.codingPath,
+                        debugDescription: Self.invalidStringDescription(normalized)
+                    )
+                )
+            }
+            self.value = value
+        } else {
+            throw DecodingError.typeMismatch(
+                UInt64.self,
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Expected an unsigned integer or decimal integer string"
+                )
+            )
+        }
+    }
+
+    private static func invalidStringDescription(_ value: String) -> String {
+        let isDecimal = !value.isEmpty && value.allSatisfy(\.isNumber)
+        return "Expected a decimal unsigned integer string; length=\(value.count), decimalDigitsOnly=\(isDecimal)"
+    }
+}
+
+private struct FlexibleIdentifier: Decodable {
+    let value: String
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let string = try? container.decode(String.self), !string.isEmpty {
+            value = string
+        } else if let number = try? container.decode(UInt64.self) {
+            value = String(number)
+        } else {
+            throw DecodingError.typeMismatch(
+                String.self,
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Expected a non-empty string or unsigned integer identifier"
+                )
+            )
+        }
+    }
 }
 
 private struct CloudUploadCheck: Decodable {
-    let code: Int?
+    let code: FlexibleInt?
     let needUpload: Bool?
-    let songId: UInt64?
+    let songId: FlexibleIdentifier?
 }
 
 private struct NosTokenResponse: Decodable {
     struct Result: Decodable {
         let token: String?
         let objectKey: String?
-        let resourceId: UInt64?
+        let resourceId: FlexibleIdentifier?
     }
 
-    let code: Int?
+    let code: FlexibleInt?
     let result: Result?
 }
 
@@ -821,15 +1028,15 @@ private struct NosLbsResponse: Decodable {
 }
 
 private struct CloudUploadInfo: Decodable {
-    let code: Int?
-    let songId: UInt64?
+    let code: FlexibleInt?
+    let songId: FlexibleIdentifier?
 }
 
 private struct CloudPublishResponse: Decodable {
     struct PrivateCloud: Decodable {
-        let songId: UInt64
+        let songId: FlexibleUInt64
     }
 
-    let code: Int?
+    let code: FlexibleInt?
     let privateCloud: PrivateCloud?
 }

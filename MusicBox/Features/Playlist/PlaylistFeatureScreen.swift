@@ -7,7 +7,8 @@ struct PlaylistFeatureScreen: View {
     @State private var model: PlaylistFeatureModel
     @State private var selectedSongsToAdd: [CloudMusicApi.Song] = []
     @State private var isImporting = false
-    @State private var isDownloadProgressPresented = false
+    @State private var isUploadPopoverPresented = false
+    @State private var isDownloadPopoverPresented = false
 
     init(
         destination: PlaylistDestination,
@@ -46,7 +47,7 @@ struct PlaylistFeatureScreen: View {
                 onAddToPlaylist: { selectedSongsToAdd = $0 },
                 onDeleteFromPlaylist: delete,
                 onUpload: { url, song in
-                    Task { await upload(url, song) }
+                    upload(url, song)
                 },
                 onViewComments: showComments,
                 onCopy: copyToPasteboard,
@@ -95,18 +96,12 @@ struct PlaylistFeatureScreen: View {
             allowsMultipleSelection: true
         ) { result in
             guard case let .success(urls) = result else { return }
-            Task {
-                for url in urls {
-                    await upload(url, nil)
-                }
+            for url in urls {
+                upload(url, nil)
             }
-        }
-        .popover(isPresented: $isDownloadProgressPresented) {
-            DownloadProgressPopover(
-                progress: model.downloadProgress,
-                isDownloading: model.isDownloading,
-                cancel: model.cancelDownload
-            )
+            if !urls.isEmpty {
+                isUploadPopoverPresented = true
+            }
         }
     }
 
@@ -115,13 +110,21 @@ struct PlaylistFeatureScreen: View {
         if model.isRemotePlaylist {
             ToolbarItemGroup {
                 PlaylistDownloadToolbarButton(
-                    isDisabled: model.songs.isEmpty || model.isDownloading
+                    transfers: app.transfers,
+                    isPresented: $isDownloadPopoverPresented,
+                    isDisabled: model.songs.isEmpty
+                        && !app.transfers.jobs.contains { $0.direction == .download },
+                    canStart: !model.songs.isEmpty
+                        && !app.transfers.hasPendingJobs(in: .download)
                 ) {
-                    model.downloadAll()
-                    isDownloadProgressPresented = true
+                    app.transfers.enqueueDownloads(model.items)
                 }
 
-                PlaylistUploadToolbarButton(isDisabled: model.isUploading) {
+                PlaylistUploadToolbarButton(
+                    transfers: app.transfers,
+                    isPresented: $isUploadPopoverPresented
+                ) {
+                    isUploadPopoverPresented = false
                     isImporting = true
                 }
 
@@ -184,15 +187,14 @@ struct PlaylistFeatureScreen: View {
         }
     }
 
-    private func upload(_ url: URL, _ song: CloudMusicApi.Song?) async {
-        let job = app.transfers.begin(name: url.lastPathComponent)
-        do {
-            try await model.upload(url, matching: song)
-            app.transfers.complete(job)
-        } catch {
-            app.transfers.fail(job, message: error.localizedDescription)
-            app.alerts.show(error.localizedDescription)
-        }
+    private func upload(_ url: URL, _ song: CloudMusicApi.Song?) {
+        app.transfers.enqueueUpload(
+            fileURL: url,
+            title: song?.name,
+            artist: song.map { $0.ar.compactMap(\.name).joined(separator: ", ") },
+            album: song?.albumName
+        )
+        isUploadPopoverPresented = true
     }
 
     private func showComments(_ song: CloudMusicApi.Song) {
@@ -213,28 +215,79 @@ struct PlaylistFeatureScreen: View {
 }
 
 private struct PlaylistDownloadToolbarButton: View {
+    let transfers: TransferCenter
+    @Binding var isPresented: Bool
     let isDisabled: Bool
+    let canStart: Bool
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            isPresented.toggle()
+        } label: {
             Image(systemName: "square.and.arrow.down")
+                .foregroundStyle(hasFailures ? Color.red : Color.primary)
+                .symbolEffect(.pulse, options: .repeating, isActive: hasPendingJobs)
         }
         .help("Download All")
         .disabled(isDisabled)
+        .popover(isPresented: $isPresented, arrowEdge: .bottom) {
+            DirectionalTransferPopover(
+                transfers: transfers,
+                direction: .download,
+                canStart: canStart,
+                start: action
+            )
+        }
+    }
+
+    private var hasPendingJobs: Bool {
+        transfers.hasPendingJobs(in: .download)
+    }
+
+    private var hasFailures: Bool {
+        transfers.jobs.contains {
+            guard $0.direction == .download else { return false }
+            if case .failed = $0.phase { return true }
+            return false
+        }
     }
 }
 
 private struct PlaylistUploadToolbarButton: View {
-    let isDisabled: Bool
+    let transfers: TransferCenter
+    @Binding var isPresented: Bool
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            isPresented.toggle()
+        } label: {
             Image(systemName: "icloud.and.arrow.up")
+                .foregroundStyle(hasFailures ? Color.red : Color.primary)
+                .symbolEffect(.pulse, options: .repeating, isActive: hasPendingJobs)
         }
         .help("Upload to Cloud")
-        .disabled(isDisabled)
+        .popover(isPresented: $isPresented, arrowEdge: .bottom) {
+            DirectionalTransferPopover(
+                transfers: transfers,
+                direction: .upload,
+                canStart: true,
+                start: action
+            )
+        }
+    }
+
+    private var hasPendingJobs: Bool {
+        transfers.hasPendingJobs(in: .upload)
+    }
+
+    private var hasFailures: Bool {
+        transfers.jobs.contains {
+            guard $0.direction == .upload else { return false }
+            if case .failed = $0.phase { return true }
+            return false
+        }
     }
 }
 
@@ -271,28 +324,160 @@ private struct PlaylistPickerSheet: View {
     }
 }
 
-private struct DownloadProgressPopover: View {
-    let progress: Double
-    let isDownloading: Bool
-    let cancel: () -> Void
+private struct DirectionalTransferPopover: View {
+    let transfers: TransferCenter
+    let direction: TransferDirection
+    let canStart: Bool
+    let start: () -> Void
+
+    private var jobs: [TransferJob] {
+        transfers.jobs.filter { $0.direction == direction }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Downloading")
-                .font(.headline)
-            ProgressView(value: progress)
-                .frame(width: 260)
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("\(Int(progress * 100))%")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Label(
+                    direction == .upload ? "Uploads" : "Downloads",
+                    systemImage: direction == .upload ? "arrow.up.circle" : "arrow.down.circle"
+                )
+                    .font(.headline)
                 Spacer()
-                Button(isDownloading ? "Cancel" : "Done") {
-                    cancel()
+                Button(action: start) {
+                    Image(systemName: direction == .upload ? "plus" : "arrow.down.to.line")
                 }
+                .buttonStyle(.borderless)
+                .help(direction == .upload ? "Upload to Cloud" : "Download All")
+                .disabled(!canStart)
+                if transfers.hasPendingJobs(in: direction) {
+                    Button {
+                        transfers.cancel(direction)
+                    } label: {
+                        Image(systemName: "xmark.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(direction == .upload ? "Cancel Uploads" : "Cancel Downloads")
+                }
+                Button {
+                    transfers.clearFinished(in: direction)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help("Clear Finished Transfers")
+                .disabled(!jobs.contains(where: { $0.phase.isFinished }))
+            }
+
+            if jobs.isEmpty {
+                Text("No Transfers")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 80)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(jobs) { job in
+                            TransferRow(job: job, retry: { transfers.retry(job.id) })
+                        }
+                    }
+                }
+                .frame(maxHeight: 340)
             }
         }
-        .padding(20)
+        .padding(16)
+        .frame(width: 520)
+    }
+}
+
+private struct TransferRow: View {
+    let job: TransferJob
+    let retry: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(job.name)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            status
+                .frame(width: 260, alignment: .trailing)
+        }
+        .padding(.vertical, 3)
+    }
+
+    @ViewBuilder
+    private var status: some View {
+        switch job.phase {
+        case .waiting:
+            Label("Waiting", systemImage: "clock")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .running:
+            VStack(alignment: .trailing, spacing: 3) {
+                if let fraction = job.progress?.fraction {
+                    ProgressView(value: fraction)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                }
+                HStack(spacing: 6) {
+                    Text(stageText)
+                    Spacer()
+                    Text(progressText)
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        case .succeeded:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .help("Transfer Completed")
+        case .failed(let message):
+            HStack(spacing: 6) {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(1)
+                    .help(message)
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+                retryButton
+            }
+        case .cancelled:
+            HStack(spacing: 6) {
+                Label("Cancelled", systemImage: "slash.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                retryButton
+            }
+        }
+    }
+
+    private var retryButton: some View {
+        Button(action: retry) {
+            Image(systemName: "arrow.clockwise")
+        }
+        .buttonStyle(.borderless)
+        .help("Retry Transfer")
+    }
+
+    private var stageText: LocalizedStringKey {
+        switch job.progress?.stage {
+        case .preparing, nil: "Preparing"
+        case .transferring: job.direction == .upload ? "Uploading" : "Downloading"
+        case .finalizing: "Finalizing"
+        }
+    }
+
+    private var progressText: String {
+        guard let progress = job.progress else { return "0%" }
+        let percent = progress.fraction.map { "\(Int($0 * 100))%" } ?? ""
+        guard let total = progress.totalBytes else {
+            return ByteCountFormatter.string(fromByteCount: progress.completedBytes, countStyle: .file)
+        }
+        let completedText = ByteCountFormatter.string(fromByteCount: progress.completedBytes, countStyle: .file)
+        let totalText = ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
+        return "\(percent)  \(completedText) / \(totalText)"
     }
 }
 

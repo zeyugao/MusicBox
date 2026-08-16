@@ -136,7 +136,7 @@ private final class AVPlaybackEngine: NSObject, PlaybackEngineControlling, @prec
         case .local(let url):
             let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
             item = AVPlayerItem(asset: asset)
-        case let .remote(url, cacheURL, fileExtension):
+        case let .remote(url, cacheURL, fileExtension, _):
             let cachingItem = CachingPlayerItem(
                 url: url,
                 saveFilePath: cacheURL.path,
