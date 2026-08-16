@@ -284,7 +284,7 @@ final class CommentsViewModel: ObservableObject {
         let target = target
         let sortOption = sortOption
         let pageSize = pageSize
-        loadTask = Task.detached(priority: .utility) { [weak self] in
+        loadTask = Task(priority: .utility) { [weak self] in
             do {
                 let page = try await Self.fetchComments(
                     target: target,
@@ -293,36 +293,29 @@ final class CommentsViewModel: ObservableObject {
                     sortOption: sortOption,
                     cursor: nil
                 )
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    guard let self else { return }
-                    guard self.sortOption == sortOption else { return }
-                    let initialComments = page.comments ?? []
-                    var uniqueComments: [CloudMusicApi.Comment] = []
-                    uniqueComments.reserveCapacity(initialComments.count)
-                    var commentIdSet: Set<UInt64> = []
-                    for comment in initialComments {
-                        if commentIdSet.insert(comment.commentId).inserted {
-                            uniqueComments.append(comment)
-                        }
+                guard !Task.isCancelled, let self, self.sortOption == sortOption else { return }
+                let initialComments = page.comments ?? []
+                var uniqueComments: [CloudMusicApi.Comment] = []
+                uniqueComments.reserveCapacity(initialComments.count)
+                var commentIdSet: Set<UInt64> = []
+                for comment in initialComments {
+                    if commentIdSet.insert(comment.commentId).inserted {
+                        uniqueComments.append(comment)
                     }
-                    self.comments = uniqueComments
-                    self.totalCount = page.totalCount ?? 0
-                    self.hasMore = page.hasMore ?? false
-                    self.pageNo = 1
-                    self.commentIdSet = commentIdSet
-                    if sortOption == .time {
-                        self.timeCursor = Self.extractTimeCursor(from: page.cursor)
-                    }
-                    self.isLoading = false
                 }
+                self.comments = uniqueComments
+                self.totalCount = page.totalCount ?? 0
+                self.hasMore = page.hasMore ?? false
+                self.pageNo = 1
+                self.commentIdSet = commentIdSet
+                if sortOption == .time {
+                    self.timeCursor = Self.extractTimeCursor(from: page.cursor)
+                }
+                self.isLoading = false
             } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    guard let self else { return }
-                    self.errorMessage = error.localizedDescription
-                    self.isLoading = false
-                }
+                guard !Task.isCancelled, let self else { return }
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
             }
         }
     }
@@ -338,7 +331,7 @@ final class CommentsViewModel: ObservableObject {
         let pageSize = pageSize
         let nextPageNo = pageNo + 1
         let cursor = sortOption == .time ? timeCursor : nil
-        loadMoreTask = Task.detached(priority: .utility) { [weak self] in
+        loadMoreTask = Task(priority: .utility) { [weak self] in
             do {
                 let page = try await Self.fetchComments(
                     target: target,
@@ -347,38 +340,31 @@ final class CommentsViewModel: ObservableObject {
                     sortOption: sortOption,
                     cursor: cursor
                 )
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    guard let self else { return }
-                    guard self.sortOption == sortOption else { return }
-                    let newComments = page.comments ?? []
-                    if !newComments.isEmpty {
-                        var uniqueComments: [CloudMusicApi.Comment] = []
-                        uniqueComments.reserveCapacity(newComments.count)
-                        for comment in newComments {
-                            if self.commentIdSet.insert(comment.commentId).inserted {
-                                uniqueComments.append(comment)
-                            }
-                        }
-                        if !uniqueComments.isEmpty {
-                            self.comments.append(contentsOf: uniqueComments)
+                guard !Task.isCancelled, let self, self.sortOption == sortOption else { return }
+                let newComments = page.comments ?? []
+                if !newComments.isEmpty {
+                    var uniqueComments: [CloudMusicApi.Comment] = []
+                    uniqueComments.reserveCapacity(newComments.count)
+                    for comment in newComments {
+                        if self.commentIdSet.insert(comment.commentId).inserted {
+                            uniqueComments.append(comment)
                         }
                     }
-                    self.hasMore = page.hasMore ?? false
-                    self.totalCount = page.totalCount ?? self.totalCount
-                    self.pageNo = nextPageNo
-                    if sortOption == .time {
-                        self.timeCursor = Self.extractTimeCursor(from: page.cursor)
+                    if !uniqueComments.isEmpty {
+                        self.comments.append(contentsOf: uniqueComments)
                     }
-                    self.isLoadingMore = false
                 }
+                self.hasMore = page.hasMore ?? false
+                self.totalCount = page.totalCount ?? self.totalCount
+                self.pageNo = nextPageNo
+                if sortOption == .time {
+                    self.timeCursor = Self.extractTimeCursor(from: page.cursor)
+                }
+                self.isLoadingMore = false
             } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    guard let self else { return }
-                    self.errorMessage = error.localizedDescription
-                    self.isLoadingMore = false
-                }
+                guard !Task.isCancelled, let self else { return }
+                self.errorMessage = error.localizedDescription
+                self.isLoadingMore = false
             }
         }
     }
@@ -401,7 +387,7 @@ final class CommentsViewModel: ObservableObject {
         floorErrorMessages[parentCommentId] = nil
 
         let target = target
-        floorTasks[parentCommentId] = Task.detached(priority: .utility) { [weak self] in
+        floorTasks[parentCommentId] = Task(priority: .utility) { [weak self] in
             do {
                 let data = try await Self.fetchFloor(
                     target: target,
@@ -409,39 +395,33 @@ final class CommentsViewModel: ObservableObject {
                     limit: 10,
                     time: nil
                 )
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    guard let self else { return }
-                    let comments = data.comments ?? []
-                    var uniqueComments: [CloudMusicApi.Comment] = []
-                    uniqueComments.reserveCapacity(comments.count)
-                    var commentIdSet: Set<UInt64> = []
-                    for comment in comments {
-                        if commentIdSet.insert(comment.commentId).inserted {
-                            uniqueComments.append(comment)
-                        }
+                guard !Task.isCancelled, let self else { return }
+                let comments = data.comments ?? []
+                var uniqueComments: [CloudMusicApi.Comment] = []
+                uniqueComments.reserveCapacity(comments.count)
+                var commentIdSet: Set<UInt64> = []
+                for comment in comments {
+                    if commentIdSet.insert(comment.commentId).inserted {
+                        uniqueComments.append(comment)
                     }
-                    self.floorThreads[parentCommentId] = FloorThread(
-                        parentCommentId: parentCommentId,
-                        ownerComment: data.ownerComment,
-                        bestComments: data.bestComments ?? [],
-                        comments: uniqueComments,
-                        commentIdSet: commentIdSet,
-                        hasMore: data.hasMore ?? false,
-                        nextTime: data.time,
-                        totalCount: data.totalCount ?? 0
-                    )
-                    self.floorLoadingIds.remove(parentCommentId)
-                    self.floorTasks[parentCommentId] = nil
                 }
+                self.floorThreads[parentCommentId] = FloorThread(
+                    parentCommentId: parentCommentId,
+                    ownerComment: data.ownerComment,
+                    bestComments: data.bestComments ?? [],
+                    comments: uniqueComments,
+                    commentIdSet: commentIdSet,
+                    hasMore: data.hasMore ?? false,
+                    nextTime: data.time,
+                    totalCount: data.totalCount ?? 0
+                )
+                self.floorLoadingIds.remove(parentCommentId)
+                self.floorTasks[parentCommentId] = nil
             } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    guard let self else { return }
-                    self.floorErrorMessages[parentCommentId] = error.localizedDescription
-                    self.floorLoadingIds.remove(parentCommentId)
-                    self.floorTasks[parentCommentId] = nil
-                }
+                guard !Task.isCancelled, let self else { return }
+                self.floorErrorMessages[parentCommentId] = error.localizedDescription
+                self.floorLoadingIds.remove(parentCommentId)
+                self.floorTasks[parentCommentId] = nil
             }
         }
     }
@@ -454,7 +434,7 @@ final class CommentsViewModel: ObservableObject {
         floorErrorMessages[parentCommentId] = nil
         let target = target
         let nextTime = thread.nextTime
-        floorTasks[parentCommentId] = Task.detached(priority: .utility) { [weak self] in
+        floorTasks[parentCommentId] = Task(priority: .utility) { [weak self] in
             do {
                 let data = try await Self.fetchFloor(
                     target: target,
@@ -462,38 +442,35 @@ final class CommentsViewModel: ObservableObject {
                     limit: 10,
                     time: nextTime
                 )
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    guard let self, var thread = self.floorThreads[parentCommentId] else { return }
+                guard !Task.isCancelled,
+                      let self,
+                      var thread = self.floorThreads[parentCommentId]
+                else { return }
 
-                    let newComments = data.comments ?? []
-                    if !newComments.isEmpty {
-                        var uniqueComments: [CloudMusicApi.Comment] = []
-                        uniqueComments.reserveCapacity(newComments.count)
-                        for comment in newComments {
-                            if thread.commentIdSet.insert(comment.commentId).inserted {
-                                uniqueComments.append(comment)
-                            }
-                        }
-                        if !uniqueComments.isEmpty {
-                            thread.comments.append(contentsOf: uniqueComments)
+                let newComments = data.comments ?? []
+                if !newComments.isEmpty {
+                    var uniqueComments: [CloudMusicApi.Comment] = []
+                    uniqueComments.reserveCapacity(newComments.count)
+                    for comment in newComments {
+                        if thread.commentIdSet.insert(comment.commentId).inserted {
+                            uniqueComments.append(comment)
                         }
                     }
-                    thread.hasMore = data.hasMore ?? false
-                    thread.nextTime = data.time
-                    thread.totalCount = data.totalCount ?? thread.totalCount
-                    self.floorThreads[parentCommentId] = thread
-                    self.floorLoadingIds.remove(parentCommentId)
-                    self.floorTasks[parentCommentId] = nil
+                    if !uniqueComments.isEmpty {
+                        thread.comments.append(contentsOf: uniqueComments)
+                    }
                 }
+                thread.hasMore = data.hasMore ?? false
+                thread.nextTime = data.time
+                thread.totalCount = data.totalCount ?? thread.totalCount
+                self.floorThreads[parentCommentId] = thread
+                self.floorLoadingIds.remove(parentCommentId)
+                self.floorTasks[parentCommentId] = nil
             } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    guard let self else { return }
-                    self.floorErrorMessages[parentCommentId] = error.localizedDescription
-                    self.floorLoadingIds.remove(parentCommentId)
-                    self.floorTasks[parentCommentId] = nil
-                }
+                guard !Task.isCancelled, let self else { return }
+                self.floorErrorMessages[parentCommentId] = error.localizedDescription
+                self.floorLoadingIds.remove(parentCommentId)
+                self.floorTasks[parentCommentId] = nil
             }
         }
     }
