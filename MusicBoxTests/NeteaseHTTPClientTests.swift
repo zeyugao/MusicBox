@@ -166,6 +166,70 @@ final class NeteaseHTTPClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.requests().count, 2)
     }
 
+    func testCloudEAPIEncoderSignsAndEncryptsPayload() throws {
+        let payload: [String: Any] = [
+            "e_r": false,
+            "header": ["MUSIC_U": "session", "os": "pc"],
+            "md5": "abc",
+        ]
+        var request = URLRequest(url: URL(string: "https://example.test/eapi/cloud/upload/check")!)
+        request.httpBody = try NeteaseHTTPClient.makeEAPIForm(
+            path: "/api/cloud/upload/check",
+            payload: payload
+        )
+
+        let decoded = try decodeEAPIRequest(request)
+        XCTAssertEqual(decoded.path, "/api/cloud/upload/check")
+        XCTAssertEqual(decoded.payload["md5"] as? String, "abc")
+        XCTAssertEqual(decoded.payload["e_r"] as? Bool, false)
+        XCTAssertEqual(
+            decoded.digest,
+            md5("nobody\(decoded.path)use\(decoded.requestJSON)md5forencrypt")
+        )
+    }
+
+    func testCloudWEAPIEncoderUsesReferenceDoubleAESAndRawRSA() throws {
+        let secretKey = "abcdefghijklmnop"
+        let payload: [String: Any] = [
+            "csrf_token": "csrf",
+            "e_r": false,
+            "filename": "song.mp3",
+            "md5": "abc",
+        ]
+        let body = try NeteaseHTTPClient.makeWEAPIForm(payload: payload, secretKey: secretKey)
+        let decoded = try decodeWEAPIPayload(body, secretKey: secretKey)
+
+        XCTAssertEqual(decoded["csrf_token"] as? String, "csrf")
+        XCTAssertEqual(decoded["e_r"] as? Bool, false)
+        XCTAssertEqual(decoded["filename"] as? String, "song.mp3")
+        XCTAssertEqual(decoded["md5"] as? String, "abc")
+
+        var request = URLRequest(url: URL(string: "https://example.test/weapi/nos/token/alloc")!)
+        request.httpBody = body
+        let form = try formFields(from: request)
+        XCTAssertEqual(form["encSecKey"]?.count, 256)
+        XCTAssertTrue(form["encSecKey"]?.allSatisfy(\.isHexDigit) == true)
+        XCTAssertEqual(
+            body,
+            try NeteaseHTTPClient.makeWEAPIForm(payload: payload, secretKey: secretKey)
+        )
+    }
+
+    func testCloudUploadMetadataFallbacksAndFilenameNormalization() {
+        XCTAssertEqual(
+            NeteaseHTTPClient.firstNonempty("  Tagged title  ", "Playlist title", "Filename"),
+            "Tagged title"
+        )
+        XCTAssertEqual(
+            NeteaseHTTPClient.firstNonempty("  ", " Playlist title ", "Filename"),
+            "Playlist title"
+        )
+        XCTAssertEqual(
+            NeteaseHTTPClient.normalizedUploadName("My Song.live.mix.FLAC"),
+            "MySong_live_mix"
+        )
+    }
+
     func testCloudUploadSkipsNosWhenServerAlreadyHasFile() async throws {
         let client = makeClient()
         let fileURL = FileManager.default.temporaryDirectory
@@ -175,20 +239,39 @@ final class NeteaseHTTPClientTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
         MockURLProtocol.configure { request in
-            switch request.url?.path {
-            case "/api/cloud/upload/check":
-                let form = try formFields(from: request)
-                XCTAssertEqual(form["length"], String(fileData.count))
-                XCTAssertEqual(form["md5"], md5(fileData))
+            switch (request.url?.host, request.url?.path) {
+            case ("interfacepc.music.163.com", "/eapi/cloud/upload/check"):
+                let decoded = try decodeEAPIRequest(request)
+                XCTAssertEqual(decoded.path, "/api/cloud/upload/check")
+                XCTAssertEqual(decoded.payload["length"] as? Int, fileData.count)
+                XCTAssertEqual(decoded.payload["md5"] as? String, md5(fileData))
                 return (response(for: request), Data(#"{"code":200,"needUpload":false,"songId":42}"#.utf8))
-            case "/api/nos/token/alloc":
-                return (response(for: request), Data(#"{"code":200,"result":{"resourceId":7}}"#.utf8))
-            case "/api/upload/cloud/info/v2":
-                let form = try formFields(from: request)
-                XCTAssertEqual(form["songid"], "42")
-                XCTAssertEqual(form["resourceId"], "7")
+            case ("music.163.com", "/weapi/nos/token/alloc"):
+                let payload = try decodeWEAPIPayload(
+                    requestBody(from: request),
+                    secretKey: "abcdefghijklmnop"
+                )
+                XCTAssertEqual(payload["bucket"] as? String, "jd-musicrep-privatecloud-audio-public")
+                XCTAssertEqual(payload["ext"] as? String, "mp3")
+                XCTAssertEqual(
+                    payload["filename"] as? String,
+                    NeteaseHTTPClient.normalizedUploadName(fileURL.lastPathComponent)
+                )
+                XCTAssertEqual(payload["md5"] as? String, md5(fileData))
+                XCTAssertEqual(payload["type"] as? String, "audio")
+                XCTAssertEqual(payload["nos_product"] as? Int, 3)
+                return (
+                    response(for: request),
+                    Data(#"{"code":200,"result":{"token":"nos-token","objectKey":"folder/object.mp3","resourceId":7}}"#.utf8)
+                )
+            case ("wanproxy.127.net", "/lbs"):
+                return (response(for: request), Data(#"{"upload":["http://upload.example.test"]}"#.utf8))
+            case ("interfacepc.music.163.com", "/eapi/upload/cloud/info/v2"):
+                let decoded = try decodeEAPIRequest(request)
+                XCTAssertEqual(decoded.payload["songid"] as? String, "42")
+                XCTAssertEqual(decoded.payload["resourceId"] as? String, "7")
                 return (response(for: request), Data(#"{"code":200,"songId":42}"#.utf8))
-            case "/api/cloud/pub/v2":
+            case ("interfacepc.music.163.com", "/eapi/cloud/pub/v2"):
                 return (response(for: request), Data(#"{"code":200,"privateCloud":{"songId":42}}"#.utf8))
             default:
                 throw TestError.unexpectedRequest(request.url?.absoluteString ?? "missing URL")
@@ -204,10 +287,11 @@ final class NeteaseHTTPClientTests: XCTestCase {
 
         XCTAssertEqual(songID, 42)
         XCTAssertEqual(MockURLProtocol.requests().map { $0.url?.path }, [
-            "/api/cloud/upload/check",
-            "/api/nos/token/alloc",
-            "/api/upload/cloud/info/v2",
-            "/api/cloud/pub/v2",
+            "/eapi/cloud/upload/check",
+            "/weapi/nos/token/alloc",
+            "/lbs",
+            "/eapi/upload/cloud/info/v2",
+            "/eapi/cloud/pub/v2",
         ])
     }
 
@@ -223,20 +307,30 @@ final class NeteaseHTTPClientTests: XCTestCase {
 
         MockURLProtocol.configure { request in
             switch (request.url?.host, request.url?.path) {
-            case ("interface.music.163.com", "/api/cloud/upload/check"):
+            case ("interfacepc.music.163.com", "/eapi/cloud/upload/check"):
+                let decoded = try decodeEAPIRequest(request)
+                XCTAssertEqual(decoded.path, "/api/cloud/upload/check")
                 return (
                     response(for: request),
                     Data("{\"code\":\"200\",\"needUpload\":true,\"songId\":\"\(checkedSongID)\"}".utf8)
                 )
-            case ("interface.music.163.com", "/api/nos/token/alloc"):
-                let form = try formFields(from: request)
-                if form["bucket"] == "" {
-                    return (response(for: request), Data(#"{"code":"200","result":{"resourceId":"7"}}"#.utf8))
-                }
-                XCTAssertEqual(form["bucket"], "jd-musicrep-privatecloud-audio-public")
+            case ("music.163.com", "/weapi/nos/token/alloc"):
+                let payload = try decodeWEAPIPayload(
+                    requestBody(from: request),
+                    secretKey: "abcdefghijklmnop"
+                )
+                XCTAssertEqual(payload["bucket"] as? String, "jd-musicrep-privatecloud-audio-public")
+                XCTAssertEqual(payload["ext"] as? String, "flac")
+                XCTAssertEqual(
+                    payload["filename"] as? String,
+                    NeteaseHTTPClient.normalizedUploadName(fileURL.lastPathComponent)
+                )
+                XCTAssertEqual(payload["md5"] as? String, md5(fileData))
+                XCTAssertEqual(payload["type"] as? String, "audio")
+                XCTAssertEqual(payload["nos_product"] as? Int, 3)
                 return (
                     response(for: request),
-                    Data(#"{"code":"200","result":{"token":"nos-token","objectKey":"folder/object.flac"}}"#.utf8)
+                    Data(#"{"code":"200","result":{"token":"nos-token","objectKey":"folder/object.flac","resourceId":"7"}}"#.utf8)
                 )
             case ("wanproxy.127.net", "/lbs"):
                 return (response(for: request), Data(#"{"upload":["http://upload.example.test"]}"#.utf8))
@@ -249,10 +343,12 @@ final class NeteaseHTTPClientTests: XCTestCase {
                 XCTAssertTrue(request.url?.absoluteString.contains("folder%2Fobject.flac") == true)
                 XCTAssertEqual(try requestBody(from: request), fileData)
                 return (response(for: request), Data())
-            case ("interface.music.163.com", "/api/upload/cloud/info/v2"):
-                XCTAssertEqual(try formFields(from: request)["songid"], checkedSongID)
+            case ("interfacepc.music.163.com", "/eapi/upload/cloud/info/v2"):
+                let decoded = try decodeEAPIRequest(request)
+                XCTAssertEqual(decoded.payload["songid"] as? String, checkedSongID)
+                XCTAssertEqual(decoded.payload["resourceId"] as? String, "7")
                 return (response(for: request), Data(#"{"code":"200","songId":"42"}"#.utf8))
-            case ("interface.music.163.com", "/api/cloud/pub/v2"):
+            case ("interfacepc.music.163.com", "/eapi/cloud/pub/v2"):
                 return (response(for: request), Data(#"{"code":"200","privateCloud":{"songId":"42"}}"#.utf8))
             default:
                 throw TestError.unexpectedRequest(request.url?.absoluteString ?? "missing URL")
@@ -268,7 +364,7 @@ final class NeteaseHTTPClientTests: XCTestCase {
         )
 
         XCTAssertEqual(songID, 42)
-        XCTAssertEqual(MockURLProtocol.requests().count, 7)
+        XCTAssertEqual(MockURLProtocol.requests().count, 6)
         let progress = progressRecorder.snapshot()
         XCTAssertEqual(progress.first?.stage, .preparing)
         XCTAssertTrue(progress.contains { $0.stage == .transferring })
@@ -284,7 +380,8 @@ final class NeteaseHTTPClientTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
         MockURLProtocol.configure { request in
-            XCTAssertEqual(request.url?.path, "/api/cloud/upload/check")
+            XCTAssertEqual(request.url?.host, "interfacepc.music.163.com")
+            XCTAssertEqual(request.url?.path, "/eapi/cloud/upload/check")
             return (
                 response(for: request),
                 Data(#"{"code":200,"needUpload":true,"songId":{"secret":"do-not-echo"}}"#.utf8)
@@ -747,7 +844,8 @@ final class NeteaseHTTPClientTests: XCTestCase {
         return NeteaseHTTPClient(
             session: URLSession(configuration: configuration),
             defaults: defaults,
-            deviceId: "test-device"
+            deviceId: "test-device",
+            weapiSecretKeyGenerator: { "abcdefghijklmnop" }
         )
     }
 
@@ -871,8 +969,8 @@ private final class MockURLProtocol: URLProtocol {
 
     override class func canInit(with request: URLRequest) -> Bool {
         switch request.url?.host {
-        case "interface.music.163.com", "wanproxy.127.net", "upload.example.test", "audio.example.test",
-            "clientlog3.music.163.com", "music.163.com":
+        case "interface.music.163.com", "interfacepc.music.163.com", "wanproxy.127.net",
+            "upload.example.test", "audio.example.test", "clientlog3.music.163.com", "music.163.com":
             return true
         default:
             return false
@@ -1009,6 +1107,35 @@ private func decodeEAPIRequest(_ request: URLRequest) throws -> DecodedEAPIReque
     )
 }
 
+private func decodeWEAPIPayload(_ body: Data, secretKey: String) throws -> [String: Any] {
+    var request = URLRequest(url: URL(string: "https://example.test")!)
+    request.httpBody = body
+    let form = try formFields(from: request)
+    guard let params = form["params"], let secondPass = Data(base64Encoded: params) else {
+        throw TestError.invalidRequest("Missing WEAPI params")
+    }
+    let firstPassData = try weapiAES(
+        secondPass,
+        key: Data(secretKey.utf8),
+        operation: CCOperation(kCCDecrypt)
+    )
+    guard
+        let firstPass = String(data: firstPassData, encoding: .utf8),
+        let encryptedPayload = Data(base64Encoded: firstPass)
+    else {
+        throw TestError.invalidRequest("Invalid WEAPI first pass")
+    }
+    let payloadData = try weapiAES(
+        encryptedPayload,
+        key: Data("0CoJUm6Qyw8W8jud".utf8),
+        operation: CCOperation(kCCDecrypt)
+    )
+    guard let payload = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any] else {
+        throw TestError.invalidRequest("Invalid WEAPI payload")
+    }
+    return payload
+}
+
 private func encryptedEAPIResponse(_ json: String) throws -> Data {
     try eapiAES(Data(json.utf8), operation: CCOperation(kCCEncrypt))
 }
@@ -1039,6 +1166,38 @@ private func eapiAES(_ data: Data, operation: CCOperation) throws -> Data {
     }
     guard result == kCCSuccess else {
         throw TestError.unexpectedRequest("AES failed: \(result)")
+    }
+    return Data(output.prefix(moved))
+}
+
+private func weapiAES(_ data: Data, key: Data, operation: CCOperation) throws -> Data {
+    let iv = Data("0102030405060708".utf8)
+    var output = Data(count: data.count + kCCBlockSizeAES128)
+    let capacity = output.count
+    var moved = 0
+    let result = output.withUnsafeMutableBytes { outputBuffer in
+        data.withUnsafeBytes { inputBuffer in
+            key.withUnsafeBytes { keyBuffer in
+                iv.withUnsafeBytes { ivBuffer in
+                    CCCrypt(
+                        operation,
+                        CCAlgorithm(kCCAlgorithmAES),
+                        CCOptions(kCCOptionPKCS7Padding),
+                        keyBuffer.baseAddress,
+                        key.count,
+                        ivBuffer.baseAddress,
+                        inputBuffer.baseAddress,
+                        data.count,
+                        outputBuffer.baseAddress,
+                        capacity,
+                        &moved
+                    )
+                }
+            }
+        }
+    }
+    guard result == kCCSuccess else {
+        throw TestError.unexpectedRequest("WEAPI AES failed: \(result)")
     }
     return Data(output.prefix(moved))
 }
