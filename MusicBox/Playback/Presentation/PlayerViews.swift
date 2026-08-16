@@ -82,7 +82,6 @@ struct PlayerCapsuleView: View {
             }
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 4)
         .frame(height: PlayerOverlayMetrics.height)
         .background(Color.gray.opacity(0.005))
         .clipShape(RoundedRectangle(cornerRadius: 26))
@@ -127,7 +126,7 @@ private struct NowPlayingTrackPresentation: View {
     @Binding var seekTarget: Double
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: PlayerOverlayMetrics.trackLayoutPadding) {
             HStack(spacing: 8) {
                 artwork
                 VStack(alignment: .leading, spacing: 2) {
@@ -205,6 +204,7 @@ private struct NowPlayingTrackPresentation: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(height: PlayerOverlayMetrics.trackInfoHeight)
 
             Slider(
                 value: Binding(
@@ -225,7 +225,11 @@ private struct NowPlayingTrackPresentation: View {
             .controlSize(.mini)
             .tint(.secondary)
             .sliderThumbVisibility(.hidden)
+            .frame(height: PlayerOverlayMetrics.trackSliderHeight)
         }
+        .padding(.top, PlayerOverlayMetrics.trackVisualPadding)
+        .padding(.bottom, PlayerOverlayMetrics.trackLayoutPadding)
+        .frame(height: PlayerOverlayMetrics.height)
     }
 
     @ViewBuilder
