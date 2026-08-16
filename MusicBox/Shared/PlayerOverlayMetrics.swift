@@ -11,4 +11,5 @@ enum PlayerOverlayMetrics {
     static let horizontalInset: CGFloat = 16
     static let bottomInset: CGFloat = 20
     static let contentClearance: CGFloat = 92
+    static let tableBottomPaddingRows = 3
 }

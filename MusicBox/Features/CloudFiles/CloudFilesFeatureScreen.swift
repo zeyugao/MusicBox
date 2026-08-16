@@ -276,12 +276,6 @@ private final class CloudFilesTableViewController: NSViewController {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
-        scrollView.contentInsets = NSEdgeInsets(
-            top: 0,
-            left: 0,
-            bottom: PlayerOverlayMetrics.contentClearance,
-            right: 0
-        )
         scrollView.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(
             self,
@@ -355,12 +349,15 @@ private final class CloudFilesTableViewController: NSViewController {
 }
 
 extension CloudFilesTableViewController: NSTableViewDataSource {
-    func numberOfRows(in _: NSTableView) -> Int { files.count }
+    func numberOfRows(in _: NSTableView) -> Int {
+        files.isEmpty ? 0 : files.count + PlayerOverlayMetrics.tableBottomPaddingRows
+    }
 }
 
 extension CloudFilesTableViewController: NSTableViewDelegate {
     func tableView(_: NSTableView, viewFor column: NSTableColumn?, row: Int) -> NSView? {
-        guard files.indices.contains(row), let column else { return nil }
+        guard let column else { return nil }
+        guard files.indices.contains(row) else { return NSView() }
         let file = files[row]
         switch column.identifier.rawValue {
         case "status":
@@ -387,6 +384,10 @@ extension CloudFilesTableViewController: NSTableViewDelegate {
     }
 
     func tableView(_: NSTableView, heightOfRow _: Int) -> CGFloat { 24 }
+
+    func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
+        files.indices.contains(row)
+    }
 
     private func textCell(_ text: String, identifier: String) -> NSTableCellView {
         let view = reusable(NSTableCellView.self, identifier: identifier)

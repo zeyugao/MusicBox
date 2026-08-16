@@ -396,12 +396,6 @@ final class SongTableViewController: NSViewController {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
-        scrollView.contentInsets = NSEdgeInsets(
-            top: 0,
-            left: 0,
-            bottom: PlayerOverlayMetrics.contentClearance,
-            right: 0
-        )
         scrollView.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(
             self,
@@ -585,7 +579,9 @@ final class SongTableViewController: NSViewController {
 }
 
 extension SongTableViewController: NSTableViewDataSource {
-    func numberOfRows(in _: NSTableView) -> Int { songs.count }
+    func numberOfRows(in _: NSTableView) -> Int {
+        songs.isEmpty ? 0 : songs.count + PlayerOverlayMetrics.tableBottomPaddingRows
+    }
 
     func tableView(
         _: NSTableView,
@@ -618,7 +614,8 @@ extension SongTableViewController: NSTableViewDataSource {
 
 extension SongTableViewController: NSTableViewDelegate {
     func tableView(_: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard songs.indices.contains(row), let column = tableColumn else { return nil }
+        guard let column = tableColumn else { return nil }
+        guard songs.indices.contains(row) else { return NSView() }
         let song = songs[row]
         switch column.identifier.rawValue {
         case "favorite":

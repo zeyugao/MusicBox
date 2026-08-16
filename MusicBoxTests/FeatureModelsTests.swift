@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 
@@ -113,6 +114,9 @@ final class FeatureModelsTests: XCTestCase {
         controller.activateSong(at: 2)
 
         XCTAssertEqual(activatedIDs, [11])
+        XCTAssertEqual(controller.numberOfRows(in: NSTableView()), 5)
+        XCTAssertTrue(controller.tableView(NSTableView(), shouldSelectRow: 1))
+        XCTAssertFalse(controller.tableView(NSTableView(), shouldSelectRow: 2))
     }
 
     @MainActor
