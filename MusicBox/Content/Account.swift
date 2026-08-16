@@ -628,6 +628,8 @@ struct LoginView: View {
 struct AccountView: View {
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject private var playlistStatus: PlaylistStatus
+    @EnvironmentObject private var playStatus: PlayStatus
+    @EnvironmentObject private var playbackReporter: PlaybackReportingCoordinator
     @StateObject private var appSettings = AppSettings.shared
 
     var body: some View {
@@ -636,6 +638,8 @@ struct AccountView: View {
                 .environmentObject(userInfo)
                 .environmentObject(appSettings)
                 .environmentObject(playlistStatus)
+                .environmentObject(playStatus)
+                .environmentObject(playbackReporter)
         } else {
             LoginView()
         }
@@ -646,6 +650,8 @@ struct SettingsView: View {
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject private var appSettings: AppSettings
     @EnvironmentObject private var playlistStatus: PlaylistStatus
+    @EnvironmentObject private var playStatus: PlayStatus
+    @EnvironmentObject private var playbackReporter: PlaybackReportingCoordinator
 
     var body: some View {
         ScrollView {
@@ -676,10 +682,16 @@ struct SettingsView: View {
 
                     Divider()
 
+                    RelaySettingsSection()
+                        .environmentObject(playbackReporter)
+
+                    Divider()
+
                     // Account Actions Section
                     AccountActionsSection()
                         .environmentObject(userInfo)
                         .environmentObject(playlistStatus)
+                        .environmentObject(playStatus)
 
                     Divider()
 
@@ -697,6 +709,54 @@ struct SettingsView: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+struct RelaySettingsSection: View {
+    @EnvironmentObject private var playbackReporter: PlaybackReportingCoordinator
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Image(systemName: "rectangle.2.swap")
+                    .foregroundColor(.accentColor)
+                    .font(.title2)
+                Text("跨设备接力")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+
+            VStack(spacing: 12) {
+                SettingRow(
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "跨设备接力",
+                    description: "",
+                    control: AnyView(
+                        Toggle(
+                            "",
+                            isOn: Binding(
+                                get: { playbackReporter.relayEnabled },
+                                set: { enabled in
+                                    Task {
+                                        await playbackReporter.updateRelayEnabled(enabled)
+                                    }
+                                }
+                            )
+                        )
+                        .labelsHidden()
+                        .toggleStyle(SwitchToggleStyle())
+                        .disabled(
+                            !playbackReporter.relayAvailable
+                                || playbackReporter.isUpdatingRelaySetting
+                        )
+                    )
+                )
+            }
+            .padding(16)
+            .background(Color(NSColor.controlBackgroundColor))
+            .cornerRadius(12)
+        }
     }
 }
 
@@ -910,6 +970,7 @@ struct StorageCacheSection: View {
 struct AccountActionsSection: View {
     @EnvironmentObject private var userInfo: UserInfo
     @EnvironmentObject private var playlistStatus: PlaylistStatus
+    @EnvironmentObject private var playStatus: PlayStatus
 
     var body: some View {
         VStack(spacing: 16) {
@@ -952,6 +1013,7 @@ struct AccountActionsSection: View {
     }
 
     private func signOut() async {
+        await playStatus.finishPlaybackReporting(reason: .stopped)
         await CloudMusicApi().logout()
         userInfo.profile = nil
         userInfo.likelist = []
@@ -986,10 +1048,12 @@ struct SettingRow: View {
                     .font(.body)
                     .fontWeight(.medium)
 
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if !description.isEmpty {
+                    Text(description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Spacer()

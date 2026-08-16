@@ -314,6 +314,7 @@ struct ContentView: View {
     @StateObject private var playingDetailModel = PlayingDetailModel()
     @StateObject private var appSettings = AppSettings.shared
     @StateObject private var playerControlState = PlayerControlState()
+    @StateObject private var playbackReporter = PlaybackReportingCoordinator()
     @State private var playlistLocateRequest: PlaylistLocateRequest?
 
     @StateObject private var alertModel = AlertModal()
@@ -392,7 +393,9 @@ struct ContentView: View {
                         AccountView()
                             .environmentObject(userInfo)
                             .environmentObject(playlistStatus)
+                            .environmentObject(playStatus)
                             .environmentObject(appSettings)
+                            .environmentObject(playbackReporter)
                             .navigationTitle("Settings")
                     } else {
                         Color.clear
@@ -517,6 +520,15 @@ struct ContentView: View {
             }
             selection = .playlist(playlist: .netease(playlistId, playlistName))
         }
+        .onChange(of: userInfo.profile?.userId) { userID in
+            Task {
+                if let userID {
+                    await playbackReporter.activate(accountID: userID)
+                } else {
+                    playbackReporter.deactivate()
+                }
+            }
+        }
         .task {
             guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
                 NSClassFromString("XCTestCase") == nil
@@ -526,6 +538,8 @@ struct ContentView: View {
 
             // Connect PlayStatus with PlayingDetailModel before loading state
             playStatus.setPlayingDetailModel(playingDetailModel)
+            playStatus.setPlaybackReporter(playbackReporter)
+            playlistStatus.setPlaybackReporter(playbackReporter)
             CloudMusicApi.migrateLegacyAuthenticationIfNeeded()
 
             await withTaskGroup(of: Void.self) { group in
@@ -554,6 +568,14 @@ struct ContentView: View {
 
             if userInfo.profile != nil {
                 lastPlaylistRefresh = Date()
+                if let accountID = userInfo.profile?.userId {
+                    await playbackReporter.activate(accountID: accountID)
+                    if let item = playStatus.currentItem,
+                        playStatus.playerState == .playing
+                    {
+                        playbackReporter.playbackDidStart(item: item)
+                    }
+                }
             }
         }
         .alert(
@@ -581,6 +603,28 @@ struct ContentView: View {
             } else {
                 Alert(title: Text(alertModel.title), message: Text(alertModel.text))
             }
+        }
+        .alert(
+            "继续播放",
+            isPresented: Binding(
+                get: { playbackReporter.handoffOffer != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        playbackReporter.dismissHandoffOffer()
+                    }
+                }
+            )
+        ) {
+            Button("继续") {
+                Task {
+                    await playbackReporter.continueHandoff(using: playlistStatus)
+                }
+            }
+            Button("取消", role: .cancel) {
+                playbackReporter.dismissHandoffOffer()
+            }
+        } message: {
+            Text(playbackReporter.handoffOffer?.title ?? "发现其他设备正在播放")
         }
     }
 

@@ -317,6 +317,7 @@ class PlayStatus: ObservableObject {
     private var lyricSynchronizer: SmartLyricSynchronizer?
     private weak var playingDetailModel: PlayingDetailModel?
     private var detailModelCancellable: AnyCancellable?
+    private weak var playbackReporter: PlaybackReportingCoordinator?
 
     @Published var isLoading: Bool = false
     @Published var loadingProgress: Double? = nil
@@ -517,6 +518,19 @@ class PlayStatus: ObservableObject {
             switchingItem = false
         }
 
+        let previousPlayback = await MainActor.run {
+            (self.currentItem, self.playbackProgress.playedSecond)
+        }
+        if let previousItem = previousPlayback.0, previousItem.id != item.id {
+            await MainActor.run {
+                self.playbackReporter?.playbackDidEnd(
+                    item: previousItem,
+                    playedSeconds: previousPlayback.1,
+                    reason: .switched
+                )
+            }
+        }
+
         if currentItem?.id != item.id && pendingItem?.id != item.id {
             trackRetryCounts[item.id] = 0
         }
@@ -643,6 +657,11 @@ class PlayStatus: ObservableObject {
             [weak self] (player, changes) in
             guard let self = self else { return }
             self.timeControlStatus = player.timeControlStatus
+            guard player.timeControlStatus == .playing else { return }
+            Task { @MainActor [weak self] in
+                guard let item = self?.currentItem else { return }
+                self?.playbackReporter?.playbackDidStart(item: item)
+            }
         }
 
         playerStateObserver = player.observe(\.rate, options: [.initial, .new]) {
@@ -768,6 +787,13 @@ class PlayStatus: ObservableObject {
                         } else {
                             // Clear loading state when stopping
                             Task { @MainActor [weak self] in
+                                if let item = self?.currentItem {
+                                    self?.playbackReporter?.playbackDidEnd(
+                                        item: item,
+                                        playedSeconds: self?.playbackProgress.playedSecond ?? 0,
+                                        reason: .stopped
+                                    )
+                                }
                                 self?.currentItem = nil
                                 self?.playbackProgress.duration = 0.0
                                 self?.playbackProgress.playedSecond = 0.0
@@ -857,7 +883,32 @@ class PlayStatus: ObservableObject {
         terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in
+            if let item = self?.currentItem {
+                Task { @MainActor [weak self] in
+                    self?.playbackReporter?.playbackDidEnd(
+                        item: item,
+                        playedSeconds: self?.playbackProgress.playedSecond ?? 0,
+                        reason: .stopped
+                    )
+                }
+            }
             self?.saveState()
+        }
+    }
+
+    func setPlaybackReporter(_ reporter: PlaybackReportingCoordinator?) {
+        playbackReporter = reporter
+    }
+
+    func finishPlaybackReporting(reason: PlaybackEndReason) async {
+        let item = currentItem
+        let playedSeconds = playbackProgress.playedSecond
+        await MainActor.run {
+            self.playbackReporter?.playbackDidEnd(
+                item: item,
+                playedSeconds: playedSeconds,
+                reason: reason
+            )
         }
     }
 
@@ -982,6 +1033,16 @@ extension PlayStatus: CachingPlayerItemDelegate {
 
         if scheduledRetry {
             return
+        }
+
+        if let track {
+            Task { @MainActor [weak self] in
+                self?.playbackReporter?.playbackDidEnd(
+                    item: track,
+                    playedSeconds: self?.playbackProgress.playedSecond ?? 0,
+                    reason: .failed
+                )
+            }
         }
 
         // Clear loading state on failure
@@ -1116,6 +1177,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     }
 
     private let mutationCoordinator = PlaylistMutationCoordinator()
+    private weak var playbackReporter: PlaybackReportingCoordinator?
 
     @Published var loopMode: LoopMode = .sequence
     private var switchingItem: Bool = false
@@ -1348,6 +1410,15 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 await self?.bootstrapShuffleSequenceFromCurrentItem()
             }
         }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.playbackReporter?.playbackModeDidChange(
+                items: self.playlist,
+                currentIndex: self.currentItemIndex ?? 0,
+                loopMode: self.loopMode
+            )
+        }
     }
 
     func startPlay() {
@@ -1527,6 +1598,7 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                         self.currentItemIndex = nil
                     }
                     pausePlay()
+                    PlayStatus.controlPlayer(command: .switchItem, argument: nil)
                 } else {
                     // Choose next song intelligently
                     let nextIndex = await MainActor.run { () -> Int in
@@ -1552,6 +1624,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 count: playlist.count)
 
             saveState()
+            await MainActor.run {
+                self.notifyPlaybackQueueChanged()
+            }
         }
     }
 
@@ -1576,6 +1651,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 item: currentItem,
                 index: currentItemIndex ?? 0,
                 count: playlist.count)
+
+            await MainActor.run {
+                self.notifyPlaybackQueueChanged()
+            }
 
             PlayStatus.controlPlayer(
                 command: .switchItem,
@@ -1619,11 +1698,13 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
                 if shouldSaveState {
                     saveState()
                 }
+                notifyPlaybackQueueChanged()
             }
             return playlist.count - 1 // Return expected index
         }
         await MainActor.run {
             playlist[idIdx].sourcePlaylist = item.sourcePlaylist
+            notifyPlaybackQueueChanged()
         }
         if shouldSaveState {
             await MainActor.run {
@@ -1637,14 +1718,16 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         _ items: [PlaylistItem],
         continuePlaying: Bool = true,
         shouldSaveState: Bool = true,
-        startIndex: Int? = nil
+        startIndex: Int? = nil,
+        startSecond: Double? = nil
     ) async {
         await withPlaylistLock {
             await replacePlaylistUnlocked(
                 items,
                 continuePlaying: continuePlaying,
                 shouldSaveState: shouldSaveState,
-                startIndex: startIndex
+                startIndex: startIndex,
+                startSecond: startSecond
             )
         }
     }
@@ -1653,7 +1736,8 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         _ items: [PlaylistItem],
         continuePlaying: Bool = true,
         shouldSaveState: Bool = true,
-        startIndex: Int? = nil
+        startIndex: Int? = nil,
+        startSecond: Double? = nil
     ) async {
         resetShuffleState()
         await MainActor.run {
@@ -1663,10 +1747,17 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
 
         let targetIndex = startIndex ?? 0
         if items.isEmpty {
+            await MainActor.run {
+                self.notifyPlaybackQueueChanged()
+            }
             await seekToItem(offset: 0, shouldPlay: continuePlaying)
         } else {
             let normalizedIndex = max(0, min(targetIndex, items.count - 1))
-            await seekToItem(offset: normalizedIndex, shouldPlay: continuePlaying)
+            await seekToItem(
+                offset: normalizedIndex,
+                playedSecond: startSecond ?? 0,
+                shouldPlay: continuePlaying
+            )
         }
 
         if shouldSaveState {
@@ -1721,6 +1812,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             if shouldSaveState {
                 saveState()
             }
+            await MainActor.run {
+                self.notifyPlaybackQueueChanged()
+            }
         }
     }
 
@@ -1753,6 +1847,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         if continuePlaying {
             startPlay()
         }
+        await MainActor.run {
+            self.notifyPlaybackQueueChanged()
+        }
         if shouldSaveState {
             saveState()
         }
@@ -1771,6 +1868,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             }
             if shouldSaveState {
                 saveState()
+            }
+            await MainActor.run {
+                self.notifyPlaybackQueueChanged()
             }
         }
     }
@@ -1827,6 +1927,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             if shouldSaveState {
                 saveState()
             }
+            await MainActor.run {
+                self.notifyPlaybackQueueChanged()
+            }
         }
     }
 
@@ -1853,10 +1956,14 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
     func clearPlaylist() async {
         await withPlaylistLock {
             resetShuffleState()
+            if currentItem != nil {
+                PlayStatus.controlPlayer(command: .switchItem, argument: nil)
+            }
             await MainActor.run {
                 playlist = []
                 playNextItemsCount = 0
                 currentItemIndex = nil
+                notifyPlaybackQueueChanged()
             }
             saveState()
         }
@@ -1925,6 +2032,9 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             }
 
             saveState()
+            await MainActor.run {
+                self.notifyPlaybackQueueChanged()
+            }
         }
     }
 
@@ -1938,7 +2048,17 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
             playlist.removeSubrange(range)
             playNextItemsCount = 0
             saveState()
+            notifyPlaybackQueueChanged()
         }
+    }
+
+    @MainActor
+    private func notifyPlaybackQueueChanged() {
+        playbackReporter?.playbackQueueDidChange(
+            items: playlist,
+            currentIndex: currentItemIndex ?? 0,
+            loopMode: loopMode
+        )
     }
 
     @MainActor
@@ -2064,6 +2184,10 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         RemoteCommandCenter.handleRemoteCommands(using: self)
     }
 
+    func setPlaybackReporter(_ reporter: PlaybackReportingCoordinator?) {
+        playbackReporter = reporter
+    }
+
     private var playerShouldNextObserver: NSObjectProtocol?
 
     init() {
@@ -2074,7 +2198,14 @@ class PlaylistStatus: ObservableObject, RemoteCommandHandler {
         ) { [weak self] _ in
             guard let self = self else { return }
 
-            Task { [weak self] in
+            Task { @MainActor [weak self] in
+                if let item = self?.currentItem {
+                    self?.playbackReporter?.playbackDidEnd(
+                        item: item,
+                        playedSeconds: item.duration.seconds,
+                        reason: .finished
+                    )
+                }
                 print("didPlayToEndTimeNotification")
                 await self?.nextTrack()
             }
