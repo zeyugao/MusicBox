@@ -8,7 +8,7 @@
 import CryptoKit
 import Foundation
 
-enum RequestError: Error {
+enum RequestError: LocalizedError {
     case error(Error)
     case noData
     case errorCode((Int, String))
@@ -28,6 +28,10 @@ enum RequestError: Error {
         case .unknown:
             return "Unknown error"
         }
+    }
+
+    var errorDescription: String? {
+        localizedDescription
     }
 }
 
@@ -105,7 +109,7 @@ class SharedCacheManager {
     }
 
     func set(value: Any, for query: String, ttl: TimeInterval) {
-        cacheQueue.async {
+        cacheQueue.sync {
             self.cache[self.md5(query)] = CacheItem(value: value, ttl: ttl)
         }
     }
@@ -124,29 +128,15 @@ class SharedCacheManager {
     }
 
     func clear() {
-        cacheQueue.async {
+        cacheQueue.sync {
             self.cache.removeAll()
         }
     }
 
-    func invalidate(memberName: String, data: [String: Any]) {
-        var data = data
-        if let cookie = CloudMusicApi().getCookie() {
-            data["cookie"] = cookie
-        }
-        guard
-            let jsonData = try? JSONSerialization.data(
-                withJSONObject: data, options: [.sortedKeys]
-            ),
-            let jsonString = String(data: jsonData, encoding: .utf8)
-        else {
-            return
-        }
-
-        let hashedKey = md5(memberName + jsonString)
-
-        cacheQueue.async {
-            self.cache.removeValue(forKey: hashedKey)
+    func invalidate(for query: String) {
+        let hashedKey = md5(query)
+        cacheQueue.sync {
+            _ = self.cache.removeValue(forKey: hashedKey)
         }
     }
 
@@ -175,21 +165,14 @@ class SharedCacheManager {
 
 class CloudMusicApi {
     let cacheTtl: TimeInterval  // 0 means no cache
+    private let client: NeteaseHTTPClient
 
-    init(cacheTtl: TimeInterval = 0) {
+    init(cacheTtl: TimeInterval = 0, client: NeteaseHTTPClient = .shared) {
         self.cacheTtl = cacheTtl
+        self.client = client
     }
 
     static let RecommandSongPlaylistId: UInt64 = 0
-
-    private func transportError(from data: Data) -> RequestError? {
-        guard let serverError = data.asType(ServerError.self, silent: true) else { return nil }
-        let message = serverError.msg ?? serverError.message ?? ""
-        guard serverError.code == 502,
-            message.localizedCaseInsensitiveContains("RST_STREAM")
-        else { return nil }
-        return .errorCode((serverError.code, message))
-    }
 
     struct Profile: Codable, Equatable {
         let avatarUrl: String
@@ -404,17 +387,6 @@ class CloudMusicApi {
         }
     }
 
-    struct Privilege: Decodable {
-        let downloadMaxBrLevel: String
-        let downloadMaxbr: UInt64
-        let fee: Int
-        let id: UInt64
-        let maxBrLevel: String
-        let maxbr: UInt64
-        let playMaxBrLevel: String
-        let playMaxbr: UInt64
-    }
-
     struct SongData: Decodable {
         let br: UInt64
         let encodeType: String
@@ -478,16 +450,6 @@ class CloudMusicApi {
         var id: UInt64 { commentId }
     }
 
-    struct CommentsPage: Decodable, Hashable {
-        let code: Int
-        let total: Int?
-        let more: Bool?
-        let moreHot: Bool?
-        let hotComments: [Comment]?
-        let comments: [Comment]?
-        let topComments: [Comment]?
-    }
-
     enum CommentNewSortType: Int, Codable {
         case recommend = 1
         case hot = 2
@@ -525,135 +487,40 @@ class CloudMusicApi {
         let data: DataPayload?
     }
 
-    private struct ApiResponse<T: Decodable>: Decodable {
-        let code: Int
-        let data: T
-    }
-
-    private func doRequest(
-        memberName: String, data: [String: Any]
-    ) async throws -> Data {
-        var data = data
-        if let cookie = getCookie() {
-            data["cookie"] = cookie
-        }
-        setenv("QT_ENABLE_REGEXP_JIT", "0", 1)  // Disable Qt's JIT in regex matching
-        setenv("QT_LOGGING_RULES", "*.debug=false", 1)  // Reduce log
-        return try await withCheckedThrowingContinuation { continuation in
-            do {
-                let jsonData = try JSONSerialization.data(
-                    withJSONObject: data, options: [.sortedKeys])
-
-                let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
-
-                let cacheKey = memberName + jsonString
-                if cacheTtl != 0 {
-                    if let cachedData = SharedCacheManager.shared.get(for: cacheKey) as? Data {
-                        if transportError(from: cachedData) != nil {
-                            SharedCacheManager.shared.invalidate(memberName: memberName, data: data)
-                        } else {
-                            SharedCacheManager.shared.set(
-                                value: cachedData, for: cacheKey, ttl: cacheTtl)
-                            continuation.resume(returning: cachedData)
-                            return
-                        }
-                    }
-                }
-
-                memberName.withCString { memberNameCString in
-                    let memberNamePtr = UnsafeMutablePointer(mutating: memberNameCString)
-                    jsonString.withCString { jsonString in
-                        let jsonString = UnsafeMutablePointer(mutating: jsonString)
-                        let jsonResultCString = invoke(memberNamePtr, jsonString)
-                        if let cString = jsonResultCString {
-                            let jsonResult = String(cString: cString)
-
-                            if let jsonData = jsonResult.data(using: .utf8) {
-                                if let error = transportError(from: jsonData) {
-                                    continuation.resume(throwing: error)
-                                    return
-                                }
-                                SharedCacheManager.shared.set(
-                                    value: jsonData, for: cacheKey, ttl: cacheTtl)
-                                continuation.resume(returning: jsonData)
-                                return
-                            }
-                            continuation.resume(
-                                throwing: RequestError.Request("No data: \(jsonResult)"))
-                            return
-                        }
-                        continuation.resume(throwing: RequestError.Request("invoke() returns nil"))
-                        return
-                    }
-                }
-            } catch let error where error is ServerError {
-                guard let err = error as? ServerError else { return }
-
-                var msg = err.msg ?? err.message ?? ""
-
-                if err.code == -462 {
-                    msg = "绑定手机号或短信验证成功后，可进行下一步操作哦~🙃"
-                }
-
-                continuation.resume(throwing: RequestError.errorCode((err.code, msg)))
-            } catch let error {
-                continuation.resume(throwing: RequestError.error(error))
-            }
-        }
-    }
-
     func login_qr_key(max_retries: UInt = 3) async throws -> String {
         struct Result: Decodable {
             let code: Int
             let unikey: String
         }
 
-        if let res = try? await doRequest(
-            memberName: "login_qr_key",
-            data: [:]
-        ).asType(ApiResponse<Result>.self) {
-            return res.data.unikey
+        _ = max_retries
+        let response = try await client.loginQRCodeKey(cacheTtl: cacheTtl)
+        guard let result = response.asType(Result.self, silent: true), result.code == 200 else {
+            throw RequestError.noData
         }
-
-        throw RequestError.noData
+        return result.unikey
     }
 
     func login_qr_create(key: String) async throws -> String {
-        struct Result: Decodable {
-            let qrurl: String
-        }
-
-        let p = [
-            "key": key
-        ]
-
-        if let res = try? await doRequest(
-            memberName: "login_qr_create",
-            data: p
-        ).asType(ApiResponse<Result>.self) {
-            return res.data.qrurl
-        }
-        throw RequestError.noData
+        return client.loginQRCodeURL(key: key)
     }
 
     static let SaveCookieName: String = "NeteaseApiCookie"
 
+    static func migrateLegacyAuthenticationIfNeeded() {
+        NeteaseHTTPClient.migrateLegacyAuthenticationIfNeeded()
+    }
+
     func setCookie(_ cookie: String) {
-        UserDefaults.standard.set(cookie, forKey: CloudMusicApi.SaveCookieName)
+        client.setCookie(cookie)
     }
 
     func getCookie() -> String? {
-        return UserDefaults.standard.string(forKey: CloudMusicApi.SaveCookieName)
+        client.cookie()
     }
 
     func login_refresh() async throws {
-        guard
-            (try? await doRequest(
-                memberName: "login_refresh",
-                data: [:])) != nil
-        else {
-            return
-        }
+        _ = try await client.loginRefresh(cacheTtl: cacheTtl)
     }
 
     func login_qr_check(key: String) async throws -> (
@@ -665,23 +532,9 @@ class CloudMusicApi {
             let cookie: String?
             let redirectUrl: String?
         }
-        let p = [
-            "key": key
-        ]
-        guard
-            let ret = try? await doRequest(
-                memberName: "login_qr_check", data: p
-            )
-        else {
-            return (0, "No data", nil, nil)
-        }
-
-        if let jsonString = String(data: ret, encoding: .utf8) {
-            print(jsonString)
-        }
-
-        guard let parsedResult = ret.asType(Result.self) else {
-            return (0, "Parse failed", nil, nil)
+        let response = try await client.loginQRCodeCheck(key: key, cacheTtl: cacheTtl)
+        guard let parsedResult = response.asType(Result.self, silent: true) else {
+            throw RequestError.noData
         }
 
         if parsedResult.code == 803, let cookie = parsedResult.cookie {
@@ -695,23 +548,13 @@ class CloudMusicApi {
     }
 
     func login_status() async -> Profile? {
-        struct Data: Decodable {
+        struct Result: Decodable {
             let profile: Profile?
         }
-        struct Result: Decodable {
-            let data: Data
-        }
-        guard let ret = try? await doRequest(memberName: "login_status", data: [:]) else {
+        guard let ret = try? await client.loginStatus(cacheTtl: cacheTtl) else {
             return nil
         }
-        return ret.asType(Result.self)?.data.profile
-    }
-
-    func history_recommend_songs() async {
-        guard let ret = try? await doRequest(memberName: "history_recommend_songs", data: [:])
-        else { return }
-
-        print(ret.asAny() ?? "No data")
+        return ret.asType(Result.self)?.profile
     }
 
     func user_playlist(
@@ -721,14 +564,13 @@ class CloudMusicApi {
         -> [CloudMusicApi.PlayListItem]?
     {
         guard
-            let ret = try? await doRequest(
-                memberName: "user_playlist",
-                data: [
-                    "uid": uid,
-                    "limit": limit,
-                    "offset": offset,
-                    "includeVideo": includeVideo,
-                ])
+            let ret = try? await client.userPlaylist(
+                userID: uid,
+                limit: limit,
+                offset: offset,
+                includeVideo: includeVideo,
+                cacheTtl: cacheTtl
+            )
         else { return nil }
 
         struct Result: Decodable {
@@ -746,65 +588,62 @@ class CloudMusicApi {
     func login_cellphone(phone: String, countrycode: Int = 86, password: String) async
         -> String?
     {
-        guard
-            let ret = try? await doRequest(
-                memberName: "login_cellphone",
-                data: [
-                    "phone": phone,
-                    "countrycode": countrycode,
-                    "password": password,
-                ])
-        else {
-            print("login_cellphone failed")
-            return "Request failed"
+        let response: Foundation.Data
+        do {
+            response = try await client.loginCellphone(
+                phone: phone,
+                countryCode: countrycode,
+                password: password,
+                cacheTtl: cacheTtl
+            )
+        } catch {
+            return error.localizedDescription
         }
 
-        print(ret.asAny() ?? "No data")
         struct Data: Decodable {
             let blockText: String?
         }
 
         struct Result: Decodable {
+            let code: Int?
             let message: String?
             let cookie: String?
             let data: Data?
         }
 
-        if let parsed = ret.asType(Result.self) {
-            if let cookie = parsed.cookie {
-                setCookie(cookie)
-                return nil
+        if let parsed = response.asType(Result.self) {
+            if parsed.code == 200 {
+                if let cookie = parsed.cookie {
+                    setCookie(cookie)
+                    return nil
+                }
+                if getCookie() != nil {
+                    return nil
+                }
             }
             if let data = parsed.data, let blockText = data.blockText {
                 return blockText
+            }
+            if let message = parsed.message, !message.isEmpty {
+                return message
             }
         }
         return "Parse failed"
     }
 
     func logout() async {
-        guard (try? await doRequest(memberName: "logout", data: [:])) != nil else { return }
-        setCookie("dummy saved cookie")
-    }
-
-    func user_account() async {
-        guard (try? await doRequest(memberName: "user_account", data: [:])) != nil else { return }
-    }
-
-    func user_subcount() async {
-        guard let ret = try? await doRequest(memberName: "user_subcount", data: [:]) else { return }
-
-        print(ret)
+        _ = try? await client.logout(cacheTtl: cacheTtl)
+        client.clearCookie()
+        SharedCacheManager.shared.clear()
     }
 
     func user_cloud(limit: Int = 30, offset: Int = 0) async -> [CloudFile]? {
         guard
-            let res = try? await doRequest(
-                memberName: "user_cloud",
-                data: [
-                    "limit": limit,
-                    "offset": offset,
-                ])
+            let res = try? await client.userCloud(
+                limit: limit,
+                offset: offset,
+                cacheTtl: cacheTtl
+            )
         else {
             print("user_cloud failed")
             return nil
@@ -821,11 +660,7 @@ class CloudMusicApi {
             return await recommend_songs().map { ($0, $0.map { $0.id }) }
         }
         guard
-            let ret: Data = try? await doRequest(
-                memberName: "playlist_detail",
-                data: [
-                    "id": id
-                ])
+            let ret: Data = try? await client.playlistDetail(id: id, cacheTtl: cacheTtl)
         else {
             return nil
         }
@@ -853,11 +688,7 @@ class CloudMusicApi {
 
     func song_detail(ids: [UInt64]) async -> [Song]? {
         guard
-            let ret = try? await doRequest(
-                memberName: "song_detail",
-                data: [
-                    "ids": ids.map { String($0) }.joined(separator: ",")
-                ])
+            let ret = try? await client.songDetail(ids: ids, cacheTtl: cacheTtl)
         else { return nil }
 
         struct Result: Decodable {
@@ -873,12 +704,7 @@ class CloudMusicApi {
 
     func song_url_v1(id: [UInt64], level: String = "jymaster") async -> [SongData]? {
         guard
-            let ret = try? await doRequest(
-                memberName: "song_url_v1",
-                data: [
-                    "id": id.map { String($0) }.joined(separator: ","),
-                    "level": level,
-                ])
+            let ret = try? await client.songURL(ids: id, level: level, cacheTtl: cacheTtl)
         else { return nil }
 
         struct Result: Decodable {
@@ -893,97 +719,6 @@ class CloudMusicApi {
         return nil
     }
 
-    func song_download_url(id: UInt64, br: UInt64 = 999000) async -> SongData? {
-        guard
-            let ret = try? await doRequest(
-                memberName: "song_download_url",
-                data: [
-                    "id": id,
-                    "br": br,
-                ])
-        else { return nil }
-
-        struct Result: Decodable {
-            let code: Int
-            let data: SongData
-        }
-
-        if let parsed = ret.asType(Result.self) {
-            return parsed.data
-        }
-        print("song_download_url failed")
-        return nil
-    }
-
-    func playlist_track_all(id: UInt64, limit: UInt64?, offset: UInt64?) async -> [Song]? {
-        var p: [String: UInt64] = [
-            "id": id
-        ]
-        if let limit = limit {
-            p["limit"] = limit
-        }
-        if let offset = offset {
-            p["offset"] = offset
-        }
-        guard
-            let ret = try? await doRequest(
-                memberName: "playlist_track_all", data: p)
-        else { return nil }
-
-        struct Result: Decodable {
-            let code: Int
-            let songs: [Song]
-        }
-
-        if let parsed = ret.asType(Result.self) {
-            return parsed.songs
-        }
-        print("playlist_track_all failed")
-        return nil
-    }
-
-    func comment_music(
-        id: UInt64,
-        limit: Int = 20,
-        offset: Int = 0,
-        before: Int64? = nil
-    ) async throws -> CommentsPage {
-        var p: [String: Any] = [
-            "id": id,
-            "limit": limit,
-            "offset": offset,
-        ]
-        if let before {
-            p["before"] = before
-        }
-        let ret = try await doRequest(memberName: "comment_music", data: p)
-        guard let parsed = ret.asType(CommentsPage.self, silent: true) else {
-            throw RequestError.noData
-        }
-        return parsed
-    }
-
-    func comment_playlist(
-        id: UInt64,
-        limit: Int = 20,
-        offset: Int = 0,
-        before: Int64? = nil
-    ) async throws -> CommentsPage {
-        var p: [String: Any] = [
-            "id": id,
-            "limit": limit,
-            "offset": offset,
-        ]
-        if let before {
-            p["before"] = before
-        }
-        let ret = try await doRequest(memberName: "comment_playlist", data: p)
-        guard let parsed = ret.asType(CommentsPage.self, silent: true) else {
-            throw RequestError.noData
-        }
-        return parsed
-    }
-
     func comment_new(
         type: CommentResourceType,
         id: UInt64,
@@ -992,17 +727,15 @@ class CloudMusicApi {
         sortType: CommentNewSortType = .hot,
         cursor: Int64? = nil
     ) async throws -> CommentNewPage.DataPayload {
-        var p: [String: Any] = [
-            "type": type.rawValue,
-            "id": id,
-            "pageNo": pageNo,
-            "pageSize": pageSize,
-            "sortType": sortType.rawValue,
-        ]
-        if let cursor {
-            p["cursor"] = cursor
-        }
-        let ret = try await doRequest(memberName: "comment_new", data: p)
+        let ret = try await client.comments(
+            type: type.rawValue,
+            resourceID: id,
+            pageNo: pageNo,
+            pageSize: pageSize,
+            sortType: sortType.rawValue,
+            cursor: cursor,
+            cacheTtl: cacheTtl
+        )
         guard let parsed = ret.asType(CommentNewPage.self, silent: true), let data = parsed.data else {
             throw RequestError.noData
         }
@@ -1016,16 +749,14 @@ class CloudMusicApi {
         limit: Int = 20,
         time: Int64? = nil
     ) async throws -> FloorCommentsPage.DataPayload {
-        var p: [String: Any] = [
-            "parentCommentId": parentCommentId,
-            "id": id,
-            "type": type.rawValue,
-            "limit": limit,
-        ]
-        if let time {
-            p["time"] = time
-        }
-        let ret = try await doRequest(memberName: "comment_floor", data: p)
+        let ret = try await client.floorComments(
+            parentCommentID: parentCommentId,
+            resourceID: id,
+            type: type.rawValue,
+            limit: limit,
+            time: time,
+            cacheTtl: cacheTtl
+        )
         guard let parsed = ret.asType(FloorCommentsPage.self, silent: true), let data = parsed.data else {
             throw RequestError.noData
         }
@@ -1076,13 +807,11 @@ class CloudMusicApi {
 
     func scrobble(song: Song, playedTime: Int? = nil) async {
         guard
-            (try? await doRequest(
-                memberName: "scrobble",
-                data: [
-                    "id": song.id,
-                    "sourceid": song.al.id,
-                    "time": playedTime ?? Int(song.dt / 1000),
-                ]
+            (try? await client.scrobble(
+                songID: song.id,
+                sourceID: song.al.id,
+                playedTime: playedTime ?? Int(song.dt / 1000),
+                cacheTtl: cacheTtl
             )) != nil
         else {
             print("scrobble failed")
@@ -1090,106 +819,25 @@ class CloudMusicApi {
         }
     }
 
-    func scrobble_legacy(id: UInt64, sourceid: UInt64, time: Int64) async {
-        guard
-            let res = try? await doRequest(
-                memberName: "scrobble",
-                data: [
-                    "id": id,
-                    "sourceid": sourceid,
-                    "time": time,
-                ])
-        else {
-            print("scrobble failed")
-            return
-        }
-
-        struct Result: Decodable {
-            let code: Int
-            let data: String
-        }
-
-        if let parsed = res.asType(Result.self),
-            parsed.code == 200
-        {
-            print("scrobble success")
-        } else {
-            print("scrobble failed")
-            print(res.asAny() ?? "")
-        }
-    }
-
     func cloud(filePath: URL, songName: String?, artist: String?, album: String?) async throws
         -> UInt64?
     {
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: filePath.path) else {
-            throw RequestError.Request("cloud failed to read file")
-        }
-
-
-        let filename = filePath.lastPathComponent
-
-        let p =
-            [
-                "dataInPath": true,
-                "songFile": [
-                    "path": filePath.path,
-                    "name": filename,
-                ],
-                "songName": songName ?? filename,
-                "artist": artist ?? "未知专辑",
-                "album": album ?? "未知艺术家",
-            ] as [String: Any]
-
-        guard
-            let res = try? await doRequest(
-                memberName: "cloud", data: p)
-        else {
-            throw RequestError.Request("Make request failed")
-        }
-
-        struct PrivateCloud: Decodable {
-            let songId: UInt64
-        }
-
-        struct Result3: Decodable {
-            let code: Int
-            let privateCloud: PrivateCloud?
-        }
-
-        struct Result: Decodable {
-            let res3: Result3
-        }
-
-        if let parsed = res.asType(Result.self, silent: true) {
-            if let songId = parsed.res3.privateCloud?.songId {
-                return songId
-            }
-            throw RequestError.errorCode((parsed.res3.code, "/api/cloud/pub/v2 Failed"))
-        }
-
-        struct ErrorResult: Decodable {
-            let code: Int
-            let msg: String
-        }
-
-        if let parsed = res.asType(ErrorResult.self, silent: true) {
-            throw RequestError.errorCode((parsed.code, "cloud failed: \(parsed.msg)"))
-        }
-
-        throw RequestError.Request("\(res.asAny() ?? "Unknown error")")
+        try await client.uploadCloudFile(
+            fileURL: filePath,
+            songName: songName,
+            artist: artist,
+            album: album
+        )
     }
 
     func cloud_match(userId: UInt64, songId: UInt64, adjustSongId: UInt64) async throws {
         guard
-            let res = try? await doRequest(
-                memberName: "cloud_match",
-                data: [
-                    "uid": userId,
-                    "sid": songId,
-                    "asid": adjustSongId,
-                ])
+            let res = try? await client.cloudMatch(
+                userID: userId,
+                songID: songId,
+                adjustedSongID: adjustSongId,
+                cacheTtl: cacheTtl
+            )
         else {
             throw RequestError.Request("cloud_match failed to make request")
         }
@@ -1215,11 +863,7 @@ class CloudMusicApi {
 
     func likelist(userId: UInt64) async -> [UInt64]? {
         guard
-            let res = try? await doRequest(
-                memberName: "likelist",
-                data: [
-                    "uid": userId
-                ])
+            let res = try? await client.likedSongIDs(userID: userId, cacheTtl: cacheTtl)
         else {
             print("likelist failed")
             return nil
@@ -1237,12 +881,11 @@ class CloudMusicApi {
 
     func like(id: UInt64, like: Bool) async throws {
         guard
-            let res = try? await doRequest(
-                memberName: "like",
-                data: [
-                    "id": id,
-                    "like": like ? "true" : "false",
-                ])
+            let res = try? await client.setLiked(
+                songID: id,
+                liked: like,
+                cacheTtl: cacheTtl
+            )
         else {
             print("like failed")
             return
@@ -1260,9 +903,7 @@ class CloudMusicApi {
 
     func recommend_resource() async -> [RecommandPlaylistItem]? {
         guard
-            let res = try? await doRequest(
-                memberName: "recommend_resource",
-                data: [:])
+            let res = try? await client.recommendedResources(cacheTtl: cacheTtl)
         else {
             print("recommend_resource failed")
             return nil
@@ -1280,9 +921,7 @@ class CloudMusicApi {
 
     func recommend_songs() async -> [Song]? {
         guard
-            let res = try? await doRequest(
-                memberName: "recommend_songs",
-                data: [:])
+            let res = try? await client.recommendedSongs(cacheTtl: cacheTtl)
         else {
             print("recommend_songs failed")
             return nil
@@ -1372,11 +1011,7 @@ class CloudMusicApi {
 
     func search_suggest(keyword: String) async -> [SearchResult.Song]? {
         guard
-            let res = try? await doRequest(
-                memberName: "search_suggest",
-                data: [
-                    "keywords": keyword
-                ])
+            let res = try? await client.searchSuggestions(keyword: keyword, cacheTtl: cacheTtl)
         else {
             print("search_suggest failed")
             return nil
@@ -1403,14 +1038,13 @@ class CloudMusicApi {
         -> [SearchResult.Song]?
     {
         guard
-            let res = try? await doRequest(
-                memberName: "search",
-                data: [
-                    "keywords": keyword,
-                    "type": type.rawValue,
-                    "limit": limit,
-                    "offset": offset,
-                ])
+            let res = try? await client.search(
+                keyword: keyword,
+                type: type.rawValue,
+                limit: limit,
+                offset: offset,
+                cacheTtl: cacheTtl
+            )
         else {
             print("search failed")
             return nil
@@ -1441,25 +1075,27 @@ class CloudMusicApi {
         async throws
     {
         guard
-            let res = try? await doRequest(
-                memberName: "playlist_tracks",
-                data: [
-                    "op": op.rawValue,
-                    "pid": playlistId,
-                    "tracks": trackIds.map { String($0) }.joined(separator: ","),
-                ])
+            let res = try? await client.updatePlaylistTracks(
+                operation: op.rawValue,
+                playlistID: playlistId,
+                trackIDs: trackIds,
+                cacheTtl: cacheTtl
+            )
         else {
             print("playlist_tracks failed")
             return
         }
 
-        struct ErrorResult: Decodable {
+        struct Result: Decodable {
             let code: Int
             let message: String?
         }
 
-        if let error = res.asType(ErrorResult.self, silent: true) {
-            throw RequestError.errorCode((error.code, error.message ?? "Unknown error"))
+        guard let result = res.asType(Result.self, silent: true) else {
+            throw RequestError.noData
+        }
+        guard result.code == 200 else {
+            throw RequestError.errorCode((result.code, result.message ?? "Unknown error"))
         }
     }
 
@@ -1560,11 +1196,7 @@ class CloudMusicApi {
 
     func lyric_new(id: UInt64) async -> LyricNew? {
         guard
-            let res = try? await doRequest(
-                memberName: "lyric_new",
-                data: [
-                    "id": id
-                ])
+            let res = try? await client.lyrics(songID: id, cacheTtl: cacheTtl)
         else {
             print("lyric_new failed")
             return nil

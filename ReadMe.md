@@ -108,9 +108,7 @@ curl -sfL https://raw.githubusercontent.com/zeyugao/MusicBox/refs/heads/main/.gi
 
 ## Acknowledgment
 
-- [QCloudMusicApi](https://github.com/s12mmm3/QCloudMusicApi): 网易云 API 接口
 - [CachingPlayerItem](https://github.com/sukov/CachingPlayerItem): 音频缓存
 - [AudioStreaming](https://github.com/dimitris-c/AudioStreaming)
 - [iOSAACStreamPlayer](https://github.com/UFOooX/iOSAACStreamPlayer)
 - [YesPlayMusic](https://github.com/qier222/YesPlayMusic): Logo
-

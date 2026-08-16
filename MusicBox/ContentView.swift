@@ -518,8 +518,15 @@ struct ContentView: View {
             selection = .playlist(playlist: .netease(playlistId, playlistName))
         }
         .task {
+            guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
+                NSClassFromString("XCTestCase") == nil
+            else {
+                return
+            }
+
             // Connect PlayStatus with PlayingDetailModel before loading state
             playStatus.setPlayingDetailModel(playingDetailModel)
+            CloudMusicApi.migrateLegacyAuthenticationIfNeeded()
 
             await withTaskGroup(of: Void.self) { group in
                 group.addTask {
@@ -684,15 +691,7 @@ struct ContentView: View {
         guard !playlistIds.isEmpty else { return }
 
         for playlistId in playlistIds {
-            SharedCacheManager.shared.invalidate(
-                memberName: "playlist_detail",
-                data: ["id": playlistId]
-            )
-
-            SharedCacheManager.shared.invalidate(
-                memberName: "playlist_track_all",
-                data: ["id": playlistId]
-            )
+            NeteaseHTTPClient.shared.invalidatePlaylistDetail(id: playlistId)
         }
     }
 }

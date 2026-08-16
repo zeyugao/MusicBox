@@ -5,8 +5,10 @@
 //  Created by Elsa on 2024/4/19.
 //
 
+import AppKit
 import AVFoundation
 import Combine
+import CoreImage.CIFilterBuiltins
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
@@ -26,12 +28,16 @@ func initUserData(userInfo: UserInfo) async {
         forKey: "playlists", type: [CloudMusicApi.PlayListItem].self)
     {
         userInfo.playlists = playlists
+    } else {
+        userInfo.playlists = []
     }
 
     if let likelist = loadDecodableState(
         forKey: "likelist", type: Set<UInt64>.self)
     {
         userInfo.likelist = likelist
+    } else {
+        userInfo.likelist = []
     }
 
     if let profile = await CloudMusicApi().login_status() {
@@ -217,50 +223,105 @@ struct WebViewLogin: NSViewRepresentable {
     }
 }
 
-struct WebViewLoginSheet: View {
-    @StateObject private var webViewLoginVM = WebViewLoginViewModel()
+private enum LoginMethod: String, CaseIterable, Identifiable {
+    case web
+    case qr
+    case phone
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .web: return "网页"
+        case .qr: return "二维码"
+        case .phone: return "手机号"
+        }
+    }
+}
+
+struct LoginSheet: View {
     @EnvironmentObject private var userInfo: UserInfo
     @Binding var isPresented: Bool
+    @State private var method: LoginMethod = .web
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                Text("登录网易云音乐")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Picker("登录方式", selection: $method) {
+                    ForEach(LoginMethod.allCases) { method in
+                        Text(method.title).tag(method)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 310)
+
+                Spacer()
+
+                Button {
+                    isPresented = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("关闭")
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+
+            Divider()
+
+            Group {
+                switch method {
+                case .web:
+                    WebLoginPane(onLoginSuccess: completeLogin)
+                case .qr:
+                    QRLoginPane(onLoginSuccess: completeLogin)
+                case .phone:
+                    PhoneLoginPane(onLoginSuccess: completeLogin)
+                }
+            }
+        }
+        .frame(width: method == .web ? 1100 : 460, height: method == .web ? 800 : 560)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    @MainActor
+    private func completeLogin() async {
+        await initUserData(userInfo: userInfo)
+        isPresented = false
+    }
+}
+
+private struct WebLoginPane: View {
+    @StateObject private var webViewLoginVM = WebViewLoginViewModel()
+    let onLoginSuccess: () async -> Void
     @State private var refreshTrigger = false
 
     var body: some View {
         VStack {
-            // Header with refresh and close buttons
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Login to NetEase Music")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    
-                    Text(webViewLoginVM.debugInfo)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
+                Text(webViewLoginVM.debugInfo)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
                 Spacer()
-                
-                Button(action: {
+
+                Button {
                     refreshTrigger = true
-                }) {
+                } label: {
                     Image(systemName: "arrow.clockwise")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
                 }
-                .buttonStyle(PlainButtonStyle())
-                .help("Refresh page")
-                
-                Button(action: {
-                    isPresented = false
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .help("Close")
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("刷新页面")
             }
             .padding(.horizontal)
-            .padding(.top, 16)
+            .padding(.top, 10)
             .padding(.bottom, 4)
             
             if webViewLoginVM.hasError {
@@ -302,8 +363,7 @@ struct WebViewLoginSheet: View {
                         viewModel: webViewLoginVM,
                         onLoginSuccess: {
                             Task {
-                                await initUserData(userInfo: userInfo)
-                                isPresented = false
+                                await onLoginSuccess()
                             }
                         },
                         refreshTrigger: $refreshTrigger
@@ -312,10 +372,213 @@ struct WebViewLoginSheet: View {
                 }
             }
         }
-        .frame(width: 1100, height: 800)
-        .background(Color(NSColor.windowBackgroundColor))
-        .cornerRadius(12)
-        .shadow(radius: 20)
+    }
+}
+
+private struct QRLoginPane: View {
+    let onLoginSuccess: () async -> Void
+
+    @State private var qrURL = ""
+    @State private var status = "正在生成二维码"
+    @State private var isLoading = true
+    @State private var isExpired = false
+    @State private var pollTask: Task<Void, Never>?
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer()
+
+            if let image = qrImage(for: qrURL) {
+                Image(nsImage: image)
+                    .interpolation(.none)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 250, height: 250)
+            } else {
+                ProgressView()
+                    .controlSize(.large)
+                    .frame(width: 250, height: 250)
+            }
+
+            Text(status)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            if isExpired {
+                Button("刷新二维码") {
+                    Task { await refreshQRCode() }
+                }
+                .buttonStyle(.borderedProminent)
+            } else if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            }
+
+            Spacer()
+        }
+        .padding(24)
+        .task {
+            await refreshQRCode()
+        }
+        .onDisappear {
+            pollTask?.cancel()
+            pollTask = nil
+        }
+    }
+
+    @MainActor
+    private func refreshQRCode() async {
+        pollTask?.cancel()
+        qrURL = ""
+        status = "正在生成二维码"
+        isLoading = true
+        isExpired = false
+
+        do {
+            let api = CloudMusicApi()
+            let key = try await api.login_qr_key()
+            let url = try await api.login_qr_create(key: key)
+            guard !Task.isCancelled else { return }
+            qrURL = url
+            status = "请使用网易云音乐扫描二维码"
+            isLoading = false
+            pollTask = Task { await poll(for: key) }
+        } catch {
+            status = error.localizedDescription
+            isLoading = false
+            isExpired = true
+        }
+    }
+
+    @MainActor
+    private func poll(for key: String) async {
+        while !Task.isCancelled {
+            do {
+                let result = try await CloudMusicApi().login_qr_check(key: key)
+                guard !Task.isCancelled else { return }
+
+                switch result.code {
+                case 800:
+                    status = "二维码已过期"
+                    isExpired = true
+                    return
+                case 801:
+                    status = "请使用网易云音乐扫描二维码"
+                case 802:
+                    status = "已扫描，请在手机上确认登录"
+                case 803:
+                    guard CloudMusicApi().getCookie()?.contains("MUSIC_U=") == true else {
+                        status = "登录成功，但未收到会话信息，请刷新二维码后重试"
+                        isExpired = true
+                        return
+                    }
+                    status = "登录成功"
+                    isLoading = false
+                    await onLoginSuccess()
+                    return
+                default:
+                    status = result.message
+                    isExpired = true
+                    return
+                }
+            } catch {
+                status = error.localizedDescription
+                isExpired = true
+                return
+            }
+
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+        }
+    }
+
+    private func qrImage(for value: String) -> NSImage? {
+        guard !value.isEmpty else { return nil }
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(value.utf8)
+        filter.correctionLevel = "M"
+        guard let output = filter.outputImage else { return nil }
+
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: 12, y: 12))
+        let representation = NSCIImageRep(ciImage: scaled)
+        let image = NSImage(size: representation.size)
+        image.addRepresentation(representation)
+        return image
+    }
+}
+
+private struct PhoneLoginPane: View {
+    let onLoginSuccess: () async -> Void
+
+    @State private var countryCode = "+86"
+    @State private var phone = ""
+    @State private var password = ""
+    @State private var errorMessage: String?
+    @State private var isSubmitting = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("手机号密码登录")
+                .font(.title3)
+                .fontWeight(.semibold)
+
+            TextField("国家/地区区号（如 +86）", text: $countryCode)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("手机号", text: $phone)
+                .textFieldStyle(.roundedBorder)
+
+            SecureField("密码", text: $password)
+                .textFieldStyle(.roundedBorder)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            HStack {
+                Spacer()
+                Button("登录") {
+                    Task { await submit() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isSubmitting || phone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty)
+            }
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .overlay(alignment: .bottom) {
+            if isSubmitting {
+                ProgressView()
+                    .padding(.bottom, 42)
+            }
+        }
+    }
+
+    @MainActor
+    private func submit() async {
+        let normalizedCode = countryCode
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "+"))
+        guard let code = Int(normalizedCode), code > 0 else {
+            errorMessage = "请输入有效的国家/地区区号"
+            return
+        }
+
+        isSubmitting = true
+        errorMessage = nil
+        let result = await CloudMusicApi().login_cellphone(
+            phone: phone.trimmingCharacters(in: .whitespacesAndNewlines),
+            countrycode: code,
+            password: password
+        )
+        isSubmitting = false
+
+        if let result {
+            errorMessage = result
+        } else {
+            await onLoginSuccess()
+        }
     }
 }
 
@@ -356,7 +619,7 @@ struct LoginView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showLoginSheet) {
-            WebViewLoginSheet(isPresented: $showLoginSheet)
+            LoginSheet(isPresented: $showLoginSheet)
                 .environmentObject(userInfo)
         }
     }
@@ -694,7 +957,10 @@ struct AccountActionsSection: View {
         userInfo.likelist = []
         userInfo.playlists = []
 
-        saveEncodableState(forKey: "profile", data: userInfo.profile)
+        UserDefaults.standard.removeObject(forKey: "profile")
+        UserDefaults.standard.removeObject(forKey: "playlists")
+        UserDefaults.standard.removeObject(forKey: "likelist")
+        SharedCacheManager.shared.clear()
         
         // Clear playlist and pause current playback
         playlistStatus.pausePlay()
