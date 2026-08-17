@@ -76,15 +76,23 @@ final class LyricsController {
                 self.loadGeneration == generation,
                 self.state.songID == songID
             else { return }
-            self.state.isLoading = false
+            var nextState = self.state
+            nextState.isLoading = false
             guard let response else {
-                self.state.errorMessage = String(localized: "lyrics.load.failed")
+                nextState.errorMessage = String(localized: "lyrics.load.failed")
+                self.state = nextState
                 return
             }
-            self.state.lines = response.merge()
-            self.state.currentIndex = nil
-            self.state.scrollResetToken = UUID()
-            self.resynchronizeAndSchedule()
+            let lines = response.merge()
+            let position = self.positionProvider?()
+            nextState.lines = lines
+            nextState.currentIndex = position.flatMap { self.lyricIndex(at: $0, in: lines) }
+            nextState.errorMessage = nil
+            nextState.scrollResetToken = UUID()
+            self.state = nextState
+            if let position {
+                self.resynchronizeAndSchedule(at: position)
+            }
         }
     }
 
@@ -117,13 +125,17 @@ final class LyricsController {
     }
 
     func lyricIndex(at position: Double) -> Int? {
-        guard !state.lines.isEmpty else { return nil }
+        lyricIndex(at: position, in: state.lines)
+    }
+
+    private func lyricIndex(at position: Double, in lines: [CloudMusicApi.LyricLine]) -> Int? {
+        guard !lines.isEmpty else { return nil }
         var lower = 0
-        var upper = state.lines.count - 1
+        var upper = lines.count - 1
         var result: Int?
         while lower <= upper {
             let midpoint = (lower + upper) / 2
-            if state.lines[midpoint].time <= position {
+            if lines[midpoint].time <= position {
                 result = midpoint
                 lower = midpoint + 1
             } else {

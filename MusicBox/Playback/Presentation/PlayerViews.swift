@@ -1,5 +1,6 @@
 import AppKit
 import AVKit
+import Observation
 import QuartzCore
 import SwiftUI
 
@@ -1181,7 +1182,6 @@ private struct AVRoutePickerViewWrapper: NSViewRepresentable {
 
 struct LyricsInspectorView: View {
     @Environment(AppModel.self) private var app
-    @State private var scrollScheduler = LyricsScrollScheduler()
 
     var body: some View {
         let lyrics = app.playbackPresentation.lyrics
@@ -1225,17 +1225,8 @@ struct LyricsInspectorView: View {
                 }
                 .padding(.bottom, 12)
             }
-            .onAppear {
-                scrollScheduler.schedule(currentIndex: lyrics.currentIndex, proxy: proxy)
-            }
-            .onChange(of: lyrics.currentIndex) { _, index in
-                scrollScheduler.schedule(currentIndex: index, proxy: proxy)
-            }
-            .onChange(of: lyrics.scrollResetToken) { _, _ in
-                scrollScheduler.schedule(currentIndex: lyrics.currentIndex, proxy: proxy)
-            }
-            .onDisappear {
-                scrollScheduler.cancel()
+            .task {
+                await observeScrollRequests(proxy: proxy)
             }
         }
         .navigationTitle(app.playbackPresentation.currentItem?.title ?? "Playing")
@@ -1246,30 +1237,50 @@ struct LyricsInspectorView: View {
         let hundredths = max(0, Int((seconds * 100).rounded()))
         return String(format: "%02d:%02d.%02d", hundredths / 6_000, (hundredths % 6_000) / 100, hundredths % 100)
     }
-}
 
-@MainActor
-private final class LyricsScrollScheduler {
-    private var task: Task<Void, Never>?
+    @MainActor
+    private func observeScrollRequests(proxy: ScrollViewProxy) async {
+        var lastRequest: LyricsScrollRequest?
+        var pendingScroll: Task<Void, Never>?
+        defer { pendingScroll?.cancel() }
 
-    func schedule(currentIndex: Int?, proxy: ScrollViewProxy) {
-        task?.cancel()
-        task = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(20))
-            guard !Task.isCancelled, let self else { return }
-            withAnimation(.easeOut(duration: 0.18)) {
-                if let currentIndex {
-                    proxy.scrollTo(currentIndex, anchor: .center)
-                } else {
-                    proxy.scrollTo(0, anchor: .top)
-                }
+        let requests = Observations { @MainActor in
+            let lyrics = app.playbackPresentation.lyrics
+            return LyricsScrollRequest(
+                currentIndex: lyrics.currentIndex,
+                resetToken: lyrics.scrollResetToken
+            )
+        }
+        for await request in requests {
+            guard !Task.isCancelled else { break }
+            guard request != lastRequest else { continue }
+            lastRequest = request
+            pendingScroll?.cancel()
+            pendingScroll = Task { @MainActor in
+                await scroll(to: request.currentIndex, proxy: proxy)
             }
-            self.task = nil
         }
     }
 
-    func cancel() {
-        task?.cancel()
-        task = nil
+    @MainActor
+    private func scroll(to currentIndex: Int?, proxy: ScrollViewProxy) async {
+        do {
+            try await Task.sleep(for: .milliseconds(20))
+        } catch {
+            return
+        }
+        guard !Task.isCancelled else { return }
+        withAnimation(.easeOut(duration: 0.18)) {
+            if let currentIndex {
+                proxy.scrollTo(currentIndex, anchor: .center)
+            } else {
+                proxy.scrollTo(0, anchor: .top)
+            }
+        }
     }
+}
+
+private struct LyricsScrollRequest: Equatable, Sendable {
+    let currentIndex: Int?
+    let resetToken: UUID
 }
