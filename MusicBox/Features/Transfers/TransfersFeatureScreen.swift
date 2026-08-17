@@ -10,20 +10,75 @@ struct TransfersFeatureScreen: View {
     var body: some View {
         @Bindable var transfers = app.transfers
 
-        TabView(selection: $transfers.selectedTab) {
-            uploadContent
-                .tabItem {
-                    Label(String(localized: "Uploads"), systemImage: "arrow.up.circle")
-                }
-                .tag(TransferDirection.upload)
+        ScrollView {
+            HStack {
+                Spacer()
 
-            transferList(direction: .download)
-                .tabItem {
-                    Label(String(localized: "Downloads"), systemImage: "arrow.down.circle")
+                Group {
+                    switch transfers.selectedTab {
+                    case .upload:
+                        uploadWorkspace
+                    case .download:
+                        downloadWorkspace
+                    }
                 }
-                .tag(TransferDirection.download)
+                .frame(maxWidth: 780, alignment: .top)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+
+                Spacer()
+            }
         }
-        .padding(20)
+        .contentMargins(.bottom, PlayerOverlayMetrics.contentClearance, for: .scrollContent)
+        .frame(maxWidth: .infinity)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker(
+                    String(localized: "Transfer Direction"),
+                    selection: $transfers.selectedTab
+                ) {
+                    Text(String(localized: "Uploads"))
+                        .tag(TransferDirection.upload)
+                    Text(String(localized: "Downloads"))
+                        .tag(TransferDirection.download)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityLabel(String(localized: "Transfer Direction"))
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                if transfers.selectedTab == .upload {
+                    Button {
+                        isImporting = true
+                    } label: {
+                        Image(systemName: "icloud.and.arrow.up")
+                    }
+                    .help(String(localized: "Upload to Cloud"))
+                    .accessibilityLabel(String(localized: "Upload to Cloud"))
+                }
+
+                if app.transfers.hasPendingJobs(in: transfers.selectedTab) {
+                    Button {
+                        app.transfers.cancel(transfers.selectedTab)
+                    } label: {
+                        Image(systemName: "xmark.circle")
+                    }
+                    .help(String(localized: transfers.selectedTab == .upload ? "Cancel Uploads" : "Cancel Downloads"))
+                    .accessibilityLabel(String(localized: transfers.selectedTab == .upload ? "Cancel Uploads" : "Cancel Downloads"))
+                }
+
+                if hasFinishedJobs(in: transfers.selectedTab) {
+                    Button {
+                        app.transfers.clearFinished(in: transfers.selectedTab)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .help(String(localized: "Clear Finished Transfers"))
+                    .accessibilityLabel(String(localized: "Clear Finished Transfers"))
+                }
+            }
+        }
         .fileImporter(
             isPresented: $isImporting,
             allowedContentTypes: [.audio],
@@ -32,94 +87,46 @@ struct TransfersFeatureScreen: View {
         )
     }
 
-    private var uploadContent: some View {
-        VStack(spacing: 16) {
-            Button {
-                isImporting = true
-            } label: {
-                Label(String(localized: "Upload to Cloud"), systemImage: "icloud.and.arrow.up")
-            }
-            .controlSize(.large)
+    private var uploadWorkspace: some View {
+        let jobs = jobs(for: .upload)
 
-            VStack(spacing: 8) {
-                Image(systemName: isDropTargeted ? "arrow.down.doc.fill" : "doc.badge.plus")
-                    .font(.system(size: 30))
-                    .foregroundStyle(isDropTargeted ? Color.accentColor : .secondary)
-                Text(String(localized: "Drop Audio Files Here"))
-                    .font(.headline)
-                Text(String(localized: "Audio files only"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, minHeight: 150)
-            .background(isDropTargeted ? Color.accentColor.opacity(0.08) : Color.secondary.opacity(0.06))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(
-                        isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.35),
-                        style: StrokeStyle(lineWidth: 1, dash: [6, 4])
-                    )
-            }
-            .contentShape(Rectangle())
-            .onDrop(
-                of: [UTType.fileURL.identifier],
-                isTargeted: $isDropTargeted,
-                perform: acceptDrop
-            )
+        return VStack(alignment: .leading, spacing: 16) {
+            TransferSummaryView(direction: .upload, jobs: jobs)
 
-            transferList(direction: .upload, maxHeight: 230)
+            switch TransferWorkspaceMode.forJobs(jobs) {
+            case .dropZone:
+                UploadDropSurface(isTargeted: $isDropTargeted, acceptDrop: acceptDrop)
+            case .list:
+                UploadTaskListSurface(
+                    jobs: jobs,
+                    isTargeted: $isDropTargeted,
+                    acceptDrop: acceptDrop,
+                    retry: { app.transfers.retry($0) }
+                )
+            }
         }
     }
 
-    private func transferList(
-        direction: TransferDirection,
-        maxHeight: CGFloat = 360
-    ) -> some View {
-        let jobs = app.transfers.jobs.filter { $0.direction == direction }
+    private var downloadWorkspace: some View {
+        let jobs = jobs(for: .download)
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label(
-                    String(localized: direction == .upload ? "Uploads" : "Downloads"),
-                    systemImage: direction == .upload ? "arrow.up.circle" : "arrow.down.circle"
-                )
-                .font(.headline)
-                Spacer()
-                if app.transfers.hasPendingJobs(in: direction) {
-                    Button {
-                        app.transfers.cancel(direction)
-                    } label: {
-                        Image(systemName: "xmark.circle")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(String(localized: direction == .upload ? "Cancel Uploads" : "Cancel Downloads"))
-                }
-                Button {
-                    app.transfers.clearFinished(in: direction)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .help(String(localized: "Clear Finished Transfers"))
-                .disabled(!jobs.contains(where: { $0.phase.isFinished }))
-            }
+        return VStack(alignment: .leading, spacing: 16) {
+            TransferSummaryView(direction: .download, jobs: jobs)
 
             if jobs.isEmpty {
-                Text(String(localized: "No Transfers"))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 100)
+                TransferEmptyState(direction: .download)
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 6) {
-                        ForEach(jobs) { job in
-                            TransferJobRow(job: job, retry: { app.transfers.retry(job.id) })
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: maxHeight)
+                TransferListSurface(jobs: jobs, retry: { app.transfers.retry($0) })
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func jobs(for direction: TransferDirection) -> [TransferJob] {
+        app.transfers.jobs.filter { $0.direction == direction }
+    }
+
+    private func hasFinishedJobs(in direction: TransferDirection) -> Bool {
+        jobs(for: direction).contains { $0.phase.isFinished }
     }
 
     private func handleImport(_ result: Result<[URL], Error>) {
@@ -140,6 +147,311 @@ struct TransfersFeatureScreen: View {
             app.transfers.enqueueUploads(TransferFileSelection.audioURLs(from: urls))
         }
         return true
+    }
+}
+
+enum TransferWorkspaceMode: Equatable {
+    case dropZone
+    case list
+
+    static func forJobs(_ jobs: [TransferJob]) -> Self {
+        jobs.isEmpty ? .dropZone : .list
+    }
+}
+
+struct TransferOverview: Equatable {
+    let active: Int
+    let completed: Int
+    let failed: Int
+
+    init(jobs: [TransferJob]) {
+        self.init(phases: jobs.map(\.phase))
+    }
+
+    init(phases: [TransferPhase]) {
+        active = phases.count(where: { !$0.isFinished })
+        completed = phases.count(where: {
+            if case .succeeded = $0 { return true }
+            return false
+        })
+        failed = phases.count(where: {
+            if case .failed = $0 { return true }
+            return false
+        })
+    }
+}
+
+private struct TransferSummaryView: View {
+    let direction: TransferDirection
+    let jobs: [TransferJob]
+
+    private var overview: TransferOverview {
+        TransferOverview(jobs: jobs)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: direction == .upload ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
+                    .font(.system(size: 25))
+                    .foregroundStyle(Color.accentColor)
+
+                Text(String(localized: direction == .upload ? "Upload Queue" : "Download Queue"))
+                    .font(.title2.weight(.semibold))
+
+                Spacer(minLength: 12)
+
+                HStack(spacing: 14) {
+                    TransferMetric(value: overview.active, label: "Active", tint: .accentColor)
+                    Divider().frame(height: 24)
+                    TransferMetric(value: overview.completed, label: "Completed", tint: .secondary)
+                    Divider().frame(height: 24)
+                    TransferMetric(value: overview.failed, label: "Failed", tint: overview.failed == 0 ? .secondary : .red)
+                }
+            }
+
+            Divider()
+        }
+    }
+}
+
+private struct TransferMetric: View {
+    let value: Int
+    let label: LocalizedStringKey
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text("\(value)")
+                .font(.headline.monospacedDigit())
+                .foregroundStyle(tint)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct UploadDropSurface: View {
+    @Binding var isTargeted: Bool
+    let acceptDrop: ([NSItemProvider]) -> Bool
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: isTargeted ? "arrow.down.doc.fill" : "doc.badge.plus")
+                .font(.system(size: 38, weight: .regular))
+                .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
+            Text(String(localized: "Drop Audio Files Here"))
+                .font(.title3.weight(.semibold))
+            Text(String(localized: "Audio files only"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 280)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.62), in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(
+                    isTargeted ? Color.accentColor : Color.secondary.opacity(0.3),
+                    style: StrokeStyle(lineWidth: isTargeted ? 2 : 1, dash: [7, 5])
+                )
+        }
+        .contentShape(Rectangle())
+        .onDrop(
+            of: [UTType.fileURL.identifier],
+            isTargeted: $isTargeted,
+            perform: acceptDrop
+        )
+    }
+}
+
+private struct UploadTaskListSurface: View {
+    let jobs: [TransferJob]
+    @Binding var isTargeted: Bool
+    let acceptDrop: ([NSItemProvider]) -> Bool
+    let retry: (UUID) -> Void
+
+    var body: some View {
+        ZStack {
+            TransferListSurface(jobs: jobs, retry: retry)
+
+            if isTargeted {
+                VStack(spacing: 10) {
+                    Image(systemName: "arrow.down.doc.fill")
+                        .font(.system(size: 34))
+                    Text(String(localized: "Drop to Add Uploads"))
+                        .font(.title3.weight(.semibold))
+                    Text(String(localized: "Release to add audio files"))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.accentColor, lineWidth: 2)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onDrop(
+            of: [UTType.fileURL.identifier],
+            isTargeted: $isTargeted,
+            perform: acceptDrop
+        )
+    }
+}
+
+private struct TransferListSurface: View {
+    let jobs: [TransferJob]
+    let retry: (UUID) -> Void
+
+    var body: some View {
+        LazyVStack(spacing: 0) {
+            ForEach(Array(jobs.enumerated()), id: \.element.id) { index, job in
+                TransferJobRow(job: job, retry: { retry(job.id) })
+                if index < jobs.count - 1 {
+                    Divider().padding(.leading, 44)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct TransferEmptyState: View {
+    let direction: TransferDirection
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: direction == .upload ? "arrow.up.circle" : "arrow.down.circle")
+                .font(.system(size: 30))
+                .foregroundStyle(.secondary)
+            Text(String(localized: direction == .upload ? "No Uploads Yet" : "No Downloads Yet"))
+                .font(.headline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 132)
+    }
+}
+
+private struct TransferJobRow: View {
+    let job: TransferJob
+    let retry: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            statusIcon
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(job.name)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(phaseText)
+                        .font(.caption)
+                        .foregroundStyle(phaseColor)
+                }
+
+                if case .running = job.phase {
+                    if let fraction = job.progress?.fraction {
+                        ProgressView(value: fraction)
+                    } else {
+                        ProgressView()
+                            .progressViewStyle(.linear)
+                    }
+                    HStack(spacing: 8) {
+                        Text(stageText)
+                        Spacer()
+                        Text(progressText)
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                } else if case .failed(let message) = job.phase {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
+                        .help(message)
+                }
+            }
+
+            if isRetryable {
+                Button(action: retry) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help(String(localized: "Retry Transfer"))
+            }
+        }
+        .padding(.vertical, 12)
+    }
+
+    private var statusIcon: some View {
+        Image(systemName: iconName)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(phaseColor)
+            .frame(width: 28, height: 28)
+            .background(phaseColor.opacity(0.12), in: Circle())
+    }
+
+    private var iconName: String {
+        switch job.phase {
+        case .waiting: "clock"
+        case .running: job.direction == .upload ? "arrow.up" : "arrow.down"
+        case .succeeded: "checkmark"
+        case .failed: "exclamationmark"
+        case .cancelled: "slash"
+        }
+    }
+
+    private var phaseText: String {
+        switch job.phase {
+        case .waiting: String(localized: "Waiting")
+        case .running: stageText
+        case .succeeded: String(localized: "Completed")
+        case .failed: String(localized: "Failed")
+        case .cancelled: String(localized: "Cancelled")
+        }
+    }
+
+    private var phaseColor: Color {
+        switch job.phase {
+        case .waiting: .secondary
+        case .running: .accentColor
+        case .succeeded: .green
+        case .failed: .red
+        case .cancelled: .secondary
+        }
+    }
+
+    private var isRetryable: Bool {
+        switch job.phase {
+        case .failed, .cancelled: true
+        case .waiting, .running, .succeeded: false
+        }
+    }
+
+    private var stageText: String {
+        switch job.progress?.stage {
+        case .preparing, nil: String(localized: "Preparing")
+        case .transferring: String(localized: job.direction == .upload ? "Uploading" : "Downloading")
+        case .finalizing: String(localized: "Finalizing")
+        }
+    }
+
+    private var progressText: String {
+        guard let progress = job.progress else { return "0%" }
+        let percent = progress.fraction.map { "\(Int($0 * 100))%" } ?? ""
+        guard let total = progress.totalBytes else {
+            return ByteCountFormatter.string(fromByteCount: progress.completedBytes, countStyle: .file)
+        }
+        let completedText = ByteCountFormatter.string(fromByteCount: progress.completedBytes, countStyle: .file)
+        let totalText = ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
+        return "\(percent)  \(completedText) / \(totalText)"
     }
 }
 
@@ -186,101 +498,5 @@ enum TransferFileSelection {
                 }
             }
         }
-    }
-}
-
-private struct TransferJobRow: View {
-    let job: TransferJob
-    let retry: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Text(job.name)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            status
-                .frame(width: 260, alignment: .trailing)
-        }
-        .padding(.vertical, 3)
-    }
-
-    @ViewBuilder
-    private var status: some View {
-        switch job.phase {
-        case .waiting:
-            Label(String(localized: "Waiting"), systemImage: "clock")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        case .running:
-            VStack(alignment: .trailing, spacing: 3) {
-                if let fraction = job.progress?.fraction {
-                    ProgressView(value: fraction)
-                } else {
-                    ProgressView()
-                        .progressViewStyle(.linear)
-                }
-                HStack(spacing: 6) {
-                    Text(stageText)
-                    Spacer()
-                    Text(progressText)
-                }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
-        case .succeeded:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .help(String(localized: "Transfer Completed"))
-        case .failed(let message):
-            HStack(spacing: 6) {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .lineLimit(1)
-                    .help(message)
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.red)
-                retryButton
-            }
-        case .cancelled:
-            HStack(spacing: 6) {
-                Label(String(localized: "Cancelled"), systemImage: "slash.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                retryButton
-            }
-        }
-    }
-
-    private var retryButton: some View {
-        Button(action: retry) {
-            Image(systemName: "arrow.clockwise")
-        }
-        .buttonStyle(.borderless)
-        .help(String(localized: "Retry Transfer"))
-    }
-
-    private var stageText: String {
-        switch job.progress?.stage {
-        case .preparing, nil:
-            String(localized: "Preparing")
-        case .transferring:
-            String(localized: job.direction == .upload ? "Uploading" : "Downloading")
-        case .finalizing:
-            String(localized: "Finalizing")
-        }
-    }
-
-    private var progressText: String {
-        guard let progress = job.progress else { return "0%" }
-        let percent = progress.fraction.map { "\(Int($0 * 100))%" } ?? ""
-        guard let total = progress.totalBytes else {
-            return ByteCountFormatter.string(fromByteCount: progress.completedBytes, countStyle: .file)
-        }
-        let completedText = ByteCountFormatter.string(fromByteCount: progress.completedBytes, countStyle: .file)
-        let totalText = ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
-        return "\(percent)  \(completedText) / \(totalText)"
     }
 }

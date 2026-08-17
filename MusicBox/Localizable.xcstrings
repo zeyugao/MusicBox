@@ -133,6 +133,22 @@
         }
       }
     },
+    "Active" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进行中"
+          }
+        }
+      }
+    },
     "Add All to Playlist" : {
 
     },
@@ -429,6 +445,9 @@
         }
       }
     },
+    "Completed" : {
+
+    },
     "Copy" : {
 
     },
@@ -444,6 +463,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全部下载"
+          }
+        }
+      }
+    },
+    "Download Queue" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Queue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载队列"
           }
         }
       }
@@ -509,6 +545,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将音频文件拖到这里"
+          }
+        }
+      }
+    },
+    "Drop to Add Uploads" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drop to Add Uploads"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖放以添加上传"
           }
         }
       }
@@ -597,6 +649,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "搜索建议"
+          }
+        }
+      }
+    },
+    "Failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失败"
           }
         }
       }
@@ -883,6 +951,23 @@
     "Next %lld" : {
 
     },
+    "No Downloads Yet" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No downloads yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无下载"
+          }
+        }
+      }
+    },
     "No matching playlists" : {
 
     },
@@ -890,6 +975,7 @@
 
     },
     "No Transfers" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -901,6 +987,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂无传输任务"
+          }
+        }
+      }
+    },
+    "No Uploads Yet" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No uploads yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无上传"
           }
         }
       }
@@ -1219,6 +1322,22 @@
     },
     "Refresh Playlist" : {
 
+    },
+    "Release to add audio files" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Release to add audio files"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "松开以添加音频文件"
+          }
+        }
+      }
     },
     "Remove" : {
 
@@ -1661,6 +1780,7 @@
       }
     },
     "Transfer Completed" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1672,6 +1792,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "传输完成"
+          }
+        }
+      }
+    },
+    "Transfer Direction" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transfer Direction"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "传输方向"
           }
         }
       }
@@ -1713,6 +1849,23 @@
     },
     "Unfavor" : {
 
+    },
+    "Upload Queue" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upload Queue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上传队列"
+          }
+        }
+      }
     },
     "Upload to Cloud" : {
       "localizations" : {

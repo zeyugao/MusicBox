@@ -167,6 +167,41 @@ final class FeatureModelsTests: XCTestCase {
     }
 
     @MainActor
+    func testUploadWorkspaceReturnsToDropZoneAfterFinishedJobsAreCleared() async {
+        let center = TransferCenter(
+            upload: { _, _, _, _, _ in },
+            download: { _, _ in }
+        )
+
+        XCTAssertEqual(TransferWorkspaceMode.forJobs(center.jobs), .dropZone)
+
+        center.enqueueUploads([URL(fileURLWithPath: "/tmp/workspace.flac")])
+        await waitUntil { center.jobs.first?.phase == .succeeded }
+
+        XCTAssertEqual(TransferWorkspaceMode.forJobs(center.jobs), .list)
+
+        center.clearFinished(in: .upload)
+
+        XCTAssertEqual(TransferWorkspaceMode.forJobs(center.jobs), .dropZone)
+    }
+
+    func testTransferOverviewCountsActiveCompletedAndFailedJobs() {
+        let overview = TransferOverview(
+            phases: [
+                .waiting,
+                .running,
+                .succeeded,
+                .failed("request failed"),
+                .cancelled,
+            ]
+        )
+
+        XCTAssertEqual(overview.active, 2)
+        XCTAssertEqual(overview.completed, 1)
+        XCTAssertEqual(overview.failed, 1)
+    }
+
+    @MainActor
     func testAppRouterPersistsTransfersRoute() {
         let suiteName = "MusicBoxTests.router-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
