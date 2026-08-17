@@ -510,7 +510,11 @@ final class NeteaseHTTPClient {
             from: checkResponse.data,
             endpoint: "/api/cloud/upload/check"
         )
-        try requireSuccess(check.code?.value, data: checkResponse.data)
+        try requireSuccess(
+            check.code?.value,
+            data: checkResponse.data,
+            endpoint: "/api/cloud/upload/check"
+        )
         let checkedSongID = try required(check.songId?.value, message: "Missing cloud upload song ID")
 
         let tokenResponse = try await postCloudWEAPI(
@@ -531,7 +535,11 @@ final class NeteaseHTTPClient {
             from: tokenResponse.data,
             endpoint: "/api/nos/token/alloc"
         )
-        try requireSuccess(uploadToken.code?.value, data: tokenResponse.data)
+        try requireSuccess(
+            uploadToken.code?.value,
+            data: tokenResponse.data,
+            endpoint: "/api/nos/token/alloc"
+        )
         let tokenResult = try required(uploadToken.result, message: "Missing NOS upload token result")
         let objectKey = try required(tokenResult.objectKey, message: "Missing NOS object key")
         let resourceID = try required(tokenResult.resourceId?.value, message: "Missing NOS resource ID")
@@ -576,7 +584,11 @@ final class NeteaseHTTPClient {
             from: infoResponse.data,
             endpoint: "/api/upload/cloud/info/v2"
         )
-        try requireSuccess(info.code?.value, data: infoResponse.data)
+        try requireSuccess(
+            info.code?.value,
+            data: infoResponse.data,
+            endpoint: "/api/upload/cloud/info/v2"
+        )
 
         let publishResponse = try await postCloudEAPI(
             path: "/api/cloud/pub/v2",
@@ -588,7 +600,11 @@ final class NeteaseHTTPClient {
             from: publishResponse.data,
             endpoint: "/api/cloud/pub/v2"
         )
-        try requireSuccess(published.code?.value, data: publishResponse.data)
+        try requireSuccess(
+            published.code?.value,
+            data: publishResponse.data,
+            endpoint: "/api/cloud/pub/v2"
+        )
         return published.privateCloud?.songId.value
     }
 
@@ -968,10 +984,17 @@ final class NeteaseHTTPClient {
         return tags
     }
 
-    private func requireSuccess(_ code: Int?, data: Data) throws {
-        guard code == 200 else {
+    private func requireSuccess(
+        _ code: Int?,
+        data: Data,
+        endpoint: String
+    ) throws {
+        guard let code, (200..<300).contains(code) else {
             let error = error(from: data)
-            throw RequestError.errorCode((code ?? -1, error ?? "NetEase API request failed"))
+            throw RequestError.errorCode((
+                code ?? -1,
+                error ?? "NetEase request failed at \(endpoint)"
+            ))
         }
     }
 

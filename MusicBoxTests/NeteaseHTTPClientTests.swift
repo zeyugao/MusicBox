@@ -230,7 +230,7 @@ final class NeteaseHTTPClientTests: XCTestCase {
         )
     }
 
-    func testCloudUploadSkipsNosWhenServerAlreadyHasFile() async throws {
+    func testCloudUploadAcceptsCheck201AndSkipsNosWhenServerAlreadyHasFile() async throws {
         let client = makeClient()
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("MusicBox-cloud-test-\(UUID().uuidString).mp3")
@@ -245,7 +245,7 @@ final class NeteaseHTTPClientTests: XCTestCase {
                 XCTAssertEqual(decoded.path, "/api/cloud/upload/check")
                 XCTAssertEqual(decoded.payload["length"] as? Int, fileData.count)
                 XCTAssertEqual(decoded.payload["md5"] as? String, md5(fileData))
-                return (response(for: request), Data(#"{"code":200,"needUpload":false,"songId":42}"#.utf8))
+                return (response(for: request), Data(#"{"code":201,"needUpload":false,"songId":42}"#.utf8))
             case ("music.163.com", "/weapi/nos/token/alloc"):
                 let payload = try decodeWEAPIPayload(
                     requestBody(from: request),
