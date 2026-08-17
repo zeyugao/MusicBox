@@ -48,6 +48,7 @@
 		A20000000000000000000013 /* PlaylistFeatureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* PlaylistFeatureScreen.swift */; };
 		A20000000000000000000014 /* CloudFilesFeatureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* CloudFilesFeatureScreen.swift */; };
 		A20000000000000000000015 /* CommentsFeatureWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* CommentsFeatureWindow.swift */; };
+		A2000000000000000000001A /* TransfersFeatureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* TransfersFeatureScreen.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -95,6 +96,7 @@
 		A10000000000000000000013 /* PlaylistFeatureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistFeatureScreen.swift; sourceTree = "<group>"; };
 		A10000000000000000000014 /* CloudFilesFeatureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudFilesFeatureScreen.swift; sourceTree = "<group>"; };
 		A10000000000000000000015 /* CommentsFeatureWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsFeatureWindow.swift; sourceTree = "<group>"; };
+		A1000000000000000000001A /* TransfersFeatureScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransfersFeatureScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -214,6 +216,7 @@
 				A30000000000000000000008 /* Playlist */,
 				A30000000000000000000009 /* CloudFiles */,
 				A3000000000000000000000A /* Comments */,
+				A3000000000000000000000C /* Transfers */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -260,6 +263,14 @@
 				A10000000000000000000015 /* CommentsFeatureWindow.swift */,
 			);
 			path = Comments;
+			sourceTree = "<group>";
+		};
+		A3000000000000000000000C /* Transfers */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000001A /* TransfersFeatureScreen.swift */,
+			);
+			path = Transfers;
 			sourceTree = "<group>";
 		};
 		A30000000000000000000003 /* Playback */ = {
@@ -461,6 +472,7 @@
 				A20000000000000000000013 /* PlaylistFeatureScreen.swift in Sources */,
 				A20000000000000000000014 /* CloudFilesFeatureScreen.swift in Sources */,
 				A20000000000000000000015 /* CommentsFeatureWindow.swift in Sources */,
+				A2000000000000000000001A /* TransfersFeatureScreen.swift in Sources */,
 				A2000000000000000000000C /* MusicRepository.swift in Sources */,
 				A2000000000000000000000D /* PlayerOverlayMetrics.swift in Sources */,
 				A2000000000000000000000E /* FoundationExtensions.swift in Sources */,

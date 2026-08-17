@@ -10,6 +10,7 @@ enum AppRoute: Hashable, Codable {
     case account
     case explore
     case cloudFiles
+    case transfers
     case playlist(PlaylistDestination)
 }
 
@@ -161,6 +162,7 @@ final class TransferCenter {
     private var downloadWorker: Task<Void, Never>?
 
     private(set) var jobs: [TransferJob] = []
+    var selectedTab: TransferDirection = .upload
 
     init(repository: any PlaylistRepository) {
         let resolver = AudioSourceResolver(repository: repository)
@@ -216,6 +218,12 @@ final class TransferCenter {
             album: album
         )
         startWorker(for: .upload)
+    }
+
+    func enqueueUploads(_ fileURLs: [URL]) {
+        for fileURL in fileURLs {
+            enqueueUpload(fileURL: fileURL, title: nil, artist: nil, album: nil)
+        }
     }
 
     func enqueueDownloads(_ items: [PlaylistItem]) {

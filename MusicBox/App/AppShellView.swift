@@ -30,6 +30,8 @@ struct ContentView: View {
                     if app.account.profile != nil {
                         SidebarLabel("My Cloud Files", image: "icloud")
                             .tag(AppRoute.cloudFiles)
+                        SidebarLabel(String(localized: "Transfers"), image: "arrow.up.arrow.down.circle")
+                            .tag(AppRoute.transfers)
                     }
                 }
 
@@ -111,6 +113,9 @@ struct ContentView: View {
         case .cloudFiles:
             CloudFilesFeatureScreen(repository: app.repository)
                 .navigationTitle("My Cloud Files")
+        case .transfers:
+            TransfersFeatureScreen()
+                .navigationTitle(String(localized: "Transfers"))
         case .playlist(let destination):
             PlaylistFeatureScreen(destination: destination, repository: app.repository)
                 .id(destination.id)

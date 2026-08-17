@@ -120,6 +120,66 @@ final class FeatureModelsTests: XCTestCase {
     }
 
     @MainActor
+    func testSongTableSelectionMappingIgnoresPaddingAndInvalidRows() {
+        let songs = [makeSong(id: 10), makeSong(id: 11)]
+
+        let selected = SongTableViewController.songs(
+            for: IndexSet([0, 1, 2, 99]),
+            in: songs
+        )
+
+        XCTAssertEqual(selected.map(\.id), [10, 11])
+    }
+
+    @MainActor
+    func testTransferCenterBatchUploadEnqueuesEachFile() async {
+        let harness = TransferOperationHarness()
+        let center = makeTransferCenter(harness: harness)
+        let first = URL(fileURLWithPath: "/tmp/batch-first.flac")
+        let second = URL(fileURLWithPath: "/tmp/batch-second.mp3")
+
+        center.enqueueUploads([first, second])
+        await waitUntil { harness.uploadNames == ["batch-first.flac"] }
+        harness.finishUpload()
+        await waitUntil { harness.uploadNames == ["batch-first.flac", "batch-second.mp3"] }
+        harness.finishUpload()
+        await waitUntil { center.jobs.allSatisfy { $0.phase == .succeeded } }
+
+        XCTAssertEqual(center.jobs.map(\.name), ["batch-first.flac", "batch-second.mp3"])
+    }
+
+    @MainActor
+    func testTransferFileSelectionFiltersNonAudioURLs() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MusicBox-transfer-selection-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let audioURL = directory.appendingPathComponent("song.flac")
+        let textURL = directory.appendingPathComponent("notes.txt")
+        try Data("audio".utf8).write(to: audioURL)
+        try Data("notes".utf8).write(to: textURL)
+
+        XCTAssertEqual(
+            TransferFileSelection.audioURLs(from: [audioURL, textURL, directory]),
+            [audioURL]
+        )
+    }
+
+    @MainActor
+    func testAppRouterPersistsTransfersRoute() {
+        let suiteName = "MusicBoxTests.router-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let router = AppRouter(defaults: defaults)
+        router.selectedRoute = .transfers
+
+        let restored = AppRouter(defaults: defaults)
+        XCTAssertEqual(restored.selectedRoute, .transfers)
+    }
+
+    @MainActor
     func testTransferCenterSerializesEachDirectionAndRunsDirectionsConcurrently() async {
         let harness = TransferOperationHarness()
         let center = makeTransferCenter(harness: harness)

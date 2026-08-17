@@ -302,6 +302,8 @@ final class NeteaseHTTPClientTests: XCTestCase {
         let fileData = Data("cloud upload audio body".utf8)
         try fileData.write(to: fileURL)
         defer { try? FileManager.default.removeItem(at: fileURL) }
+        let initialAttributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        let initialModificationDate = initialAttributes[.modificationDate] as? Date
         let progressRecorder = TransferProgressRecorder()
         let checkedSongID = String(repeating: "a", count: 128)
 
@@ -370,6 +372,10 @@ final class NeteaseHTTPClientTests: XCTestCase {
         XCTAssertTrue(progress.contains { $0.stage == .transferring })
         XCTAssertEqual(progress.last?.stage, .finalizing)
         XCTAssertEqual(progress.last?.fraction, 1)
+        XCTAssertEqual(try Data(contentsOf: fileURL), fileData)
+        let finalAttributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        XCTAssertEqual(finalAttributes[.size] as? NSNumber, initialAttributes[.size] as? NSNumber)
+        XCTAssertEqual(finalAttributes[.modificationDate] as? Date, initialModificationDate)
     }
 
     func testCloudUploadDecodeErrorNamesEndpointAndOnlyReportsShape() async throws {
