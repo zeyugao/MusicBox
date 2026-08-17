@@ -199,7 +199,7 @@ private struct WebLoginPane: View {
                 ZStack {
                     if model.isLoading {
                         VStack(spacing: 16) {
-                            ProgressView().scaleEffect(1.5)
+                            ProgressView().controlSize(.large)
                             Text(String(localized: "login.web.loading"))
                                 .foregroundStyle(.secondary)
                         }
