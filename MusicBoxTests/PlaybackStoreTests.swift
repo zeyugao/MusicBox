@@ -277,10 +277,10 @@ final class PlaybackTimelineTests: XCTestCase {
         XCTAssertEqual(timeline.position(at: 100.25), 10.25, accuracy: 0.001)
 
         let midpoint = 100.25 + PlaybackTimeline.sampleCorrectionDuration / 2
-        XCTAssertEqual(timeline.position(at: midpoint), 10.415, accuracy: 0.001)
+        XCTAssertEqual(timeline.position(at: midpoint), 10.575, accuracy: 0.001)
         XCTAssertEqual(
             timeline.position(at: 100.25 + PlaybackTimeline.sampleCorrectionDuration),
-            10.58,
+            10.9,
             accuracy: 0.001
         )
     }
@@ -289,11 +289,11 @@ final class PlaybackTimelineTests: XCTestCase {
         var timeline = PlaybackTimeline()
         timeline.reset(position: 10, duration: 180, isAdvancing: true, at: 100)
 
-        let correction = timeline.applySample(position: 11, duration: 180, at: 100.5)
+        let correction = timeline.applySample(position: 11.5, duration: 180, at: 100.5)
 
-        XCTAssertEqual(correction, 0.5, accuracy: 0.001)
-        XCTAssertEqual(timeline.position(at: 100.5), 11, accuracy: 0.001)
-        XCTAssertEqual(timeline.position(at: 100.6), 11.1, accuracy: 0.001)
+        XCTAssertEqual(correction, 1, accuracy: 0.001)
+        XCTAssertEqual(timeline.position(at: 100.5), 11.5, accuracy: 0.001)
+        XCTAssertEqual(timeline.position(at: 100.6), 11.6, accuracy: 0.001)
     }
 
     func testFreezesAndResumesWithoutLosingTheAnchor() {
@@ -317,6 +317,133 @@ final class PlaybackTimelineTests: XCTestCase {
 
         timeline.reset(position: 999, duration: 180, isAdvancing: true, at: 103)
         XCTAssertEqual(timeline.position(at: 104), 180, accuracy: 0.001)
+    }
+}
+
+final class PlaybackProgressMotionTests: XCTestCase {
+    func testAdvancesAtPlaybackRateWhenTheCoreTimelineMatches() {
+        var motion = PlaybackProgressMotion()
+        motion.reset(position: 10, duration: 180, isAdvancing: true, at: 100)
+
+        XCTAssertEqual(
+            motion.advance(toward: 10.1, duration: 180, isAdvancing: true, at: 100.1),
+            10.1,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            motion.advance(toward: 10.6, duration: 180, isAdvancing: true, at: 100.6),
+            10.6,
+            accuracy: 0.001
+        )
+    }
+
+    func testAbsorbsSmallCorrectionsWithAContinuousLimitedVelocity() {
+        var motion = PlaybackProgressMotion()
+        motion.reset(position: 10, duration: 180, isAdvancing: true, at: 100)
+
+        XCTAssertEqual(
+            motion.advance(toward: 10.35, duration: 180, isAdvancing: true, at: 100.1),
+            10.1075,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            motion.advance(toward: 10.45, duration: 180, isAdvancing: true, at: 100.2),
+            10.2275,
+            accuracy: 0.001
+        )
+    }
+
+    func testHardResetsForLargeTimelineDrift() {
+        var motion = PlaybackProgressMotion()
+        motion.reset(position: 10, duration: 180, isAdvancing: true, at: 100)
+
+        XCTAssertEqual(
+            motion.advance(toward: 12, duration: 180, isAdvancing: true, at: 100.1),
+            12,
+            accuracy: 0.001
+        )
+    }
+
+    func testFreezesAndDurationChangesResetTheVisualPosition() {
+        var motion = PlaybackProgressMotion()
+        motion.reset(position: 10, duration: 180, isAdvancing: false, at: 100)
+
+        XCTAssertEqual(
+            motion.advance(toward: 10, duration: 180, isAdvancing: false, at: 100.5),
+            10,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            motion.advance(toward: 40, duration: 40, isAdvancing: true, at: 101),
+            40,
+            accuracy: 0.001
+        )
+    }
+}
+
+final class PlaybackProgressInteractionTests: XCTestCase {
+    func testMapsPointerLocationsIntoTheTrackBounds() {
+        XCTAssertEqual(PlaybackProgressInteraction.position(for: -10, width: 100, duration: 240), 0)
+        XCTAssertEqual(PlaybackProgressInteraction.position(for: 25, width: 100, duration: 240), 60)
+        XCTAssertEqual(PlaybackProgressInteraction.position(for: 120, width: 100, duration: 240), 240)
+        XCTAssertEqual(PlaybackProgressInteraction.position(for: 25, width: 0, duration: 240), 0)
+    }
+
+    func testDragPreviewsUntilMouseReleaseProducesOneCommitValue() {
+        var interaction = PlaybackProgressInteraction()
+
+        XCTAssertEqual(interaction.begin(location: 20, width: 100, duration: 200), 40)
+        XCTAssertTrue(interaction.isTracking)
+        XCTAssertEqual(interaction.update(location: 45, width: 100, duration: 200), 90)
+        XCTAssertEqual(interaction.update(location: 70, width: 100, duration: 200), 140)
+        XCTAssertEqual(interaction.end(location: 80, width: 100, duration: 200), 160)
+        XCTAssertFalse(interaction.isTracking)
+        XCTAssertNil(interaction.end(location: 90, width: 100, duration: 200))
+    }
+
+    func testCancelledDragDoesNotProduceACommitValue() {
+        var interaction = PlaybackProgressInteraction()
+
+        _ = interaction.begin(location: 50, width: 100, duration: 200)
+        XCTAssertTrue(interaction.cancel())
+        XCTAssertFalse(interaction.isTracking)
+        XCTAssertNil(interaction.update(location: 75, width: 100, duration: 200))
+    }
+}
+
+final class PlaybackProgressThumbVisibilityTests: XCTestCase {
+    func testKeepsTheThumbVisibleForPointThreeSecondsAfterPointerExit() {
+        var visibility = PlaybackProgressThumbVisibility()
+        visibility.pointerEntered()
+
+        XCTAssertTrue(visibility.isVisible)
+        XCTAssertEqual(visibility.pointerExited(at: 10), 10.3)
+        XCTAssertFalse(visibility.hideIfDue(at: 10.299))
+        XCTAssertTrue(visibility.isVisible)
+        XCTAssertTrue(visibility.hideIfDue(at: 10.3))
+        XCTAssertFalse(visibility.isVisible)
+    }
+
+    func testDraggingOutsideDefersTheCountdownUntilRelease() {
+        var visibility = PlaybackProgressThumbVisibility()
+        visibility.pointerEntered()
+
+        XCTAssertNil(visibility.setTracking(true, at: 10))
+        XCTAssertNil(visibility.pointerExited(at: 11))
+        XCTAssertTrue(visibility.isVisible)
+        XCTAssertEqual(visibility.setTracking(false, at: 12), 12.3)
+        XCTAssertFalse(visibility.hideIfDue(at: 12.299))
+        XCTAssertTrue(visibility.hideIfDue(at: 12.3))
+    }
+
+    func testPointerReentryCancelsAPendingHide() {
+        var visibility = PlaybackProgressThumbVisibility()
+        visibility.pointerEntered()
+        XCTAssertEqual(visibility.pointerExited(at: 10), 10.3)
+
+        visibility.pointerEntered()
+        XCTAssertFalse(visibility.hideIfDue(at: 20))
+        XCTAssertTrue(visibility.isVisible)
     }
 }
 

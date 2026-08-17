@@ -12,8 +12,8 @@ enum PlaybackPhase: String, Codable {
 }
 
 struct PlaybackTimeline {
-    static let sampleCorrectionDuration: TimeInterval = 0.18
-    static let hardSampleCorrectionThreshold: Double = 0.25
+    static let sampleCorrectionDuration: TimeInterval = 0.5
+    static let hardSampleCorrectionThreshold: Double = 1.0
 
     private var anchorPosition: Double = 0
     private var anchorUptime: TimeInterval = 0

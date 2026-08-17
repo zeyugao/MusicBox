@@ -20,11 +20,21 @@ must be preserved when changing the application.
   run with `Cmd-R`.
 - Keep `SPUStandardUpdaterController` initialized in `MusicBoxApp` when
   touching startup code.
+- Build the Debug app with:
+
+  ```sh
+  xcodebuild -project MusicBox.xcodeproj -scheme MusicBox -configuration Debug build
+  ```
+
 - Run the complete test suite with:
 
   ```sh
-  xcodebuild -project MusicBox.xcodeproj -scheme MusicBox -configuration Debug test CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM=""
+  xcodebuild -project MusicBox.xcodeproj -scheme MusicBox -configuration Debug test
   ```
+
+- Do not override `CODE_SIGN_IDENTITY` or `DEVELOPMENT_TEAM` for MusicBox
+  command-line builds or tests. Use the project's automatic Apple Development
+  signing so the shared Xcode DerivedData products remain runnable from Xcode.
 
 - The project has no sibling-repository or external C++ build dependency.
 

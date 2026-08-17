@@ -5,7 +5,7 @@ enum PlayerOverlayMetrics {
     static let trackVisualPadding: CGFloat = 6
     static let trackInfoHeight: CGFloat = 32
     static let trackSliderHeight: CGFloat = 10
-    static let trackSliderLineHeight: CGFloat = 2
+    static let trackSliderLineHeight: CGFloat = 3
     static let trackLayoutPadding = trackVisualPadding
         - (trackSliderHeight - trackSliderLineHeight) / 2
     static let horizontalInset: CGFloat = 16
