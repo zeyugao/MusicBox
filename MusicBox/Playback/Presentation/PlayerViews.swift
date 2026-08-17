@@ -125,6 +125,18 @@ private struct NowPlayingTrackPresentation: View {
     @Binding var seekTarget: Double
 
     var body: some View {
+        TimelineView(
+            .animation(
+                minimumInterval: 1.0 / 60.0,
+                paused: !playback.shouldAnimateDisplayedPosition || isSeeking
+            )
+        ) { _ in
+            trackContent(position: isSeeking ? seekTarget : playback.displayedPosition)
+        }
+    }
+
+    @ViewBuilder
+    private func trackContent(position: Double) -> some View {
         VStack(alignment: .leading, spacing: PlayerOverlayMetrics.trackLayoutPadding) {
             HStack(spacing: 8) {
                 artwork
@@ -195,7 +207,7 @@ private struct NowPlayingTrackPresentation: View {
                             .lineLimit(1)
                             .foregroundStyle(Color(nsColor: .placeholderTextColor))
                         Spacer(minLength: 4)
-                        Text("\(clock(playback.position)) / \(clock(playback.duration))")
+                        Text("\(clock(position)) / \(clock(playback.duration))")
                             .font(.system(size: 12))
                             .lineLimit(1)
                             .foregroundStyle(Color(nsColor: .secondaryLabelColor))
@@ -207,14 +219,14 @@ private struct NowPlayingTrackPresentation: View {
 
             Slider(
                 value: Binding(
-                    get: { isSeeking ? seekTarget : playback.position },
+                    get: { isSeeking ? seekTarget : position },
                     set: { seekTarget = $0 }
                 ),
                 in: 0...max(1, playback.duration),
                 onEditingChanged: { editing in
                     isSeeking = editing
                     if editing {
-                        seekTarget = playback.position
+                        seekTarget = playback.displayedPosition
                     } else {
                         playback.seek(to: seekTarget)
                     }

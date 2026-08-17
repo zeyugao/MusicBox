@@ -172,6 +172,121 @@ final class PlaybackStoreTests: XCTestCase {
     }
 }
 
+final class PlaybackDisplayClockTests: XCTestCase {
+    func testAdvancesBetweenAuthoritativeSamples() {
+        var clock = PlaybackDisplayClock(position: 10, duration: 180, isAdvancing: true, now: 100)
+
+        XCTAssertEqual(clock.position(at: 100.1), 10.1, accuracy: 0.001)
+
+        clock.synchronize(position: 10.25, duration: 180, at: 100.25)
+        XCTAssertEqual(clock.position(at: 100.4), 10.4, accuracy: 0.001)
+    }
+
+    func testFreezesWhenPlaybackStopsOrBuffers() {
+        var clock = PlaybackDisplayClock(position: 10, duration: 180, isAdvancing: true, now: 100)
+
+        clock.setAdvancing(false, at: 100.1)
+        XCTAssertEqual(clock.position(at: 100.5), 10.1, accuracy: 0.001)
+
+        clock.setAdvancing(true, at: 100.5)
+        XCTAssertEqual(clock.position(at: 100.75), 10.35, accuracy: 0.001)
+    }
+
+    func testSeekAndItemChangesReanchorTheDisplayClock() {
+        var clock = PlaybackDisplayClock(position: 10, duration: 180, isAdvancing: true, now: 100)
+
+        clock.synchronize(position: 75, duration: 180, at: 101)
+        XCTAssertEqual(clock.position(at: 101.1), 75.1, accuracy: 0.001)
+
+        clock.synchronize(position: 0, duration: 240, at: 102)
+        XCTAssertEqual(clock.position(at: 102.1), 0.1, accuracy: 0.001)
+    }
+
+    func testClampsToTrackDuration() {
+        let clock = PlaybackDisplayClock(position: 179.9, duration: 180, isAdvancing: true, now: 100)
+
+        XCTAssertEqual(clock.position(at: 101), 180, accuracy: 0.001)
+    }
+}
+
+@MainActor
+final class PlaybackPresentationModelTests: XCTestCase {
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        suiteName = "PlaybackPresentationModelTests.\(UUID().uuidString)"
+        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    override func tearDownWithError() throws {
+        defaults.removePersistentDomain(forName: suiteName)
+        try super.tearDownWithError()
+    }
+
+    func testPresentationClockIgnoresDownloadProgressAndFreezesForRateInterruptions() async {
+        var now = 100.0
+        let engine = FakePlaybackEngine()
+        let store = PlaybackStore(
+            resolver: AudioSourceResolver { item in .local(URL(fileURLWithPath: "/tmp/\(item.id).mp3")) },
+            lyrics: LyricsController(load: { _ in nil }),
+            engine: engine,
+            defaults: defaults
+        )
+        let presentation = PlaybackPresentationModel(playback: store, currentUptime: { now })
+
+        store.replaceSource([track(1)], autoplay: false)
+        await settle()
+        engine.send(.ready(duration: 180), generation: 1)
+        engine.send(.playbackChanged(true), generation: 1)
+        engine.send(.position(position: 10, duration: 180), generation: 1)
+
+        now = 100.1
+        XCTAssertEqual(presentation.displayedPosition, 10.1, accuracy: 0.001)
+
+        engine.send(.buffering(0.5), generation: 1)
+        now = 100.4
+        XCTAssertEqual(presentation.displayedPosition, 10.4, accuracy: 0.001)
+
+        engine.send(.playbackChanged(false), generation: 1)
+        now = 100.6
+        XCTAssertEqual(presentation.displayedPosition, 10.4, accuracy: 0.001)
+
+        engine.send(.playbackChanged(true), generation: 1)
+        now = 100.7
+        XCTAssertEqual(presentation.displayedPosition, 10.5, accuracy: 0.001)
+
+        engine.send(.playbackChanged(false), generation: 1)
+        now = 101
+        XCTAssertEqual(presentation.displayedPosition, 10.5, accuracy: 0.001)
+
+        presentation.seek(to: 75)
+        XCTAssertEqual(presentation.displayedPosition, 75, accuracy: 0.001)
+        XCTAssertFalse(presentation.shouldAnimateDisplayedPosition)
+    }
+
+    private func track(_ id: UInt64) -> PlaylistItem {
+        PlaylistItem(
+            id: id,
+            url: URL(string: "https://example.invalid/\(id).mp3"),
+            title: "Track \(id)",
+            artist: "Artist",
+            albumId: 1,
+            ext: "mp3",
+            duration: CMTime(seconds: 180, preferredTimescale: 1_000),
+            artworkUrl: nil,
+            nsSong: nil
+        )
+    }
+
+    private func settle() async {
+        await Task.yield()
+        await Task.yield()
+    }
+}
+
 @MainActor
 private final class FakePlaybackEngine: PlaybackEngineControlling {
     struct Load {
