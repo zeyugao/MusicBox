@@ -1115,84 +1115,111 @@ class CloudMusicApi {
 
     struct LyricNew: Decodable {
 
-        struct RawLyricLine: Decodable, Hashable {
-            let time: Float64
+        struct RawLyricLine: Hashable {
+            let milliseconds: Int
             let text: String
         }
+
         struct Lyric: Decodable {
             let lyric: String
             let version: Int
 
             func parse() -> [RawLyricLine] {
-                return lyric.split(separator: "\n").map { (line: Substring) in
-                    if !line.starts(with: "[") {
-                        return RawLyricLine(time: -1, text: String(line))
+                let offset = Self.offset(in: lyric)
+                var result: [(line: RawLyricLine, order: Int)] = []
+
+                for rawLine in lyric.split(separator: "\n", omittingEmptySubsequences: false) {
+                    var remainder = rawLine[...]
+                    var timestamps: [Int] = []
+
+                    while remainder.first == "[",
+                        let closingIndex = remainder.firstIndex(of: "]")
+                    {
+                        let tagStart = remainder.index(after: remainder.startIndex)
+                        let tag = remainder[tagStart..<closingIndex]
+                        if let timestamp = Self.timestampMilliseconds(for: tag) {
+                            timestamps.append(timestamp + offset)
+                        }
+                        remainder = remainder[remainder.index(after: closingIndex)...]
                     }
 
-                    let parts = line.split(separator: "]")
-                    let time = parts[0].dropFirst().split(separator: ":")
-                    let text = parts.count < 2 ? "" : parts[1]
-                    if time.count < 2 {
-                        return RawLyricLine(time: 0, text: String(text))
+                    let text = String(remainder).trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !text.isEmpty else { continue }
+                    for timestamp in timestamps where timestamp >= 0 {
+                        result.append(
+                            (
+                                RawLyricLine(milliseconds: timestamp, text: text),
+                                result.count
+                            )
+                        )
                     }
-                    let minute = Int(String(time[0])) ?? 0
-                    let second = Float64(time[1]) ?? 0
-                    return RawLyricLine(time: Float64(minute * 60) + second, text: String(text))
                 }
-                .filter {
-                    line in
-                    return !line.text.isEmpty
+
+                return result.sorted {
+                    $0.line.milliseconds == $1.line.milliseconds
+                        ? $0.order < $1.order
+                        : $0.line.milliseconds < $1.line.milliseconds
+                }.map(\.line)
+            }
+
+            private static func offset(in lyric: String) -> Int {
+                for rawLine in lyric.split(separator: "\n", omittingEmptySubsequences: false) {
+                    var remainder = rawLine[...]
+                    while remainder.first == "[",
+                        let closingIndex = remainder.firstIndex(of: "]")
+                    {
+                        let tagStart = remainder.index(after: remainder.startIndex)
+                        let tag = remainder[tagStart..<closingIndex]
+                        let normalized = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if normalized.lowercased().hasPrefix("offset:"),
+                            let value = Int(normalized.dropFirst("offset:".count))
+                        {
+                            return value
+                        }
+                        remainder = remainder[remainder.index(after: closingIndex)...]
+                    }
                 }
+                return 0
+            }
+
+            private static func timestampMilliseconds(for tag: Substring) -> Int? {
+                let components = tag.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+                guard components.count == 2,
+                    let minutes = Int(components[0]),
+                    let seconds = Double(components[1]),
+                    minutes >= 0,
+                    seconds >= 0
+                else { return nil }
+                return minutes * 60_000 + Int((seconds * 1_000).rounded())
             }
         }
 
         func merge() -> [LyricLine] {
-            let lrc = self.lrc.parse()
-            let tlyric = self.tlyric?.parse() ?? []
-            let romalrc = self.romalrc?.parse() ?? []
+            let lyrics = grouped(self.lrc.parse())
+            let translations = grouped(self.tlyric?.parse() ?? [])
+            let romanizations = grouped(self.romalrc?.parse() ?? [])
 
-            var result: [LyricLine] = []
-            var lrcIndex = 0
-            var tlyricIndex = 0
-            var romalrcIndex = 0
+            return lyrics.keys.sorted().compactMap { timestamp in
+                guard let lyric = lyrics[timestamp], !lyric.isEmpty else { return nil }
+                return LyricLine(
+                    time: Float64(timestamp) / 1_000,
+                    lyric: lyric,
+                    tlyric: translations[timestamp],
+                    romalrc: romanizations[timestamp]
+                )
+            }
+        }
 
-            while lrcIndex < lrc.count || tlyricIndex < tlyric.count || romalrcIndex < romalrc.count
-            {
-                let lrcTime = lrcIndex < lrc.count ? lrc[lrcIndex].time : 1e9
-                let tlyricTime = tlyricIndex < tlyric.count ? tlyric[tlyricIndex].time : 1e9
-                let romalrcTime = romalrcIndex < romalrc.count ? romalrc[romalrcIndex].time : 1e9
-
-                let time: Float64 = min(lrcTime, tlyricTime, romalrcTime)
-
-                var lyricStr: String?
-                var tlyricStr: String?
-                var romalrcStr: String?
-
-                if lrcIndex < lrc.count, lrc[lrcIndex].time == time {
-                    lyricStr = lrc[lrcIndex].text
-                    lrcIndex += 1
-                }
-                if tlyricIndex < tlyric.count, tlyric[tlyricIndex].time == time {
-                    tlyricStr = tlyric[tlyricIndex].text
-                    tlyricIndex += 1
-                }
-                if romalrcIndex < romalrc.count, romalrc[romalrcIndex].time == time {
-                    romalrcStr = romalrc[romalrcIndex].text
-                    romalrcIndex += 1
-                }
-
-                if time >= 0 && lyricStr != nil && lyricStr != "" {
-                    result.append(
-                        LyricLine(
-                            time: time,
-                            lyric: (lyricStr ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
-                            tlyric: tlyricStr?.trimmingCharacters(in: .whitespacesAndNewlines),
-                            romalrc: romalrcStr?.trimmingCharacters(in: .whitespacesAndNewlines)
-                        )
-                    )
+        private func grouped(_ lines: [RawLyricLine]) -> [Int: String] {
+            var grouped: [Int: [String]] = [:]
+            for line in lines {
+                let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
+                if grouped[line.milliseconds]?.contains(text) != true {
+                    grouped[line.milliseconds, default: []].append(text)
                 }
             }
-            return result
+            return grouped.mapValues { $0.joined(separator: "\n") }
         }
 
         // let klyric: LyricNew.Lyric

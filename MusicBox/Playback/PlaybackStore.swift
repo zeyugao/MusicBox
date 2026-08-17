@@ -11,6 +11,81 @@ enum PlaybackPhase: String, Codable {
     case failed
 }
 
+struct PlaybackTimeline {
+    static let sampleCorrectionDuration: TimeInterval = 0.18
+    static let hardSampleCorrectionThreshold: Double = 0.25
+
+    private var anchorPosition: Double = 0
+    private var anchorUptime: TimeInterval = 0
+    private(set) var duration: Double = 0
+    private var isAdvancing = false
+    private var sampleCorrection: Double = 0
+    private var sampleCorrectionStartUptime: TimeInterval = 0
+
+    mutating func reset(position: Double, duration: Double, isAdvancing: Bool, at uptime: TimeInterval) {
+        self.duration = Self.normalizedDuration(duration)
+        anchorPosition = Self.boundedPosition(position, duration: self.duration)
+        anchorUptime = uptime
+        self.isAdvancing = isAdvancing
+        sampleCorrection = 0
+        sampleCorrectionStartUptime = uptime
+    }
+
+    @discardableResult
+    mutating func applySample(position: Double, duration: Double, at uptime: TimeInterval) -> Double {
+        let normalizedDuration = Self.normalizedDuration(duration)
+        let predictedPosition = Self.boundedPosition(self.position(at: uptime), duration: normalizedDuration)
+        let sampledPosition = Self.boundedPosition(position, duration: normalizedDuration)
+        let correction = sampledPosition - predictedPosition
+
+        guard isAdvancing, abs(correction) < Self.hardSampleCorrectionThreshold else {
+            reset(position: sampledPosition, duration: normalizedDuration, isAdvancing: isAdvancing, at: uptime)
+            return correction
+        }
+
+        self.duration = normalizedDuration
+        anchorPosition = predictedPosition
+        anchorUptime = uptime
+        sampleCorrection = correction
+        sampleCorrectionStartUptime = uptime
+        return correction
+    }
+
+    mutating func setAdvancing(_ isAdvancing: Bool, at uptime: TimeInterval) {
+        guard self.isAdvancing != isAdvancing else { return }
+        if self.isAdvancing {
+            anchorPosition = position(at: uptime)
+        }
+        anchorUptime = uptime
+        self.isAdvancing = isAdvancing
+        sampleCorrection = 0
+        sampleCorrectionStartUptime = uptime
+    }
+
+    func position(at uptime: TimeInterval) -> Double {
+        guard isAdvancing else { return anchorPosition }
+        let elapsed = max(0, uptime - anchorUptime)
+        let correctionProgress = min(
+            1,
+            max(0, (uptime - sampleCorrectionStartUptime) / Self.sampleCorrectionDuration)
+        )
+        return Self.boundedPosition(
+            anchorPosition + elapsed + sampleCorrection * correctionProgress,
+            duration: duration
+        )
+    }
+
+    private static func normalizedDuration(_ value: Double) -> Double {
+        value.isFinite && value > 0 ? value : 0
+    }
+
+    private static func boundedPosition(_ value: Double, duration: Double) -> Double {
+        let position = value.isFinite ? max(0, value) : 0
+        guard duration > 0 else { return position }
+        return min(position, duration)
+    }
+}
+
 struct PlaybackState {
     var phase: PlaybackPhase = .idle
     var currentEntry: PlaybackQueueEntry?
@@ -21,7 +96,6 @@ struct PlaybackState {
     var position: Double = 0
     var duration: Double = 0
     var volume: Float = 1
-    var bufferingProgress: Double?
     var errorMessage: String?
     var isSeeking = false
 
@@ -70,7 +144,6 @@ enum PlaybackEngineEvent {
     case ready(duration: Double)
     case position(position: Double, duration: Double)
     case playbackChanged(Bool)
-    case buffering(Double?)
     case ended
     case failed(String)
 }
@@ -114,7 +187,7 @@ private final class AVPlaybackEngine: NSObject, PlaybackEngineControlling, @prec
             }
         }
         timeObserver = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.25, preferredTimescale: 1_000),
+            forInterval: CMTime(seconds: 0.5, preferredTimescale: 1_000),
             queue: .main
         ) { [weak self] time in
             Task { @MainActor [weak self] in
@@ -210,16 +283,6 @@ private final class AVPlaybackEngine: NSObject, PlaybackEngineControlling, @prec
         player.replaceCurrentItem(with: nil)
     }
 
-    func playerItemReadyToPlay(_ playerItem: CachingPlayerItem) {
-        guard playerItem === activeCachingItem else { return }
-        onEvent?(.buffering(nil), activeGeneration)
-    }
-
-    func playerItem(_ playerItem: CachingPlayerItem, didDownloadBytesSoFar bytesDownloaded: Int, outOf bytesExpected: Int) {
-        guard playerItem === activeCachingItem, bytesExpected > 0 else { return }
-        onEvent?(.buffering(Double(bytesDownloaded) / Double(bytesExpected)), activeGeneration)
-    }
-
     func playerItem(_ playerItem: CachingPlayerItem, downloadingFailedWith error: Error) {
         guard playerItem === activeCachingItem else { return }
         onEvent?(.failed(error.localizedDescription), activeGeneration)
@@ -250,12 +313,17 @@ final class PlaybackStore {
     private let resolver: AudioSourceResolver
     private let engine: any PlaybackEngineControlling
     private let defaults: UserDefaults
+    private let currentUptime: () -> TimeInterval
+    private let persistenceInterval: Duration
     private var generation = 0
     private var wantsPlayback = false
     private var loadTask: Task<Void, Never>?
-    private var persistTask: Task<Void, Never>?
+    private var persistenceTask: Task<Void, Never>?
+    private var persistenceGeneration: UInt64 = 0
+    private var sessionDirty = false
     private var eventListeners: [UUID: (PlaybackEvent) -> Void] = [:]
     private var terminationObserver: NSObjectProtocol?
+    private var timeline = PlaybackTimeline()
 
     private(set) var queue = PlaybackQueue()
     private(set) var state = PlaybackState()
@@ -265,8 +333,15 @@ final class PlaybackStore {
         self.init(repository: NeteaseMusicRepository())
     }
 
-    init(repository: any MusicRepository, defaults: UserDefaults = .standard) {
+    init(
+        repository: any MusicRepository,
+        defaults: UserDefaults = .standard,
+        currentUptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        persistenceInterval: Duration = .seconds(5)
+    ) {
         self.defaults = defaults
+        self.currentUptime = currentUptime
+        self.persistenceInterval = persistenceInterval
         resolver = AudioSourceResolver(repository: repository)
         lyrics = LyricsController(repository: repository)
         let engine = AVPlaybackEngine()
@@ -281,24 +356,31 @@ final class PlaybackStore {
         ) { [weak self] _ in
             Task { @MainActor in self?.saveSession() }
         }
+        lyrics.configurePositionProvider { [weak self] in self?.currentPosition ?? 0 }
     }
 
     init(
         resolver: AudioSourceResolver,
         lyrics: LyricsController,
         engine: some PlaybackEngineControlling,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        currentUptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        persistenceInterval: Duration = .seconds(5)
     ) {
         self.resolver = resolver
         self.lyrics = lyrics
         self.engine = engine
         self.defaults = defaults
+        self.currentUptime = currentUptime
+        self.persistenceInterval = persistenceInterval
         engine.onEvent = { [weak self] event, generation in
             self?.receive(event, generation: generation)
         }
+        lyrics.configurePositionProvider { [weak self] in self?.currentPosition ?? 0 }
     }
 
     var currentItem: PlaylistItem? { state.currentItem }
+    var currentPosition: Double { timeline.position(at: currentUptime()) }
 
     @discardableResult
     func addEventListener(_ listener: @escaping (PlaybackEvent) -> Void) -> UUID {
@@ -334,6 +416,10 @@ final class PlaybackStore {
 
     func pause() {
         wantsPlayback = false
+        timeline.setAdvancing(false, at: currentUptime())
+        refreshTimelineState()
+        lyrics.playbackStateDidChange(isPlaying: false)
+        persistImmediately()
         engine.pause()
     }
 
@@ -343,14 +429,23 @@ final class PlaybackStore {
 
     func seek(to seconds: Double) {
         guard state.currentEntry != nil else { return }
+        let now = currentUptime()
+        let target = max(0, min(seconds, state.duration > 0 ? state.duration : seconds))
         state.isSeeking = true
-        state.position = max(0, min(seconds, state.duration > 0 ? state.duration : seconds))
-        lyrics.synchronize(at: state.position)
-        engine.seek(to: state.position) { [weak self] in
+        timeline.reset(position: target, duration: state.duration, isAdvancing: false, at: now)
+        refreshTimelineState()
+        lyrics.seeked()
+        emit(.positionChanged(position: state.position, duration: state.duration))
+        persistImmediately()
+        engine.seek(to: target) { [weak self] in
             guard let self else { return }
             self.state.isSeeking = false
+            let now = self.currentUptime()
+            self.timeline.setAdvancing(self.state.isPlaying, at: now)
+            self.refreshTimelineState()
+            self.lyrics.seeked()
             self.emit(.positionChanged(position: self.state.position, duration: self.state.duration))
-            self.schedulePersistence()
+            self.persistImmediately()
         }
     }
 
@@ -448,7 +543,7 @@ final class PlaybackStore {
         let volume = min(max(value, 0), 1)
         engine.volume = volume
         state.volume = volume
-        schedulePersistence()
+        persistImmediately()
     }
 
     func stopPlayback(reason: PlaybackEndReason) {
@@ -456,17 +551,17 @@ final class PlaybackStore {
         generation += 1
         wantsPlayback = false
         let item = state.currentItem
-        let position = state.position
+        let position = currentPosition
         engine.stop()
         lyrics.clear()
         state.phase = .idle
-        state.position = 0
-        state.duration = 0
-        state.bufferingProgress = nil
+        timeline.reset(position: 0, duration: 0, isAdvancing: false, at: currentUptime())
+        refreshTimelineState()
         state.isSeeking = false
         emit(.didEnd(item: item, position: position, reason: reason))
         emit(.playbackChanged(isPlaying: false))
-        schedulePersistence()
+        stopPeriodicPersistence()
+        persistImmediately()
     }
 
     private func load(
@@ -476,25 +571,31 @@ final class PlaybackStore {
         reportPrevious: Bool = true
     ) {
         let prior = state.currentItem
-        let priorPosition = state.position
+        let priorPosition = currentPosition
         loadTask?.cancel()
+        stopPeriodicPersistence()
         generation += 1
         wantsPlayback = autoplay
         let requestGeneration = generation
         state.phase = .preparing
         state.currentEntry = entry
-        state.position = max(0, position)
-        state.duration = max(0, entry.item.duration.seconds)
+        timeline.reset(
+            position: position,
+            duration: max(0, entry.item.duration.seconds),
+            isAdvancing: false,
+            at: currentUptime()
+        )
+        refreshTimelineState()
         state.errorMessage = nil
-        state.bufferingProgress = 0
         state.isSeeking = false
+        lyrics.playbackStateDidChange(isPlaying: false)
         lyrics.load(for: entry.item.id)
         if reportPrevious, let prior, prior != entry.item {
             emit(.didEnd(item: prior, position: priorPosition, reason: .switched))
         }
         emit(.itemChanged(entry.item))
         emit(.positionChanged(position: state.position, duration: state.duration))
-        schedulePersistence()
+        persistImmediately()
 
         loadTask = Task { [weak self] in
             guard let self else { return }
@@ -518,38 +619,56 @@ final class PlaybackStore {
         guard generation == self.generation else { return }
         switch event {
         case .ready(let duration):
-            state.duration = duration > 0 ? duration : state.duration
-            state.bufferingProgress = nil
+            timeline.applySample(
+                position: currentPosition,
+                duration: duration > 0 ? duration : state.duration,
+                at: currentUptime()
+            )
+            refreshTimelineState()
             state.phase = state.isPlaying ? .playing : .paused
-            lyrics.synchronize(at: state.position)
+            lyrics.seeked()
+            emit(.positionChanged(position: state.position, duration: state.duration))
         case let .position(position, duration):
             guard !state.isSeeking else { return }
-            state.position = max(0, position)
-            if duration > 0 { state.duration = duration }
-            lyrics.synchronize(at: state.position)
+            let correction = timeline.applySample(
+                position: position,
+                duration: duration > 0 ? duration : state.duration,
+                at: currentUptime()
+            )
+            refreshTimelineState()
             emit(.positionChanged(position: state.position, duration: state.duration))
-            schedulePersistence()
+            lyrics.reconcile(afterTimelineCorrection: correction, at: position)
+            markSessionDirty()
         case .playbackChanged(let isPlaying):
             guard state.currentEntry != nil else { return }
             let changed = state.isPlaying != isPlaying
+            guard changed else { return }
+            timeline.setAdvancing(isPlaying && !state.isSeeking, at: currentUptime())
+            refreshTimelineState()
             state.phase = isPlaying ? .playing : .paused
+            lyrics.playbackStateDidChange(isPlaying: isPlaying)
+            emit(.playbackChanged(isPlaying: isPlaying))
+            emit(.positionChanged(position: state.position, duration: state.duration))
             if isPlaying {
-                lyrics.startSynchronizing { [weak self] in self?.state.position ?? 0 }
+                markSessionDirty()
+                if let item = state.currentItem { emit(.didStart(item)) }
             } else {
-                lyrics.stopSynchronizing()
+                stopPeriodicPersistence()
+                persistImmediately()
             }
-            if changed {
-                emit(.playbackChanged(isPlaying: isPlaying))
-                if isPlaying, let item = state.currentItem { emit(.didStart(item)) }
-            }
-        case .buffering(let progress):
-            state.bufferingProgress = progress
         case .ended:
             let endedItem = state.currentItem
-            let endedPosition = state.duration
+            let endedPosition = max(currentPosition, state.duration)
+            timeline.reset(position: endedPosition, duration: state.duration, isAdvancing: false, at: currentUptime())
+            refreshTimelineState()
+            lyrics.playbackStateDidChange(isPlaying: false)
             emit(.didEnd(item: endedItem, position: endedPosition, reason: .finished))
             guard let nextEntry = queue.next(isNaturalCompletion: true) else {
+                let wasPlaying = state.isPlaying
                 state.phase = .paused
+                if wasPlaying { emit(.playbackChanged(isPlaying: false)) }
+                stopPeriodicPersistence()
+                persistImmediately()
                 return
             }
             refreshQueue()
@@ -560,13 +679,17 @@ final class PlaybackStore {
     }
 
     private func failCurrentItem(_ message: String) {
+        let wasPlaying = state.isPlaying
+        timeline.setAdvancing(false, at: currentUptime())
+        refreshTimelineState()
         state.phase = .failed
         state.errorMessage = message
-        state.bufferingProgress = nil
-        lyrics.stopSynchronizing()
+        lyrics.playbackStateDidChange(isPlaying: false)
         emit(.failed(state.currentItem, message: message))
         emit(.didEnd(item: state.currentItem, position: state.position, reason: .failed))
-        schedulePersistence()
+        if wasPlaying { emit(.playbackChanged(isPlaying: false)) }
+        stopPeriodicPersistence()
+        persistImmediately()
     }
 
     private func refreshQueue() {
@@ -576,7 +699,7 @@ final class PlaybackStore {
         state.upcomingCount = queue.upcomingCount
         state.mode = queue.mode
         emit(.queueChanged(queue.snapshot))
-        schedulePersistence()
+        persistImmediately()
     }
 
     private func refreshState(position: Double, volume: Float) {
@@ -585,8 +708,13 @@ final class PlaybackStore {
         state.sourceCount = queue.source.count
         state.upcomingCount = queue.upcomingCount
         state.mode = queue.mode
-        state.position = max(0, position)
-        state.duration = queue.currentItem?.duration.seconds ?? 0
+        timeline.reset(
+            position: position,
+            duration: queue.currentItem?.duration.seconds ?? 0,
+            isAdvancing: false,
+            at: currentUptime()
+        )
+        refreshTimelineState()
         state.volume = volume
         state.phase = queue.current == nil ? .idle : .paused
     }
@@ -597,19 +725,51 @@ final class PlaybackStore {
         }
     }
 
-    private func schedulePersistence() {
-        persistTask?.cancel()
-        persistTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled else { return }
-            self?.saveSession()
+    private func refreshTimelineState() {
+        state.position = currentPosition
+        state.duration = timeline.duration
+    }
+
+    private func markSessionDirty() {
+        sessionDirty = true
+        guard state.isPlaying, persistenceTask == nil else { return }
+        persistenceGeneration &+= 1
+        let generation = persistenceGeneration
+        let interval = persistenceInterval
+        persistenceTask = Task { [weak self, interval] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: interval)
+                guard !Task.isCancelled,
+                    let self,
+                    self.persistenceGeneration == generation
+                else { break }
+                if self.sessionDirty {
+                    self.saveSession()
+                    self.sessionDirty = false
+                }
+                guard self.state.isPlaying else { break }
+            }
+            if self?.persistenceGeneration == generation {
+                self?.persistenceTask = nil
+            }
         }
+    }
+
+    private func stopPeriodicPersistence() {
+        persistenceGeneration &+= 1
+        persistenceTask?.cancel()
+        persistenceTask = nil
+    }
+
+    private func persistImmediately() {
+        sessionDirty = false
+        saveSession()
     }
 
     func saveSession() {
         let snapshot = PlaybackSessionSnapshot(
             queue: queue.snapshot,
-            position: state.position,
+            position: currentPosition,
             volume: state.volume
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }

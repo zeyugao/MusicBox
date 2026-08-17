@@ -20,25 +20,48 @@ struct LyricsState {
 final class LyricsController {
     private let repository: (any PlaybackResourceServing)?
     private let loader: ((UInt64) async -> CloudMusicApi.LyricNew?)?
+    private let sleep: @Sendable (Duration) async -> Void
     private var loadTask: Task<Void, Never>?
-    private var precisionTimer: Timer?
+    private var scheduleTask: Task<Void, Never>?
     private var positionProvider: (() -> Double)?
+    private var isPlaying = false
+    private var loadGeneration: UInt64 = 0
+    private var scheduleGeneration: UInt64 = 0
 
     private(set) var state = LyricsState()
 
-    init(repository: any PlaybackResourceServing) {
+    init(
+        repository: any PlaybackResourceServing,
+        sleep: @escaping @Sendable (Duration) async -> Void = { duration in
+            try? await Task.sleep(for: duration)
+        }
+    ) {
         self.repository = repository
         loader = nil
+        self.sleep = sleep
     }
 
-    init(load: @escaping (UInt64) async -> CloudMusicApi.LyricNew?) {
+    init(
+        load: @escaping (UInt64) async -> CloudMusicApi.LyricNew?,
+        sleep: @escaping @Sendable (Duration) async -> Void = { duration in
+            try? await Task.sleep(for: duration)
+        }
+    ) {
         repository = nil
         loader = load
+        self.sleep = sleep
+    }
+
+    func configurePositionProvider(_ provider: @escaping () -> Double) {
+        positionProvider = provider
+        resynchronizeAndSchedule()
     }
 
     func load(for songID: UInt64) {
         loadTask?.cancel()
-        stopSynchronizing()
+        cancelScheduledUpdate()
+        loadGeneration &+= 1
+        let generation = loadGeneration
         state = LyricsState(songID: songID, isLoading: true)
 
         loadTask = Task { [weak self] in
@@ -49,7 +72,10 @@ final class LyricsController {
             } else {
                 response = await self.repository?.lyrics(for: songID)
             }
-            guard !Task.isCancelled, self.state.songID == songID else { return }
+            guard !Task.isCancelled,
+                self.loadGeneration == generation,
+                self.state.songID == songID
+            else { return }
             self.state.isLoading = false
             guard let response else {
                 self.state.errorMessage = String(localized: "lyrics.load.failed")
@@ -58,28 +84,36 @@ final class LyricsController {
             self.state.lines = response.merge()
             self.state.currentIndex = nil
             self.state.scrollResetToken = UUID()
+            self.resynchronizeAndSchedule()
         }
     }
 
     func clear() {
         loadTask?.cancel()
-        stopSynchronizing()
+        loadGeneration &+= 1
+        cancelScheduledUpdate()
+        isPlaying = false
         state = LyricsState()
     }
 
     func synchronize(at position: Double) {
-        state.currentIndex = lyricIndex(at: position)
+        let index = lyricIndex(at: position)
+        guard state.currentIndex != index else { return }
+        state.currentIndex = index
     }
 
-    func startSynchronizing(positionProvider: @escaping () -> Double) {
-        self.positionProvider = positionProvider
-        scheduleNextUpdate()
+    func playbackStateDidChange(isPlaying: Bool) {
+        self.isPlaying = isPlaying
+        resynchronizeAndSchedule()
     }
 
-    func stopSynchronizing() {
-        precisionTimer?.invalidate()
-        precisionTimer = nil
-        positionProvider = nil
+    func seeked() {
+        resynchronizeAndSchedule()
+    }
+
+    func reconcile(afterTimelineCorrection correction: Double, at position: Double) {
+        guard abs(correction) >= 0.01 else { return }
+        resynchronizeAndSchedule(at: position)
     }
 
     func lyricIndex(at position: Double) -> Int? {
@@ -99,27 +133,46 @@ final class LyricsController {
         return result
     }
 
-    private func scheduleNextUpdate() {
-        precisionTimer?.invalidate()
-        guard let positionProvider else { return }
-        let position = positionProvider()
-        synchronize(at: position)
-
-        let nextTime: Double
-        if let currentIndex = state.currentIndex, state.lines.indices.contains(currentIndex + 1) {
-            nextTime = state.lines[currentIndex + 1].time
-        } else if let first = state.lines.first, state.currentIndex == nil {
-            nextTime = first.time
+    private func resynchronizeAndSchedule(at suppliedPosition: Double? = nil) {
+        cancelScheduledUpdate()
+        let position: Double
+        if let suppliedPosition {
+            position = suppliedPosition
         } else {
-            nextTime = position + 1
+            guard let positionProvider else { return }
+            position = positionProvider()
         }
+        synchronize(at: position)
+        guard isPlaying, let nextTime = nextTimestamp(after: position) else { return }
 
-        let interval = max(0.01, min(nextTime - position, 5))
-        precisionTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
-            Task { @MainActor in
-                self?.scheduleNextUpdate()
-            }
+        let delayMilliseconds = max(1, Int(((nextTime - position) * 1_000).rounded(.up)))
+        let generation = scheduleGeneration
+        let sleep = self.sleep
+        scheduleTask = Task { [weak self, sleep] in
+            await sleep(.milliseconds(delayMilliseconds))
+            guard !Task.isCancelled,
+                let self,
+                self.scheduleGeneration == generation
+            else { return }
+            self.scheduleTask = nil
+            self.resynchronizeAndSchedule()
         }
+    }
+
+    private func nextTimestamp(after _: Double) -> Double? {
+        if let currentIndex = state.currentIndex, state.lines.indices.contains(currentIndex + 1) {
+            return state.lines[currentIndex + 1].time
+        } else if let first = state.lines.first, state.currentIndex == nil {
+            return first.time
+        } else {
+            return nil
+        }
+    }
+
+    private func cancelScheduledUpdate() {
+        scheduleGeneration &+= 1
+        scheduleTask?.cancel()
+        scheduleTask = nil
     }
 
 }

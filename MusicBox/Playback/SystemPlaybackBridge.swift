@@ -1,11 +1,22 @@
 import AppKit
 import MediaPlayer
 
+struct PlaybackPositionPublicationGate {
+    private var lastPublishedUptime: TimeInterval?
+
+    mutating func shouldPublish(at uptime: TimeInterval, force: Bool = false) -> Bool {
+        guard force || (lastPublishedUptime.map { uptime - $0 >= 1 } ?? true) else { return false }
+        lastPublishedUptime = uptime
+        return true
+    }
+}
+
 @MainActor
 final class SystemPlaybackBridge {
     private weak var playback: PlaybackStore?
     private var listenerToken: UUID?
     private var artworkTask: Task<Void, Never>?
+    private var positionPublicationGate = PlaybackPositionPublicationGate()
 
     init(playback: PlaybackStore) {
         self.playback = playback
@@ -57,10 +68,13 @@ final class SystemPlaybackBridge {
         switch event {
         case .itemChanged(let item):
             updateItem(item)
+            updatePlaybackState(playback?.state.isPlaying == true)
+            publishPosition(force: true)
         case .playbackChanged(let isPlaying):
             updatePlaybackState(isPlaying)
-        case let .positionChanged(position, duration):
-            updatePosition(position: position, duration: duration)
+            publishPosition(force: true)
+        case .positionChanged:
+            publishPosition(force: playback?.state.isSeeking == true)
         case .didEnd(let item, _, .stopped):
             if item != nil { updateItem(nil) }
         case .queueChanged, .modeChanged, .didStart, .didEnd, .failed:
@@ -127,6 +141,13 @@ final class SystemPlaybackBridge {
         info[MPMediaItemPropertyPlaybackDuration] = duration
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = position
         center.nowPlayingInfo = info
+    }
+
+    private func publishPosition(force: Bool = false) {
+        guard let playback else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard positionPublicationGate.shouldPublish(at: now, force: force) else { return }
+        updatePosition(position: playback.currentPosition, duration: playback.state.duration)
     }
 
 }

@@ -1,5 +1,6 @@
 import AppKit
 import AVKit
+import QuartzCore
 import SwiftUI
 
 struct PlayerCapsuleView: View {
@@ -125,18 +126,11 @@ private struct NowPlayingTrackPresentation: View {
     @Binding var seekTarget: Double
 
     var body: some View {
-        TimelineView(
-            .animation(
-                minimumInterval: 1.0 / 60.0,
-                paused: !playback.shouldAnimateDisplayedPosition || isSeeking
-            )
-        ) { _ in
-            trackContent(position: isSeeking ? seekTarget : playback.displayedPosition)
-        }
+        trackContent
     }
 
     @ViewBuilder
-    private func trackContent(position: Double) -> some View {
+    private var trackContent: some View {
         VStack(alignment: .leading, spacing: PlayerOverlayMetrics.trackLayoutPadding) {
             HStack(spacing: 8) {
                 artwork
@@ -207,36 +201,22 @@ private struct NowPlayingTrackPresentation: View {
                             .lineLimit(1)
                             .foregroundStyle(Color(nsColor: .placeholderTextColor))
                         Spacer(minLength: 4)
-                        Text("\(clock(position)) / \(clock(playback.duration))")
-                            .font(.system(size: 12))
-                            .lineLimit(1)
-                            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                        PlaybackElapsedTimeView(
+                            playback: playback,
+                            isSeeking: isSeeking,
+                            seekTarget: seekTarget
+                        )
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(height: PlayerOverlayMetrics.trackInfoHeight)
 
-            Slider(
-                value: Binding(
-                    get: { isSeeking ? seekTarget : position },
-                    set: { seekTarget = $0 }
-                ),
-                in: 0...max(1, playback.duration),
-                onEditingChanged: { editing in
-                    isSeeking = editing
-                    if editing {
-                        seekTarget = playback.displayedPosition
-                    } else {
-                        playback.seek(to: seekTarget)
-                    }
-                }
+            PlaybackProgressSlider(
+                playback: playback,
+                isSeeking: $isSeeking,
+                seekTarget: $seekTarget
             )
-            .disabled(!playback.hasCurrentItem || playback.isLoading)
-            .controlSize(.mini)
-            .tint(.secondary)
-            .sliderThumbVisibility(.hidden)
-            .frame(height: PlayerOverlayMetrics.trackSliderHeight)
         }
         .padding(.top, PlayerOverlayMetrics.trackVisualPadding)
         .padding(.bottom, PlayerOverlayMetrics.trackLayoutPadding)
@@ -270,11 +250,179 @@ private struct NowPlayingTrackPresentation: View {
         .frame(width: 32, height: 32)
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
+}
+
+private struct PlaybackElapsedTimeView: View {
+    let playback: PlaybackPresentationModel
+    let isSeeking: Bool
+    let seekTarget: Double
+
+    var body: some View {
+        if playback.shouldAnimateDisplayedPosition && !isSeeking {
+            TimelineView(.periodic(from: .now, by: 1)) { _ in
+                timeText(position: playback.displayedPosition)
+            }
+        } else {
+            timeText(position: isSeeking ? seekTarget : playback.displayedPosition)
+        }
+    }
+
+    private func timeText(position: Double) -> some View {
+        Text("\(clock(position)) / \(clock(playback.duration))")
+            .font(.system(size: 12))
+            .lineLimit(1)
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+    }
 
     private func clock(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "00:00" }
         let total = Int(seconds)
         return String(format: "%02d:%02d", total / 60, total % 60)
+    }
+}
+
+private struct PlaybackProgressSlider: View {
+    let playback: PlaybackPresentationModel
+    @Binding var isSeeking: Bool
+    @Binding var seekTarget: Double
+    @State private var renderedPosition = 0.0
+
+    private var displayLinkPaused: Bool {
+        isSeeking || !playback.shouldAnimateDisplayedPosition
+    }
+
+    var body: some View {
+        Slider(
+            value: Binding(
+                get: { isSeeking ? seekTarget : renderedPosition },
+                set: { seekTarget = bounded($0) }
+            ),
+            in: 0...max(1, playback.duration),
+            onEditingChanged: { editing in
+                isSeeking = editing
+                if editing {
+                    seekTarget = renderedPosition
+                } else {
+                    let target = bounded(seekTarget)
+                    renderedPosition = target
+                    playback.seek(to: target)
+                }
+            }
+        )
+        .disabled(!playback.hasCurrentItem || playback.isLoading)
+        .controlSize(.mini)
+        .tint(.secondary)
+        .sliderThumbVisibility(.hidden)
+        .frame(height: PlayerOverlayMetrics.trackSliderHeight)
+        .background {
+            PlaybackDisplayLinkView(isPaused: displayLinkPaused) {
+                guard !isSeeking else { return }
+                let position = bounded(playback.displayedPosition)
+                guard abs(position - renderedPosition) > .ulpOfOne else { return }
+                renderedPosition = position
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .allowsHitTesting(false)
+        }
+        .onAppear(perform: synchronizeRenderedPosition)
+        .onChange(of: playback.currentItem?.id) { _, _ in
+            synchronizeRenderedPosition()
+        }
+        .onChange(of: playback.duration) { _, _ in
+            synchronizeRenderedPosition()
+        }
+        .onChange(of: playback.isPlaying) { _, _ in
+            synchronizeRenderedPosition()
+        }
+        .onChange(of: playback.isSeeking) { _, _ in
+            synchronizeRenderedPosition()
+        }
+        .onChange(of: isSeeking) { _, seeking in
+            if !seeking {
+                renderedPosition = bounded(seekTarget)
+            }
+        }
+    }
+
+    private func synchronizeRenderedPosition() {
+        guard !isSeeking else { return }
+        renderedPosition = bounded(playback.displayedPosition)
+    }
+
+    private func bounded(_ position: Double) -> Double {
+        min(max(position.isFinite ? position : 0, 0), max(1, playback.duration))
+    }
+}
+
+private struct PlaybackDisplayLinkView: NSViewRepresentable {
+    let isPaused: Bool
+    let onFrame: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = DisplayLinkHostView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
+        view.didMoveToWindow = { [weak coordinator = context.coordinator] hostView in
+            coordinator?.attach(to: hostView)
+        }
+        context.coordinator.update(onFrame: onFrame, isPaused: isPaused)
+        context.coordinator.attach(to: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.update(onFrame: onFrame, isPaused: isPaused)
+        context.coordinator.attach(to: nsView)
+    }
+
+    static func dismantleNSView(_: NSView, coordinator: Coordinator) {
+        coordinator.invalidate()
+    }
+
+    private final class DisplayLinkHostView: NSView {
+        var didMoveToWindow: ((NSView) -> Void)?
+
+        override var intrinsicContentSize: NSSize {
+            NSSize(width: 1, height: 1)
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            didMoveToWindow?(self)
+        }
+    }
+
+    final class Coordinator: NSObject {
+        private var displayLink: CADisplayLink?
+        private var onFrame: () -> Void = {}
+        private var isPaused = true
+
+        func update(onFrame: @escaping () -> Void, isPaused: Bool) {
+            self.onFrame = onFrame
+            self.isPaused = isPaused
+            displayLink?.isPaused = isPaused
+        }
+
+        func attach(to view: NSView) {
+            guard displayLink == nil, view.window != nil else { return }
+            let displayLink = view.displayLink(
+                target: self,
+                selector: #selector(displayLinkDidRefresh(_:))
+            )
+            displayLink.isPaused = isPaused
+            self.displayLink = displayLink
+        }
+
+        @objc private func displayLinkDidRefresh(_: CADisplayLink) {
+            onFrame()
+        }
+
+        func invalidate() {
+            displayLink?.invalidate()
+            displayLink = nil
+        }
     }
 }
 
@@ -523,11 +671,11 @@ struct LyricsInspectorView: View {
             }
             .onChange(of: lyrics.currentIndex) { _, index in
                 if let index {
-                    withAnimation(.spring) { proxy.scrollTo(index, anchor: .center) }
+                    withAnimation(.easeOut(duration: 0.18)) { proxy.scrollTo(index, anchor: .center) }
                 }
             }
             .onChange(of: lyrics.scrollResetToken) { _, _ in
-                withAnimation(.spring) { proxy.scrollTo(0, anchor: .top) }
+                withAnimation(.easeOut(duration: 0.18)) { proxy.scrollTo(0, anchor: .top) }
             }
         }
         .navigationTitle(app.playbackPresentation.currentItem?.title ?? "Playing")

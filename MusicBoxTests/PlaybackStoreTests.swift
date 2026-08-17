@@ -120,6 +120,93 @@ final class PlaybackStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testPositionSamplesDoNotEmitQueueOrPlaybackLifecycleEvents() async {
+        let engine = FakePlaybackEngine()
+        let store = makeStore(engine: engine)
+        var emittedKinds: [String] = []
+        let token = store.addEventListener { event in
+            switch event {
+            case .queueChanged: emittedKinds.append("queue")
+            case .modeChanged: emittedKinds.append("mode")
+            case .itemChanged: emittedKinds.append("item")
+            case .playbackChanged: emittedKinds.append("playback")
+            case .positionChanged: emittedKinds.append("position")
+            case .didStart: emittedKinds.append("start")
+            case .didEnd: emittedKinds.append("end")
+            case .failed: emittedKinds.append("failed")
+            }
+        }
+        defer { store.removeEventListener(token) }
+
+        store.replaceSource([track(1)], autoplay: false)
+        await settle()
+        engine.send(.ready(duration: 180), generation: 1)
+        engine.send(.playbackChanged(true), generation: 1)
+        emittedKinds.removeAll()
+
+        engine.send(.position(position: 12.5, duration: 180), generation: 1)
+
+        XCTAssertEqual(emittedKinds, ["position"])
+    }
+
+    @MainActor
+    func testPeriodicPersistenceIsNotResetByPositionSamples() async throws {
+        var now = 100.0
+        let engine = FakePlaybackEngine()
+        let store = PlaybackStore(
+            resolver: AudioSourceResolver { item in .local(URL(fileURLWithPath: "/tmp/\(item.id).mp3")) },
+            lyrics: LyricsController(load: { _ in nil }),
+            engine: engine,
+            defaults: defaults,
+            currentUptime: { now },
+            persistenceInterval: .milliseconds(20)
+        )
+
+        store.replaceSource([track(1)], autoplay: false)
+        await settle()
+        engine.send(.ready(duration: 180), generation: 1)
+        engine.send(.playbackChanged(true), generation: 1)
+        engine.send(.position(position: 10, duration: 180), generation: 1)
+        now = 100.1
+        engine.send(.position(position: 10.1, duration: 180), generation: 1)
+        now = 100.2
+        engine.send(.position(position: 10.2, duration: 180), generation: 1)
+
+        await settle(milliseconds: 40)
+
+        let data = try XCTUnwrap(defaults.data(forKey: PlaybackStore.sessionKey))
+        let snapshot = try JSONDecoder().decode(PlaybackSessionSnapshot.self, from: data)
+        XCTAssertEqual(snapshot.position, 10.2, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testSeekAndPausePersistTheTimelineImmediately() async throws {
+        var now = 100.0
+        let engine = FakePlaybackEngine()
+        let store = PlaybackStore(
+            resolver: AudioSourceResolver { item in .local(URL(fileURLWithPath: "/tmp/\(item.id).mp3")) },
+            lyrics: LyricsController(load: { _ in nil }),
+            engine: engine,
+            defaults: defaults,
+            currentUptime: { now }
+        )
+
+        store.replaceSource([track(1)], autoplay: false)
+        await settle()
+        engine.send(.ready(duration: 180), generation: 1)
+        engine.send(.position(position: 20, duration: 180), generation: 1)
+
+        store.seek(to: 75)
+        XCTAssertEqual(try sessionSnapshot().position, 75, accuracy: 0.001)
+
+        engine.send(.playbackChanged(true), generation: 1)
+        now = 100.5
+        store.pause()
+        XCTAssertEqual(try sessionSnapshot().position, 75.5, accuracy: 0.001)
+        engine.send(.playbackChanged(false), generation: 1)
+    }
+
+    @MainActor
     func testLyricsFindsBoundaryAndClearsOnItemChange() async throws {
         let lyricsData = Data(#"""
         {"lrc":{"lyric":"[00:01.00]first\n[00:03.50]second","version":1}}
@@ -149,6 +236,12 @@ final class PlaybackStoreTests: XCTestCase {
         )
     }
 
+    @MainActor
+    private func sessionSnapshot() throws -> PlaybackSessionSnapshot {
+        let data = try XCTUnwrap(defaults.data(forKey: PlaybackStore.sessionKey))
+        return try JSONDecoder().decode(PlaybackSessionSnapshot.self, from: data)
+    }
+
     private func track(_ id: UInt64) -> PlaylistItem {
         PlaylistItem(
             id: id,
@@ -172,40 +265,200 @@ final class PlaybackStoreTests: XCTestCase {
     }
 }
 
-final class PlaybackDisplayClockTests: XCTestCase {
-    func testAdvancesBetweenAuthoritativeSamples() {
-        var clock = PlaybackDisplayClock(position: 10, duration: 180, isAdvancing: true, now: 100)
+final class PlaybackTimelineTests: XCTestCase {
+    func testGraduallyAbsorbsSmallLowFrequencySampleErrors() {
+        var timeline = PlaybackTimeline()
+        timeline.reset(position: 10, duration: 180, isAdvancing: true, at: 100)
 
-        XCTAssertEqual(clock.position(at: 100.1), 10.1, accuracy: 0.001)
+        XCTAssertEqual(timeline.position(at: 100.1), 10.1, accuracy: 0.001)
 
-        clock.synchronize(position: 10.25, duration: 180, at: 100.25)
-        XCTAssertEqual(clock.position(at: 100.4), 10.4, accuracy: 0.001)
+        let correction = timeline.applySample(position: 10.4, duration: 180, at: 100.25)
+        XCTAssertEqual(correction, 0.15, accuracy: 0.001)
+        XCTAssertEqual(timeline.position(at: 100.25), 10.25, accuracy: 0.001)
+
+        let midpoint = 100.25 + PlaybackTimeline.sampleCorrectionDuration / 2
+        XCTAssertEqual(timeline.position(at: midpoint), 10.415, accuracy: 0.001)
+        XCTAssertEqual(
+            timeline.position(at: 100.25 + PlaybackTimeline.sampleCorrectionDuration),
+            10.58,
+            accuracy: 0.001
+        )
     }
 
-    func testFreezesWhenPlaybackStopsOrBuffers() {
-        var clock = PlaybackDisplayClock(position: 10, duration: 180, isAdvancing: true, now: 100)
+    func testHardSampleErrorsStillSnapToTheAuthoritativePosition() {
+        var timeline = PlaybackTimeline()
+        timeline.reset(position: 10, duration: 180, isAdvancing: true, at: 100)
 
-        clock.setAdvancing(false, at: 100.1)
-        XCTAssertEqual(clock.position(at: 100.5), 10.1, accuracy: 0.001)
+        let correction = timeline.applySample(position: 11, duration: 180, at: 100.5)
 
-        clock.setAdvancing(true, at: 100.5)
-        XCTAssertEqual(clock.position(at: 100.75), 10.35, accuracy: 0.001)
+        XCTAssertEqual(correction, 0.5, accuracy: 0.001)
+        XCTAssertEqual(timeline.position(at: 100.5), 11, accuracy: 0.001)
+        XCTAssertEqual(timeline.position(at: 100.6), 11.1, accuracy: 0.001)
     }
 
-    func testSeekAndItemChangesReanchorTheDisplayClock() {
-        var clock = PlaybackDisplayClock(position: 10, duration: 180, isAdvancing: true, now: 100)
+    func testFreezesAndResumesWithoutLosingTheAnchor() {
+        var timeline = PlaybackTimeline()
+        timeline.reset(position: 10, duration: 180, isAdvancing: true, at: 100)
 
-        clock.synchronize(position: 75, duration: 180, at: 101)
-        XCTAssertEqual(clock.position(at: 101.1), 75.1, accuracy: 0.001)
+        timeline.setAdvancing(false, at: 100.1)
+        XCTAssertEqual(timeline.position(at: 100.5), 10.1, accuracy: 0.001)
 
-        clock.synchronize(position: 0, duration: 240, at: 102)
-        XCTAssertEqual(clock.position(at: 102.1), 0.1, accuracy: 0.001)
+        timeline.setAdvancing(true, at: 100.5)
+        XCTAssertEqual(timeline.position(at: 100.75), 10.35, accuracy: 0.001)
     }
 
-    func testClampsToTrackDuration() {
-        let clock = PlaybackDisplayClock(position: 179.9, duration: 180, isAdvancing: true, now: 100)
+    func testSeekItemChangesAndTrackBoundsResetTheTimeline() {
+        var timeline = PlaybackTimeline()
+        timeline.reset(position: 75, duration: 180, isAdvancing: false, at: 101)
+        XCTAssertEqual(timeline.position(at: 101.1), 75, accuracy: 0.001)
 
-        XCTAssertEqual(clock.position(at: 101), 180, accuracy: 0.001)
+        timeline.reset(position: 0, duration: 240, isAdvancing: true, at: 102)
+        XCTAssertEqual(timeline.position(at: 102.1), 0.1, accuracy: 0.001)
+
+        timeline.reset(position: 999, duration: 180, isAdvancing: true, at: 103)
+        XCTAssertEqual(timeline.position(at: 104), 180, accuracy: 0.001)
+    }
+}
+
+@MainActor
+final class LyricsControllerTests: XCTestCase {
+    func testLyricsLoadedAfterPlaybackStartsUseTheCurrentTimelinePosition() async throws {
+        var position = 3.5
+        let expectedResponse = try response("[00:01.00]first\n[00:03.50]second")
+        let lyrics = LyricsController(load: { _ in
+            try? await Task.sleep(for: .milliseconds(20))
+            return expectedResponse
+        })
+        lyrics.configurePositionProvider { position }
+        lyrics.playbackStateDidChange(isPlaying: true)
+        lyrics.load(for: 1)
+
+        try? await Task.sleep(for: .milliseconds(40))
+        await settle()
+
+        XCTAssertEqual(lyrics.state.currentIndex, 1)
+        lyrics.playbackStateDidChange(isPlaying: false)
+        position = 0
+    }
+
+    func testClearRetainsTimelineProviderForTheNextTrack() async throws {
+        var position = 2.5
+        let response = try response("[00:01.00]first\n[00:02.00]second")
+        let lyrics = LyricsController(load: { _ in response })
+        lyrics.configurePositionProvider { position }
+        lyrics.clear()
+        lyrics.load(for: 2)
+        await settle()
+        lyrics.playbackStateDidChange(isPlaying: true)
+
+        XCTAssertEqual(lyrics.state.currentIndex, 1)
+        lyrics.playbackStateDidChange(isPlaying: false)
+        position = 0
+    }
+
+    func testSampleReconcileUsesTheAuthoritativePositionDuringVisualCorrection() async throws {
+        var displayedPosition = 2.9
+        let response = try response("[00:01.00]first\n[00:03.00]second")
+        let lyrics = LyricsController(load: { _ in response })
+        lyrics.configurePositionProvider { displayedPosition }
+        lyrics.load(for: 1)
+        await settle()
+        lyrics.playbackStateDidChange(isPlaying: true)
+
+        lyrics.reconcile(afterTimelineCorrection: 0.1, at: 3.05)
+
+        XCTAssertEqual(lyrics.state.currentIndex, 1)
+        lyrics.playbackStateDidChange(isPlaying: false)
+        displayedPosition = 0
+    }
+
+    func testSeekInvalidatesAnOlderLyricSchedule() async throws {
+        let sleeper = ManualLyricsSleeper()
+        var position = 0.0
+        let response = try response("[00:01.00]first\n[00:03.00]second\n[00:05.00]third")
+        let lyrics = LyricsController(
+            load: { _ in response },
+            sleep: { duration in await sleeper.sleep(for: duration) }
+        )
+        lyrics.configurePositionProvider { position }
+        lyrics.load(for: 1)
+        await settle()
+        lyrics.playbackStateDidChange(isPlaying: true)
+        await waitForPendingSleeps(1, sleeper: sleeper)
+
+        position = 3
+        lyrics.seeked()
+        XCTAssertEqual(lyrics.state.currentIndex, 1)
+        await waitForPendingSleeps(2, sleeper: sleeper)
+
+        await sleeper.resumeNext()
+        await settle()
+        XCTAssertEqual(lyrics.state.currentIndex, 1)
+
+        position = 5
+        await sleeper.resumeNext()
+        await settle()
+        XCTAssertEqual(lyrics.state.currentIndex, 2)
+
+        lyrics.playbackStateDidChange(isPlaying: false)
+        await sleeper.resumeAll()
+    }
+
+    func testParserSupportsMetadataMultipleTagsMillisecondsAndMergedTranslations() throws {
+        let data = Data(#"""
+        {
+          "lrc": {"lyric":"[ar:Artist]\n[ti:Song]\n[offset:100]\n[00:01.000][00:02.500]main\n[00:02.500]same time", "version":1},
+          "tlyric": {"lyric":"[offset:100]\n[00:01.000]translated\n[00:02.500]translated same", "version":1},
+          "romalrc": {"lyric":"[offset:100]\n[00:01.000]roma\n[00:02.500]roma same", "version":1}
+        }
+        """#.utf8)
+        let response = try JSONDecoder().decode(CloudMusicApi.LyricNew.self, from: data)
+
+        let lines = response.merge()
+
+        XCTAssertEqual(lines.count, 2)
+        XCTAssertEqual(lines[0].time, 1.1, accuracy: 0.0001)
+        XCTAssertEqual(lines[0].lyric, "main")
+        XCTAssertEqual(lines[0].tlyric, "translated")
+        XCTAssertEqual(lines[0].romalrc, "roma")
+        XCTAssertEqual(lines[1].time, 2.6, accuracy: 0.0001)
+        XCTAssertEqual(lines[1].lyric, "main\nsame time")
+        XCTAssertEqual(lines[1].tlyric, "translated same")
+        XCTAssertEqual(lines[1].romalrc, "roma same")
+    }
+
+    private func response(_ lyric: String) throws -> CloudMusicApi.LyricNew {
+        let data = try JSONSerialization.data(
+            withJSONObject: ["lrc": ["lyric": lyric, "version": 1]]
+        )
+        return try JSONDecoder().decode(CloudMusicApi.LyricNew.self, from: data)
+    }
+
+    private func waitForPendingSleeps(_ count: Int, sleeper: ManualLyricsSleeper) async {
+        for _ in 0..<100 {
+            if await sleeper.pendingCount() >= count { return }
+            await Task.yield()
+        }
+        XCTFail("Lyrics scheduler did not create \(count) pending sleeps")
+    }
+
+    private func settle() async {
+        await Task.yield()
+        await Task.yield()
+        await Task.yield()
+    }
+}
+
+final class PlaybackPositionPublicationGateTests: XCTestCase {
+    func testPublishesTransitionsImmediatelyAndPositionAtMostOncePerSecond() {
+        var gate = PlaybackPositionPublicationGate()
+
+        XCTAssertTrue(gate.shouldPublish(at: 100))
+        XCTAssertFalse(gate.shouldPublish(at: 100.99))
+        XCTAssertTrue(gate.shouldPublish(at: 101))
+        XCTAssertTrue(gate.shouldPublish(at: 101.1, force: true))
+        XCTAssertFalse(gate.shouldPublish(at: 102.0))
+        XCTAssertTrue(gate.shouldPublish(at: 102.1))
     }
 }
 
@@ -226,29 +479,30 @@ final class PlaybackPresentationModelTests: XCTestCase {
         try super.tearDownWithError()
     }
 
-    func testPresentationClockIgnoresDownloadProgressAndFreezesForRateInterruptions() async {
+    func testPresentationUsesCoreTimelineAndFreezesForRateInterruptions() async {
         var now = 100.0
         let engine = FakePlaybackEngine()
         let store = PlaybackStore(
             resolver: AudioSourceResolver { item in .local(URL(fileURLWithPath: "/tmp/\(item.id).mp3")) },
             lyrics: LyricsController(load: { _ in nil }),
             engine: engine,
-            defaults: defaults
+            defaults: defaults,
+            currentUptime: { now }
         )
-        let presentation = PlaybackPresentationModel(playback: store, currentUptime: { now })
+        let presentation = PlaybackPresentationModel(playback: store)
 
         store.replaceSource([track(1)], autoplay: false)
         await settle()
         engine.send(.ready(duration: 180), generation: 1)
         engine.send(.playbackChanged(true), generation: 1)
         engine.send(.position(position: 10, duration: 180), generation: 1)
+        let queueEntries = presentation.queueEntries
 
         now = 100.1
         XCTAssertEqual(presentation.displayedPosition, 10.1, accuracy: 0.001)
-
-        engine.send(.buffering(0.5), generation: 1)
         now = 100.4
         XCTAssertEqual(presentation.displayedPosition, 10.4, accuracy: 0.001)
+        XCTAssertEqual(presentation.queueEntries, queueEntries)
 
         engine.send(.playbackChanged(false), generation: 1)
         now = 100.6
@@ -265,6 +519,10 @@ final class PlaybackPresentationModelTests: XCTestCase {
         presentation.seek(to: 75)
         XCTAssertEqual(presentation.displayedPosition, 75, accuracy: 0.001)
         XCTAssertFalse(presentation.shouldAnimateDisplayedPosition)
+
+        presentation.clearQueue()
+        XCTAssertNil(presentation.currentItem)
+        XCTAssertTrue(presentation.queueEntries.isEmpty)
     }
 
     private func track(_ id: UInt64) -> PlaylistItem {
@@ -324,6 +582,31 @@ private final class FakePlaybackEngine: PlaybackEngineControlling {
 
     func send(_ event: PlaybackEngineEvent, generation: Int) {
         onEvent?(event, generation)
+    }
+}
+
+private actor ManualLyricsSleeper {
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+
+    func sleep(for _: Duration) async {
+        await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func pendingCount() -> Int {
+        continuations.count
+    }
+
+    func resumeNext() {
+        guard !continuations.isEmpty else { return }
+        continuations.removeFirst().resume()
+    }
+
+    func resumeAll() {
+        let pending = continuations
+        continuations.removeAll()
+        pending.forEach { $0.resume() }
     }
 }
 
