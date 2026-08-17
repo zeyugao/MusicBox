@@ -96,12 +96,12 @@ struct PlaylistFeatureScreen: View {
         if model.isRemotePlaylist {
             ToolbarItemGroup {
                 Button {
-                    app.transfers.enqueueDownloads(model.items)
+                    app.playback.replaceSource(model.items)
                 } label: {
-                    Image(systemName: "square.and.arrow.down")
+                    Image(systemName: "play.fill")
                 }
-                .help(String(localized: "Download All"))
-                .disabled(model.items.isEmpty || app.transfers.hasPendingJobs(in: .download))
+                .help(String(localized: "Play All"))
+                .disabled(model.items.isEmpty)
 
                 if !selectedSongs.isEmpty {
                     Button {
@@ -115,11 +115,11 @@ struct PlaylistFeatureScreen: View {
 
                 Menu {
                     Button {
-                        app.playback.replaceSource(model.items)
+                        app.transfers.enqueueDownloads(model.items)
                     } label: {
-                        Label("Play All", systemImage: "play")
+                        Label(String(localized: "Download All"), systemImage: "square.and.arrow.down")
                     }
-                    .disabled(model.items.isEmpty)
+                    .disabled(model.items.isEmpty || app.transfers.hasPendingJobs(in: .download))
 
                     Button {
                         app.playback.appendSource(model.items)
