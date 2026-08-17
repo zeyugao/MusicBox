@@ -59,7 +59,7 @@ final class PlaybackStoreTests: XCTestCase {
         store.restore()
         await settle()
 
-        XCTAssertEqual(store.queue.source.map(\.item.id), [1, 2])
+        XCTAssertEqual(store.queue.source.map(\.item.id), [1, 2, 3, 4])
         XCTAssertEqual(store.queue.current?.item.id, 2)
         XCTAssertEqual(store.queue.upNext.map(\.item.id), [3, 4])
         XCTAssertEqual(store.queue.mode, .shuffle)

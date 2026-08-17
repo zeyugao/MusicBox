@@ -68,7 +68,9 @@ struct PlaybackQueue: Codable {
         mode = snapshot.mode
         shuffleOrder = snapshot.shuffleOrder
         shuffleCursor = snapshot.shuffleCursor
+        normalizeRuntimeEntries()
         normalizeShuffleState()
+        rebasePendingAfterCurrent()
     }
 
     var snapshot: PlaybackQueueSnapshot {
@@ -91,13 +93,10 @@ struct PlaybackQueue: Codable {
     }
 
     var visibleEntries: [PlaybackQueueEntry] {
-        var result: [PlaybackQueueEntry] = []
-        if let current { result.append(current) }
-        result.append(contentsOf: upNext)
-        for entry in source where entry.id != current?.id && !upNext.contains(where: { $0.id == entry.id }) {
-            result.append(entry)
+        guard let current, !source.contains(where: { $0.id == current.id }) else {
+            return source
         }
-        return result
+        return [current] + source
     }
 
     var upcomingCount: Int { upNext.count }
@@ -135,9 +134,23 @@ struct PlaybackQueue: Codable {
     }
 
     mutating func enqueueNext(_ items: [PlaylistItem]) -> [PlaybackQueueEntry] {
-        let entries = items.map { PlaybackQueueEntry(item: $0) }
+        var entries: [PlaybackQueueEntry] = []
+        for item in items {
+            guard current?.item != item else { continue }
+
+            let entry = queuedEntry(for: item)
+                ?? sourceEntry(for: item)
+                ?? appendSourceEntry(for: item)
+            guard !entries.contains(where: { $0.id == entry.id }) else { continue }
+            entries.append(entry)
+        }
         guard !entries.isEmpty else { return [] }
+
+        let entryIDs = Set(entries.map(\.id))
+        upNext.removeAll { entryIDs.contains($0.id) }
         upNext.insert(contentsOf: entries, at: 0)
+        rebasePendingAfterCurrent()
+        normalizeShuffleState()
         return entries
     }
 
@@ -145,6 +158,7 @@ struct PlaybackQueue: Codable {
         mode = mode.next
         if mode == .shuffle {
             rebuildShuffle(anchoredAt: current?.id)
+            rebasePendingAfterCurrent()
         }
         return mode
     }
@@ -153,14 +167,17 @@ struct PlaybackQueue: Codable {
         mode = newMode
         if newMode == .shuffle {
             rebuildShuffle(anchoredAt: current?.id)
+            rebasePendingAfterCurrent()
         }
     }
 
     mutating func playNow(_ entry: PlaybackQueueEntry) -> PlaybackQueueEntry? {
+        let entry = ensureSourceEntry(entry)
         guard current?.id != entry.id else { return current }
         if let current { history.append(current) }
         upNext.removeAll { $0.id == entry.id }
         current = entry
+        rebasePendingAfterCurrent()
         alignShuffleToCurrent()
         return current
     }
@@ -207,8 +224,8 @@ struct PlaybackQueue: Codable {
 
     mutating func previous() -> PlaybackQueueEntry? {
         if let prior = history.popLast() {
-            if let current { upNext.insert(current, at: 0) }
             current = prior
+            rebasePendingAfterCurrent()
             alignShuffleToCurrent()
             return current
         }
@@ -216,11 +233,13 @@ struct PlaybackQueue: Codable {
         guard !source.isEmpty else { return current }
         guard let currentIndex = sourceIndex else {
             current = source.last
+            rebasePendingAfterCurrent()
             alignShuffleToCurrent()
             return current
         }
         let index = (currentIndex - 1 + source.count) % source.count
         current = source[index]
+        rebasePendingAfterCurrent()
         alignShuffleToCurrent()
         return current
     }
@@ -258,6 +277,7 @@ struct PlaybackQueue: Codable {
         upNext.removeAll { $0.id == id }
         history.removeAll { $0.id == id }
         normalizeShuffleState()
+        rebasePendingAfterCurrent()
         return current
     }
 
@@ -272,7 +292,9 @@ struct PlaybackQueue: Codable {
 
     mutating func restoreCurrent(_ entry: PlaybackQueueEntry?) {
         current = entry
+        normalizeRuntimeEntries()
         normalizeShuffleState()
+        rebasePendingAfterCurrent()
     }
 
     private mutating func advance(to entry: PlaybackQueueEntry?) -> PlaybackQueueEntry? {
@@ -280,12 +302,111 @@ struct PlaybackQueue: Codable {
             current = nil
             return nil
         }
-        if let current, current.id != entry.id {
+        let target = ensureSourceEntry(entry)
+        if let current, current.id != target.id {
             history.append(current)
         }
-        current = entry
+        current = target
+        rebasePendingAfterCurrent()
         alignShuffleToCurrent()
         return current
+    }
+
+    private mutating func normalizeRuntimeEntries() {
+        var sourceIDs = Set<UUID>()
+        source = source.filter { sourceIDs.insert($0.id).inserted }
+
+        if let current, sourceIDs.insert(current.id).inserted {
+            source.append(current)
+        }
+
+        var pendingIDs = Set<UUID>()
+        var normalizedPending: [PlaybackQueueEntry] = []
+        for entry in upNext {
+            guard entry.id != current?.id else { continue }
+            let canonicalEntry: PlaybackQueueEntry
+            if let sourceEntry = source.first(where: { $0.id == entry.id }) {
+                canonicalEntry = sourceEntry
+            } else if let sourceEntry = sourceEntry(for: entry.item, excluding: pendingIDs) {
+                canonicalEntry = sourceEntry
+            } else {
+                source.append(entry)
+                sourceIDs.insert(entry.id)
+                canonicalEntry = entry
+            }
+            guard pendingIDs.insert(canonicalEntry.id).inserted else { continue }
+            normalizedPending.append(canonicalEntry)
+        }
+        upNext = normalizedPending
+    }
+
+    private func queuedEntry(for item: PlaylistItem) -> PlaybackQueueEntry? {
+        upNext.first { $0.item == item }
+    }
+
+    private func sourceEntry(
+        for item: PlaylistItem,
+        excluding entryIDs: Set<UUID> = []
+    ) -> PlaybackQueueEntry? {
+        guard let currentIndex = sourceIndex else {
+            return source.first {
+                $0.item == item && $0.id != current?.id && !entryIDs.contains($0.id)
+            }
+        }
+
+        if let following = source.dropFirst(currentIndex + 1).first(where: {
+            $0.item == item && !entryIDs.contains($0.id)
+        }) {
+            return following
+        }
+        return source.prefix(currentIndex).first {
+            $0.item == item && !entryIDs.contains($0.id)
+        }
+    }
+
+    private mutating func appendSourceEntry(for item: PlaylistItem) -> PlaybackQueueEntry {
+        let entry = PlaybackQueueEntry(item: item)
+        source.append(entry)
+        return entry
+    }
+
+    private mutating func ensureSourceEntry(_ entry: PlaybackQueueEntry) -> PlaybackQueueEntry {
+        if let sourceEntry = source.first(where: { $0.id == entry.id }) {
+            return sourceEntry
+        }
+        source.append(entry)
+        normalizeShuffleState()
+        return entry
+    }
+
+    // Keeps the runtime queue canonical: a pending entry belongs to source once and is placed after current.
+    private mutating func rebasePendingAfterCurrent() {
+        guard let current, !upNext.isEmpty else { return }
+
+        let pendingIDs = upNext.map(\.id)
+        let pendingIDSet = Set(pendingIDs)
+        source.removeAll { pendingIDSet.contains($0.id) }
+        if let currentIndex = source.firstIndex(where: { $0.id == current.id }) {
+            source.insert(contentsOf: upNext, at: currentIndex + 1)
+        } else {
+            source.insert(current, at: 0)
+            source.insert(contentsOf: upNext, at: 1)
+        }
+
+        guard mode == .shuffle else { return }
+        normalizeShuffleState()
+        shuffleOrder.removeAll { pendingIDSet.contains($0) }
+        if let currentIndex = shuffleOrder.firstIndex(of: current.id) {
+            shuffleOrder.insert(contentsOf: pendingIDs, at: currentIndex + 1)
+            shuffleCursor = currentIndex
+        } else {
+            rebuildShuffle(anchoredAt: current.id)
+            shuffleOrder.removeAll { pendingIDSet.contains($0) }
+            if let currentIndex = shuffleOrder.firstIndex(of: current.id) {
+                shuffleOrder.insert(contentsOf: pendingIDs, at: currentIndex + 1)
+                shuffleCursor = currentIndex
+            }
+        }
     }
 
     private func nextSequentialEntry() -> PlaybackQueueEntry? {
@@ -325,7 +446,8 @@ struct PlaybackQueue: Codable {
 
     private mutating func normalizeShuffleState() {
         let sourceIDs = Set(source.map(\.id))
-        shuffleOrder.removeAll { !sourceIDs.contains($0) }
+        var seen = Set<UUID>()
+        shuffleOrder.removeAll { !sourceIDs.contains($0) || !seen.insert($0).inserted }
         if shuffleOrder.count != source.count || shuffleOrder.isEmpty {
             rebuildShuffle(anchoredAt: current?.id)
             return

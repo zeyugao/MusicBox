@@ -48,7 +48,7 @@ final class PlaybackPresentationModel {
     var isPlaying: Bool { phase == .playing }
     var isLoading: Bool { phase == .preparing }
     var hasCurrentItem: Bool { currentItem != nil }
-    var explicitNextCount: Int { queueEntries.filter(\.isExplicitNext).count }
+    var explicitNextCount: Int { playback.queue.upcomingCount }
     var lyrics: LyricsState { playback.lyrics.state }
 
     func toggle() { playback.toggle() }
@@ -87,20 +87,7 @@ final class PlaybackPresentationModel {
         let explicitNextPositions = Dictionary(
             uniqueKeysWithValues: snapshot.upNext.enumerated().map { ($0.element.id, $0.offset + 1) }
         )
-        var entries = snapshot.source
-
-        if let current = snapshot.current,
-            let currentIndex = entries.firstIndex(where: { $0.id == current.id })
-        {
-            entries.insert(contentsOf: snapshot.upNext, at: currentIndex + 1)
-        } else {
-            if let current = snapshot.current {
-                entries.insert(current, at: 0)
-            }
-            entries.insert(contentsOf: snapshot.upNext, at: min(entries.count, currentID == nil ? 0 : 1))
-        }
-
-        queueEntries = entries.map {
+        queueEntries = playback.queue.visibleEntries.map {
             QueueDisplayEntry(
                 id: $0.id,
                 item: $0.item,
