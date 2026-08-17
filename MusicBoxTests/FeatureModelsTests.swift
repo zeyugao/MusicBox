@@ -132,6 +132,22 @@ final class FeatureModelsTests: XCTestCase {
     }
 
     @MainActor
+    func testSongTableSelectionSurvivesRepresentableRefresh() throws {
+        let controller = SongTableViewController()
+        controller.songs = [makeSong(id: 10), makeSong(id: 11), makeSong(id: 12)]
+        controller.loadViewIfNeeded()
+        controller.refresh()
+
+        let scrollView = try XCTUnwrap(controller.view.subviews.first as? NSScrollView)
+        let tableView = try XCTUnwrap(scrollView.documentView as? NSTableView)
+
+        tableView.selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
+        controller.refresh()
+
+        XCTAssertEqual(tableView.selectedRowIndexes, IndexSet(integer: 1))
+    }
+
+    @MainActor
     func testTransferCenterBatchUploadEnqueuesEachFile() async {
         let harness = TransferOperationHarness()
         let center = makeTransferCenter(harness: harness)

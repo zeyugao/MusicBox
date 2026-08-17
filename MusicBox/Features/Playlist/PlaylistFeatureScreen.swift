@@ -6,7 +6,6 @@ struct PlaylistFeatureScreen: View {
     @Environment(AppModel.self) private var app
     @State private var model: PlaylistFeatureModel
     @State private var selectedSongsToAdd: [CloudMusicApi.Song] = []
-    @State private var selectedSongs: [CloudMusicApi.Song] = []
 
     init(
         destination: PlaylistDestination,
@@ -33,6 +32,8 @@ struct PlaylistFeatureScreen: View {
                 ),
                 allowsPlaylistMutations: model.isRemotePlaylist
                     && model.destination.id != CloudMusicApi.RecommandSongPlaylistId,
+                allowsDownloads: model.isRemotePlaylist,
+                canDownload: !app.transfers.hasPendingJobs(in: .download),
                 sort: model.sort,
                 onActivate: play,
                 onPlayNext: { songs in
@@ -44,10 +45,12 @@ struct PlaylistFeatureScreen: View {
                 onToggleLike: toggleLike,
                 onAddToPlaylist: { selectedSongsToAdd = $0 },
                 onDeleteFromPlaylist: delete,
+                onDownload: { songs in
+                    app.transfers.enqueueDownloads(songs.map(model.item(for:)))
+                },
                 onUpload: { url, song in
                     upload(url, song)
                 },
-                onSelectionChange: { selectedSongs = $0 },
                 onViewComments: showComments,
                 onCopy: copyToPasteboard,
                 onLoadMore: model.loadMore,
@@ -102,16 +105,6 @@ struct PlaylistFeatureScreen: View {
                 }
                 .help(String(localized: "Play All"))
                 .disabled(model.items.isEmpty)
-
-                if !selectedSongs.isEmpty {
-                    Button {
-                        app.transfers.enqueueDownloads(selectedSongs.map(model.item(for:)))
-                    } label: {
-                        Image(systemName: "arrow.down.circle")
-                    }
-                    .help(String(localized: "Download Selected"))
-                    .disabled(app.transfers.hasPendingJobs(in: .download))
-                }
 
                 Menu {
                     Button {
@@ -237,6 +230,8 @@ private struct PlaylistSongTable: NSViewControllerRepresentable {
     let currentSongID: UInt64?
     let explicitNextSongIDs: Set<UInt64>
     let allowsPlaylistMutations: Bool
+    let allowsDownloads: Bool
+    let canDownload: Bool
     let sort: PlaylistSongSort?
     let onActivate: (CloudMusicApi.Song) -> Void
     let onPlayNext: ([CloudMusicApi.Song]) -> Void
@@ -244,8 +239,8 @@ private struct PlaylistSongTable: NSViewControllerRepresentable {
     let onToggleLike: (CloudMusicApi.Song) -> Void
     let onAddToPlaylist: ([CloudMusicApi.Song]) -> Void
     let onDeleteFromPlaylist: ([CloudMusicApi.Song]) -> Void
+    let onDownload: ([CloudMusicApi.Song]) -> Void
     let onUpload: (URL, CloudMusicApi.Song?) -> Void
-    let onSelectionChange: ([CloudMusicApi.Song]) -> Void
     let onViewComments: (CloudMusicApi.Song) -> Void
     let onCopy: (String) -> Void
     let onLoadMore: () -> Void
@@ -261,6 +256,8 @@ private struct PlaylistSongTable: NSViewControllerRepresentable {
         controller.currentSongID = currentSongID
         controller.explicitNextSongIDs = explicitNextSongIDs
         controller.allowsPlaylistMutations = allowsPlaylistMutations
+        controller.allowsDownloads = allowsDownloads
+        controller.canDownload = canDownload
         controller.sort = sort
         controller.onActivate = onActivate
         controller.onPlayNext = onPlayNext
@@ -268,8 +265,8 @@ private struct PlaylistSongTable: NSViewControllerRepresentable {
         controller.onToggleLike = onToggleLike
         controller.onAddToPlaylist = onAddToPlaylist
         controller.onDeleteFromPlaylist = onDeleteFromPlaylist
+        controller.onDownload = onDownload
         controller.onUpload = onUpload
-        controller.onSelectionChange = onSelectionChange
         controller.onViewComments = onViewComments
         controller.onCopy = onCopy
         controller.onLoadMore = onLoadMore
@@ -284,12 +281,19 @@ final class SongTableViewController: NSViewController {
     private var isSynchronizingSort = false
     private var pendingDropURLs: [URL] = []
     private var displayedSongIDs: [UInt64] = []
+    private var displayedLikedSongIDs: Set<UInt64> = []
+    private var displayedCurrentSongID: UInt64?
+    private var displayedExplicitNextSongIDs: Set<UInt64> = []
+    private var displayedSort: PlaylistSongSort?
+    private var hasRendered = false
 
     var songs: [CloudMusicApi.Song] = []
     var likedSongIDs: Set<UInt64> = []
     var currentSongID: UInt64?
     var explicitNextSongIDs: Set<UInt64> = []
     var allowsPlaylistMutations = false
+    var allowsDownloads = false
+    var canDownload = false
     var sort: PlaylistSongSort?
     var onActivate: ((CloudMusicApi.Song) -> Void)?
     var onPlayNext: (([CloudMusicApi.Song]) -> Void)?
@@ -297,8 +301,8 @@ final class SongTableViewController: NSViewController {
     var onToggleLike: ((CloudMusicApi.Song) -> Void)?
     var onAddToPlaylist: (([CloudMusicApi.Song]) -> Void)?
     var onDeleteFromPlaylist: (([CloudMusicApi.Song]) -> Void)?
+    var onDownload: (([CloudMusicApi.Song]) -> Void)?
     var onUpload: ((URL, CloudMusicApi.Song?) -> Void)?
-    var onSelectionChange: (([CloudMusicApi.Song]) -> Void)?
     var onViewComments: ((CloudMusicApi.Song) -> Void)?
     var onCopy: ((String) -> Void)?
     var onLoadMore: (() -> Void)?
@@ -317,14 +321,28 @@ final class SongTableViewController: NSViewController {
     func refresh() {
         let songIDs = songs.map(\.id)
         let songsChanged = songIDs != displayedSongIDs
-        tableView.reloadData()
-        syncSortDescriptors()
+        let rowAppearanceChanged = likedSongIDs != displayedLikedSongIDs
+            || currentSongID != displayedCurrentSongID
+            || explicitNextSongIDs != displayedExplicitNextSongIDs
+        let sortChanged = sort != displayedSort
+        guard !hasRendered || songsChanged || rowAppearanceChanged || sortChanged else { return }
+
+        if !hasRendered || songsChanged || rowAppearanceChanged {
+            tableView.reloadData()
+        }
+        if !hasRendered || sortChanged {
+            syncSortDescriptors()
+        }
+
+        displayedSongIDs = songIDs
+        displayedLikedSongIDs = likedSongIDs
+        displayedCurrentSongID = currentSongID
+        displayedExplicitNextSongIDs = explicitNextSongIDs
+        displayedSort = sort
+        hasRendered = true
+
         if songsChanged {
             tableView.deselectAll(nil)
-            displayedSongIDs = songIDs
-            DispatchQueue.main.async { [weak self] in
-                self?.onSelectionChange?([])
-            }
         }
     }
 
@@ -440,10 +458,6 @@ final class SongTableViewController: NSViewController {
         return selected.isEmpty ? [songs[row]] : selected
     }
 
-    private func selectedSongs() -> [CloudMusicApi.Song] {
-        Self.songs(for: tableView.selectedRowIndexes, in: songs)
-    }
-
     static func songs(
         for selection: IndexSet,
         in songs: [CloudMusicApi.Song]
@@ -456,6 +470,16 @@ final class SongTableViewController: NSViewController {
         let multiple = selected.count > 1
         if !multiple, let song = selected.first {
             menu.addItem(item("Play", symbol: "play.fill", action: #selector(play(_:)), object: song))
+        }
+        if allowsDownloads {
+            let download = item(
+                String(localized: "Download Selected"),
+                symbol: "arrow.down.circle",
+                action: #selector(download(_:)),
+                object: selected
+            )
+            download.isEnabled = canDownload
+            menu.addItem(download)
         }
         menu.addItem(item(multiple ? "Play \(selected.count) Songs Next" : "Play Next", symbol: "text.badge.plus", action: #selector(playNext(_:)), object: selected))
         menu.addItem(item(multiple ? "Add \(selected.count) Songs to Now Playing" : "Add to Now Playing", symbol: "music.note.list", action: #selector(addToNowPlaying(_:)), object: selected))
@@ -501,6 +525,10 @@ final class SongTableViewController: NSViewController {
 
     @objc private func deleteFromPlaylist(_ sender: NSMenuItem) {
         onDeleteFromPlaylist?(songs(from: sender))
+    }
+
+    @objc private func download(_ sender: NSMenuItem) {
+        onDownload?(songs(from: sender))
     }
 
     @objc private func upload(_ sender: NSMenuItem) {
@@ -607,10 +635,6 @@ extension SongTableViewController: NSTableViewDelegate {
 
     func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
         songs.indices.contains(row)
-    }
-
-    func tableViewSelectionDidChange(_: Notification) {
-        onSelectionChange?(selectedSongs())
     }
 
     func tableView(_: NSTableView, sortDescriptorsDidChange _: [NSSortDescriptor]) {
