@@ -103,6 +103,45 @@ final class FeatureModelsTests: XCTestCase {
     }
 
     @MainActor
+    func testAccountPlaylistFailuresKeepCurrentAndPersistedPlaylists() async throws {
+        let suiteName = "MusicBoxTests.account-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let profile = makeProfile(userID: 7)
+        let playlist = makePlaylist(id: 11, owner: profile)
+        defaults.set(try JSONEncoder().encode(profile), forKey: "profile")
+        defaults.set(try JSONEncoder().encode([playlist]), forKey: "playlists")
+        let repository = RecordingAccountRepository()
+        repository.profile = profile
+        repository.playlistError = URLError(.timedOut)
+        let store = AccountStore(repository: repository, defaults: defaults)
+
+        await store.refreshPlaylists()
+        XCTAssertEqual(store.playlists, [playlist])
+        await store.refresh()
+        XCTAssertEqual(store.playlists, [playlist])
+        XCTAssertEqual(AccountStore(repository: repository, defaults: defaults).playlists, [playlist])
+    }
+
+    @MainActor
+    func testAccountPlaylistRefreshAcceptsSuccessfulEmptyResponse() async throws {
+        let suiteName = "MusicBoxTests.account-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let profile = makeProfile(userID: 7)
+        let playlist = makePlaylist(id: 11, owner: profile)
+        defaults.set(try JSONEncoder().encode(profile), forKey: "profile")
+        defaults.set(try JSONEncoder().encode([playlist]), forKey: "playlists")
+        let repository = RecordingAccountRepository()
+        let store = AccountStore(repository: repository, defaults: defaults)
+
+        await store.refreshPlaylists()
+
+        XCTAssertTrue(store.playlists.isEmpty)
+        XCTAssertTrue(AccountStore(repository: repository, defaults: defaults).playlists.isEmpty)
+    }
+
+    @MainActor
     func testSongTableControllerOnlyEmitsActivationForAValidRow() {
         let controller = SongTableViewController()
         controller.songs = [makeSong(id: 10), makeSong(id: 11)]
@@ -425,9 +464,17 @@ private final class RecordingCatalogRepository: CatalogRepository {
 @MainActor
 private final class RecordingAccountRepository: AccountRepository {
     var cookie: String?
+    var profile: CloudMusicApi.Profile?
+    var playlistResponse: [CloudMusicApi.PlayListItem] = []
+    var playlistError: Error?
 
-    func loginStatus() async -> CloudMusicApi.Profile? { nil }
-    func userPlaylists(for _: UInt64) async throws -> [CloudMusicApi.PlayListItem]? { nil }
+    func loginStatus() async -> CloudMusicApi.Profile? { profile }
+    func userPlaylists(for _: UInt64) async throws -> [CloudMusicApi.PlayListItem] {
+        if let playlistError {
+            throw playlistError
+        }
+        return playlistResponse
+    }
     func likedSongIDs(for _: UInt64) async -> [UInt64]? { nil }
     func setLiked(songID _: UInt64, liked _: Bool) async throws {}
     func setCookie(_ cookie: String) { self.cookie = cookie }
@@ -525,6 +572,29 @@ private final class RecordingCommentsRepository: CommentsRepository {
             currentComment: nil
         )
     }
+}
+
+private func makeProfile(userID: UInt64) -> CloudMusicApi.Profile {
+    CloudMusicApi.Profile(avatarUrl: "", nickname: "User", userId: userID)
+}
+
+private func makePlaylist(
+    id: UInt64,
+    owner: CloudMusicApi.Profile
+) -> CloudMusicApi.PlayListItem {
+    CloudMusicApi.PlayListItem(
+        subscribed: false,
+        coverImgUrl: "",
+        name: "Playlist \(id)",
+        id: id,
+        createTime: 0,
+        userId: Int(owner.userId),
+        privacy: 0,
+        description: nil,
+        creator: owner,
+        trackCount: 1,
+        cloudTrackCount: 0
+    )
 }
 
 private func makeSong(id: UInt64) -> CloudMusicApi.Song {

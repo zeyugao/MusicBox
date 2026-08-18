@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 protocol AccountRepository: AnyObject {
     func loginStatus() async -> CloudMusicApi.Profile?
-    func userPlaylists(for userID: UInt64) async throws -> [CloudMusicApi.PlayListItem]?
+    func userPlaylists(for userID: UInt64) async throws -> [CloudMusicApi.PlayListItem]
     func likedSongIDs(for userID: UInt64) async -> [UInt64]?
     func setLiked(songID: UInt64, liked: Bool) async throws
     func setCookie(_ cookie: String)
@@ -94,7 +94,7 @@ final class NeteaseMusicRepository: MusicRepository {
         await api().login_status()
     }
 
-    func userPlaylists(for userID: UInt64) async throws -> [CloudMusicApi.PlayListItem]? {
+    func userPlaylists(for userID: UInt64) async throws -> [CloudMusicApi.PlayListItem] {
         try await api().user_playlist(uid: userID)
     }
 

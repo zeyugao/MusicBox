@@ -55,6 +55,19 @@ final class NeteaseHTTPClientTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.requests().count, 1)
     }
 
+    func testUserPlaylistThrowsForErrorPayload() async throws {
+        let api = CloudMusicApi(client: makeClient())
+        MockURLProtocol.configure { request in
+            XCTAssertEqual(request.url?.path, "/api/user/playlist")
+            return (response(for: request), Data(#"{"code":301}"#.utf8))
+        }
+
+        do {
+            _ = try await api.user_playlist(uid: 42)
+            XCTFail("Expected an error payload to throw")
+        } catch {}
+    }
+
     func testCellphoneLoginHashesPasswordAndMergesResponseCookie() async throws {
         let client = makeClient()
         let api = CloudMusicApi(client: client)

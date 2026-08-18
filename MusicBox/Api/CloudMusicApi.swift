@@ -559,19 +559,14 @@ class CloudMusicApi {
 
     func user_playlist(
         uid: UInt64, limit: Int = 30, offset: Int = 0, includeVideo: Bool = true
-    )
-        async throws
-        -> [CloudMusicApi.PlayListItem]?
-    {
-        guard
-            let ret = try? await client.userPlaylist(
-                userID: uid,
-                limit: limit,
-                offset: offset,
-                includeVideo: includeVideo,
-                cacheTtl: cacheTtl
-            )
-        else { return nil }
+    ) async throws -> [CloudMusicApi.PlayListItem] {
+        let response = try await client.userPlaylist(
+            userID: uid,
+            limit: limit,
+            offset: offset,
+            includeVideo: includeVideo,
+            cacheTtl: cacheTtl
+        )
 
         struct Result: Decodable {
             let playlist: [PlayListItem]
@@ -579,10 +574,10 @@ class CloudMusicApi {
         }
 
         // TODO: Fix more = true
-        if let parsed = ret.asType(Result.self) {
-            return parsed.playlist
+        guard let parsed = response.asType(Result.self, silent: true) else {
+            throw RequestError.noData
         }
-        return nil
+        return parsed.playlist
     }
 
     func login_cellphone(phone: String, countrycode: Int = 86, password: String) async

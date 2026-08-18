@@ -446,10 +446,19 @@ final class AccountStore {
             save()
             return
         }
+        let previousUserID = self.profile?.userId
         self.profile = profile
-        async let fetchedPlaylists = try? repository.userPlaylists(for: profile.userId)
+        if previousUserID != profile.userId {
+            playlists = []
+            likedSongIDs = []
+        }
+        async let fetchedPlaylists = repository.userPlaylists(for: profile.userId)
         async let fetchedLikes = repository.likedSongIDs(for: profile.userId)
-        playlists = await fetchedPlaylists ?? []
+        do {
+            playlists = try await fetchedPlaylists
+        } catch {
+            errorMessage = error.localizedDescription
+        }
         likedSongIDs = Set(await fetchedLikes ?? [])
         save()
     }
@@ -457,7 +466,8 @@ final class AccountStore {
     func refreshPlaylists() async {
         guard let profile else { return }
         do {
-            playlists = try await repository.userPlaylists(for: profile.userId) ?? []
+            playlists = try await repository.userPlaylists(for: profile.userId)
+            errorMessage = nil
             save()
         } catch {
             errorMessage = error.localizedDescription
