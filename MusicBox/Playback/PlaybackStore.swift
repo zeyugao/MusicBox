@@ -2,6 +2,7 @@ import AVFoundation
 import AppKit
 import Foundation
 import Observation
+import OSLog
 
 enum PlaybackPhase: String, Codable {
     case idle
@@ -86,6 +87,27 @@ struct PlaybackTimeline {
     }
 }
 
+struct PlaybackDiagnosticRateLimiter {
+    private var lastEmissionUptimeByKey: [String: TimeInterval] = [:]
+
+    mutating func shouldEmit(key: String, at uptime: TimeInterval, minimumInterval: TimeInterval) -> Bool {
+        guard let lastEmission = lastEmissionUptimeByKey[key] else {
+            lastEmissionUptimeByKey[key] = uptime
+            return true
+        }
+        guard uptime - lastEmission >= minimumInterval else { return false }
+        lastEmissionUptimeByKey[key] = uptime
+        return true
+    }
+}
+
+private enum PlaybackDiagnostics {
+    static let logger = Logger(subsystem: "me.elsanna.MusicBox", category: "playback")
+    static let repeatedEventInterval: TimeInterval = 60
+    static let earlyEndMinimumRemaining: TimeInterval = 15
+    static let earlyEndMinimumFraction = 0.05
+}
+
 struct PlaybackState {
     var phase: PlaybackPhase = .idle
     var currentEntry: PlaybackQueueEntry?
@@ -144,7 +166,7 @@ enum PlaybackEngineEvent {
     case ready(duration: Double)
     case position(position: Double, duration: Double)
     case playbackChanged(Bool)
-    case ended
+    case ended(position: Double, duration: Double)
     case failed(String)
 }
 
@@ -173,9 +195,14 @@ private final class AVPlaybackEngine: NSObject, PlaybackEngineControlling, @prec
     private var timeObserver: Any?
     private var rateObservation: NSKeyValueObservation?
     private var itemObservation: NSKeyValueObservation?
-    private var endObserver: NSObjectProtocol?
+    private var itemObservers: [NSObjectProtocol] = []
     private var activeCachingItem: CachingPlayerItem?
     private var pendingAutoplay = false
+    private var activeSourceKind = "unknown"
+    private var failedGeneration: Int?
+    private var diagnosticsRateLimiter = PlaybackDiagnosticRateLimiter()
+    private var observedPlayingRate = false
+    private var isSeeking = false
 
     override init() {
         super.init()
@@ -183,7 +210,13 @@ private final class AVPlaybackEngine: NSObject, PlaybackEngineControlling, @prec
         rateObservation = player.observe(\.rate, options: [.initial, .new]) { [weak self] player, _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.onEvent?(.playbackChanged(player.rate > 0), self.activeGeneration)
+                let isPlaying = player.rate > 0
+                if isPlaying {
+                    self.observedPlayingRate = true
+                } else {
+                    self.reportUnexpectedPauseIfNeeded()
+                }
+                self.onEvent?(.playbackChanged(isPlaying), self.activeGeneration)
             }
         }
         timeObserver = player.addPeriodicTimeObserver(
@@ -203,13 +236,18 @@ private final class AVPlaybackEngine: NSObject, PlaybackEngineControlling, @prec
         detachCurrentItem()
         activeGeneration = generation
         pendingAutoplay = autoplay
+        failedGeneration = nil
+        observedPlayingRate = false
+        isSeeking = false
 
         let item: AVPlayerItem
         switch source {
         case .local(let url):
+            activeSourceKind = "local"
             let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
             item = AVPlayerItem(asset: asset)
         case let .remote(url, cacheURL, fileExtension, _):
+            activeSourceKind = "remote"
             let cachingItem = CachingPlayerItem(
                 url: url,
                 saveFilePath: cacheURL.path,
@@ -236,7 +274,12 @@ private final class AVPlaybackEngine: NSObject, PlaybackEngineControlling, @prec
                         self.player.play()
                     }
                 case .failed:
-                    self.onEvent?(.failed(observedItem.error?.localizedDescription ?? String(localized: "playback.failed")), generation)
+                    self.reportFailure(
+                        observedItem.error,
+                        fallback: String(localized: "playback.failed"),
+                        generation: generation,
+                        origin: "item_status"
+                    )
                 case .unknown:
                     break
                 @unknown default:
@@ -245,16 +288,75 @@ private final class AVPlaybackEngine: NSObject, PlaybackEngineControlling, @prec
             }
         }
 
-        endObserver = NotificationCenter.default.addObserver(
-            forName: AVPlayerItem.didPlayToEndTimeNotification,
-            object: item,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.onEvent?(.ended, self.activeGeneration)
+        itemObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: AVPlayerItem.didPlayToEndTimeNotification,
+                object: item,
+                queue: .main
+            ) { [weak self, weak item] _ in
+                Task { @MainActor [weak self, weak item] in
+                    guard let self else { return }
+                    let itemIsCurrent = item.map { self.player.currentItem === $0 } ?? false
+                    guard let item,
+                        generation == self.activeGeneration,
+                        itemIsCurrent,
+                        self.failedGeneration != generation
+                    else {
+                        if generation != self.activeGeneration || !itemIsCurrent {
+                            self.reportStaleEnd(
+                                callbackGeneration: generation,
+                                itemIsCurrent: itemIsCurrent
+                            )
+                        }
+                        return
+                    }
+                    self.onEvent?(
+                        .ended(
+                            position: self.player.currentTime().seconds,
+                            duration: item.duration.seconds
+                        ),
+                        generation
+                    )
+                }
             }
-        }
+        )
+        itemObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: AVPlayerItem.failedToPlayToEndTimeNotification,
+                object: item,
+                queue: .main
+            ) { [weak self, weak item] notification in
+                Task { @MainActor [weak self, weak item] in
+                    guard let self,
+                        let item,
+                        generation == self.activeGeneration,
+                        self.player.currentItem === item
+                    else { return }
+                    self.reportFailure(
+                        notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error,
+                        fallback: String(localized: "playback.failed"),
+                        generation: generation,
+                        origin: "failed_to_end"
+                    )
+                }
+            }
+        )
+        itemObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: AVPlayerItem.playbackStalledNotification,
+                object: item,
+                queue: .main
+            ) { [weak self, weak item] _ in
+                Task { @MainActor [weak self, weak item] in
+                    guard let self,
+                        let item,
+                        generation == self.activeGeneration,
+                        self.player.currentItem === item
+                    else { return }
+                    self.reportStall(generation: generation, origin: "player_item_stalled")
+                }
+            }
+        )
         player.replaceCurrentItem(with: item)
     }
 
@@ -266,18 +368,26 @@ private final class AVPlaybackEngine: NSObject, PlaybackEngineControlling, @prec
 
     func pause() {
         pendingAutoplay = false
+        observedPlayingRate = false
+        isSeeking = false
         player.pause()
     }
 
     func seek(to seconds: Double, completion: @escaping () -> Void) {
+        isSeeking = true
         let time = CMTime(seconds: max(0, seconds), preferredTimescale: 1_000)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
-            Task { @MainActor in completion() }
+            Task { @MainActor [weak self] in
+                self?.isSeeking = false
+                completion()
+            }
         }
     }
 
     func stop() {
         pendingAutoplay = false
+        observedPlayingRate = false
+        isSeeking = false
         player.pause()
         detachCurrentItem()
         player.replaceCurrentItem(with: nil)
@@ -285,23 +395,139 @@ private final class AVPlaybackEngine: NSObject, PlaybackEngineControlling, @prec
 
     func playerItem(_ playerItem: CachingPlayerItem, downloadingFailedWith error: Error) {
         guard playerItem === activeCachingItem else { return }
-        onEvent?(.failed(error.localizedDescription), activeGeneration)
+        reportFailure(
+            error,
+            fallback: String(localized: "playback.failed"),
+            generation: activeGeneration,
+            origin: "cache_download"
+        )
     }
 
     func playerItemDidFailToPlay(_ playerItem: CachingPlayerItem, withError error: Error?) {
         guard playerItem === activeCachingItem else { return }
-        onEvent?(.failed(error?.localizedDescription ?? String(localized: "playback.failed")), activeGeneration)
+        reportFailure(
+            error,
+            fallback: String(localized: "playback.failed"),
+            generation: activeGeneration,
+            origin: "cache_item"
+        )
+    }
+
+    func playerItemPlaybackStalled(_ playerItem: CachingPlayerItem) {
+        guard playerItem === activeCachingItem else { return }
+        reportStall(generation: activeGeneration, origin: "cache_item_stalled")
     }
 
     private func detachCurrentItem() {
-        if let endObserver {
-            NotificationCenter.default.removeObserver(endObserver)
-            self.endObserver = nil
-        }
+        itemObservers.forEach(NotificationCenter.default.removeObserver)
+        itemObservers.removeAll()
         itemObservation?.invalidate()
         itemObservation = nil
         activeCachingItem?.delegate = nil
         activeCachingItem = nil
+        activeSourceKind = "unknown"
+    }
+
+    private func reportFailure(
+        _ error: Error?,
+        fallback: String,
+        generation: Int,
+        origin: String
+    ) {
+        guard generation == activeGeneration, failedGeneration != generation else { return }
+        failedGeneration = generation
+
+        let message = error?.localizedDescription ?? fallback
+        let nsError = error.map { $0 as NSError }
+        let errorContext = nsError.map { " error_domain=\($0.domain) error_code=\($0.code)" } ?? ""
+        let context = diagnosticContext(origin: origin, generation: generation) + errorContext
+        let now = ProcessInfo.processInfo.systemUptime
+        if diagnosticsRateLimiter.shouldEmit(
+            key: "failure",
+            at: now,
+            minimumInterval: PlaybackDiagnostics.repeatedEventInterval
+        ) {
+            PlaybackDiagnostics.logger.error(
+                "Playback failure \(context, privacy: .public) message=\(message, privacy: .private)"
+            )
+        }
+        onEvent?(.failed(message), generation)
+    }
+
+    private func reportStall(generation: Int, origin: String) {
+        guard generation == activeGeneration else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard diagnosticsRateLimiter.shouldEmit(
+            key: "stall",
+            at: now,
+            minimumInterval: PlaybackDiagnostics.repeatedEventInterval
+        ) else { return }
+        let context = diagnosticContext(origin: origin, generation: generation)
+        PlaybackDiagnostics.logger.notice("Playback stalled \(context, privacy: .public)")
+    }
+
+    private func reportStaleEnd(callbackGeneration: Int, itemIsCurrent: Bool) {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard diagnosticsRateLimiter.shouldEmit(
+            key: "stale_end",
+            at: now,
+            minimumInterval: PlaybackDiagnostics.repeatedEventInterval
+        ) else { return }
+        let context = diagnosticContext(origin: "stale_end", generation: activeGeneration)
+        let itemMatch = itemIsCurrent ? "true" : "false"
+        let staleDetails = "callback_generation=\(callbackGeneration) current_generation=\(activeGeneration) item_is_current=\(itemMatch)"
+        PlaybackDiagnostics.logger.notice(
+            "Discarded stale playback end callback \(staleDetails, privacy: .public) \(context, privacy: .public)"
+        )
+    }
+
+    private func reportUnexpectedPauseIfNeeded() {
+        guard pendingAutoplay,
+            observedPlayingRate,
+            !isSeeking,
+            let item = player.currentItem,
+            item.status == .readyToPlay
+        else { return }
+
+        let position = player.currentTime().seconds
+        let duration = item.duration.seconds
+        guard position.isFinite,
+            duration.isFinite,
+            duration > 0,
+            duration - position > max(
+                PlaybackDiagnostics.earlyEndMinimumRemaining,
+                duration * PlaybackDiagnostics.earlyEndMinimumFraction
+            )
+        else { return }
+
+        let now = ProcessInfo.processInfo.systemUptime
+        guard diagnosticsRateLimiter.shouldEmit(
+            key: "rate_zero",
+            at: now,
+            minimumInterval: PlaybackDiagnostics.repeatedEventInterval
+        ) else { return }
+        let context = diagnosticContext(origin: "rate_zero", generation: activeGeneration)
+        PlaybackDiagnostics.logger.notice("Playback rate became zero while playback was requested \(context, privacy: .public)")
+    }
+
+    private func diagnosticContext(origin: String, generation: Int) -> String {
+        let item = player.currentItem
+        let position = formattedSeconds(player.currentTime())
+        let duration = item.map { formattedSeconds($0.duration) } ?? "unknown"
+        let keepUp = item?.isPlaybackLikelyToKeepUp == true ? "true" : "false"
+        let bufferEmpty = item?.isPlaybackBufferEmpty == true ? "true" : "false"
+        let bufferFull = item?.isPlaybackBufferFull == true ? "true" : "false"
+        let externalPlayback = player.isExternalPlaybackActive ? "true" : "false"
+        let timeControlStatus = player.timeControlStatus.rawValue
+        let rate = String(format: "%.2f", player.rate)
+        let wantsPlayback = pendingAutoplay ? "true" : "false"
+        return "origin=\(origin) generation=\(generation) source=\(activeSourceKind) position=\(position) duration=\(duration) likely_to_keep_up=\(keepUp) buffer_empty=\(bufferEmpty) buffer_full=\(bufferFull) external_playback=\(externalPlayback) time_control_status=\(timeControlStatus) rate=\(rate) wants_playback=\(wantsPlayback)"
+    }
+
+    private func formattedSeconds(_ time: CMTime) -> String {
+        let seconds = time.seconds
+        guard seconds.isFinite else { return "unknown" }
+        return String(format: "%.1f", max(0, seconds))
     }
 
 }
@@ -324,6 +550,7 @@ final class PlaybackStore {
     private var eventListeners: [UUID: (PlaybackEvent) -> Void] = [:]
     private var terminationObserver: NSObjectProtocol?
     private var timeline = PlaybackTimeline()
+    private var diagnosticsRateLimiter = PlaybackDiagnosticRateLimiter()
 
     private(set) var queue = PlaybackQueue()
     private(set) var state = PlaybackState()
@@ -656,9 +883,18 @@ final class PlaybackStore {
                 stopPeriodicPersistence()
                 persistImmediately()
             }
-        case .ended:
+        case let .ended(enginePosition, engineDuration):
             let endedItem = state.currentItem
-            let endedPosition = max(currentPosition, state.duration)
+            let observedPosition = enginePosition.isFinite ? max(0, enginePosition) : currentPosition
+            recordUnexpectedEndIfNeeded(
+                item: endedItem,
+                position: observedPosition,
+                duration: state.duration,
+                generation: generation,
+                engineDuration: engineDuration,
+                wasPlaying: state.isPlaying
+            )
+            let endedPosition = max(observedPosition, state.duration)
             timeline.reset(position: endedPosition, duration: state.duration, isAdvancing: false, at: currentUptime())
             refreshTimelineState()
             lyrics.playbackStateDidChange(isPlaying: false)
@@ -728,6 +964,54 @@ final class PlaybackStore {
     private func refreshTimelineState() {
         state.position = currentPosition
         state.duration = timeline.duration
+    }
+
+    private func recordUnexpectedEndIfNeeded(
+        item: PlaylistItem?,
+        position: Double,
+        duration: Double,
+        generation: Int,
+        engineDuration: Double,
+        wasPlaying: Bool
+    ) {
+        guard let item,
+            position.isFinite,
+            duration.isFinite,
+            duration > 0
+        else { return }
+
+        let remaining = duration - position
+        let suspiciousRemaining = max(
+            PlaybackDiagnostics.earlyEndMinimumRemaining,
+            duration * PlaybackDiagnostics.earlyEndMinimumFraction
+        )
+        guard remaining > suspiciousRemaining else { return }
+
+        let now = currentUptime()
+        guard diagnosticsRateLimiter.shouldEmit(
+            key: "unexpected_end",
+            at: now,
+            minimumInterval: PlaybackDiagnostics.repeatedEventInterval
+        ) else { return }
+
+        let completion = min(max(position / duration * 100, 0), 100)
+        let details = String(
+            format: "song_id=%llu generation=%d position=%.1f duration=%.1f remaining=%.1f completion=%.1f%%",
+            item.id,
+            generation,
+            position,
+            duration,
+            remaining,
+            completion
+        )
+        let actualDuration = engineDuration.isFinite && engineDuration > 0
+            ? String(format: "%.1f", engineDuration)
+            : "unknown"
+        let playbackState = wasPlaying ? "true" : "false"
+        let context = "\(details) engine_duration=\(actualDuration) was_playing=\(playbackState)"
+        PlaybackDiagnostics.logger.notice(
+            "Unexpected playback end \(context, privacy: .public)"
+        )
     }
 
     private func markSessionDirty() {

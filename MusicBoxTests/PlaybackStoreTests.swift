@@ -20,6 +20,15 @@ final class PlaybackStoreTests: XCTestCase {
         try super.tearDownWithError()
     }
 
+    func testPlaybackDiagnosticRateLimiterLimitsRepeatedEvents() {
+        var limiter = PlaybackDiagnosticRateLimiter()
+
+        XCTAssertTrue(limiter.shouldEmit(key: "stall", at: 100, minimumInterval: 60))
+        XCTAssertFalse(limiter.shouldEmit(key: "stall", at: 159.9, minimumInterval: 60))
+        XCTAssertTrue(limiter.shouldEmit(key: "stall", at: 160, minimumInterval: 60))
+        XCTAssertTrue(limiter.shouldEmit(key: "unexpected_end", at: 160.1, minimumInterval: 60))
+    }
+
     @MainActor
     func testSessionRestoresQueuePositionAndVolume() async throws {
         var queue = PlaybackQueue()
