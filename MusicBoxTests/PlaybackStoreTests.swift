@@ -632,6 +632,9 @@ final class PlaybackPresentationModelTests: XCTestCase {
         engine.send(.ready(duration: 180), generation: 1)
         engine.send(.playbackChanged(true), generation: 1)
         engine.send(.position(position: 10, duration: 180), generation: 1)
+
+        store.enqueueNext(track(2))
+        XCTAssertEqual(presentation.explicitNextSongIDs, [2])
         let queueEntries = presentation.queueEntries
 
         now = 100.1

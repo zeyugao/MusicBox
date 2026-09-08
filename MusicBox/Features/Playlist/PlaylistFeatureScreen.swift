@@ -26,10 +26,8 @@ struct PlaylistFeatureScreen: View {
             PlaylistSongTable(
                 songs: model.visibleSongs,
                 likedSongIDs: app.account.likedSongIDs,
-                currentSongID: app.playback.currentItem?.id,
-                explicitNextSongIDs: Set(
-                    app.playbackPresentation.queueEntries.filter(\.isExplicitNext).map(\.item.id)
-                ),
+                currentSongID: app.playbackPresentation.currentItem?.id,
+                explicitNextSongIDs: app.playbackPresentation.explicitNextSongIDs,
                 allowsPlaylistMutations: model.isRemotePlaylist
                     && model.destination.id != CloudMusicApi.RecommandSongPlaylistId,
                 allowsDownloads: model.isRemotePlaylist,

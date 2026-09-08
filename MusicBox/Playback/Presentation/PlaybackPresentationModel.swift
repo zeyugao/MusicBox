@@ -25,6 +25,7 @@ final class PlaybackPresentationModel {
     private(set) var isSeeking: Bool
     private(set) var errorMessage: String?
     private(set) var queueEntries: [QueueDisplayEntry] = []
+    private(set) var explicitNextSongIDs: Set<UInt64> = []
 
     init(playback: PlaybackStore) {
         self.playback = playback
@@ -120,5 +121,6 @@ final class PlaybackPresentationModel {
                 explicitNextPosition: explicitNextPositions[$0.id]
             )
         }
+        explicitNextSongIDs = Set(snapshot.upNext.map { $0.item.id })
     }
 }
