@@ -53,6 +53,24 @@ final class FeatureModelsTests: XCTestCase {
     }
 
     @MainActor
+    func testPlaylistDerivedCollectionsRefreshAfterSongsChange() {
+        let repository = RecordingPlaylistRepository()
+        let model = PlaylistFeatureModel(
+            destination: PlaylistDestination(id: 99, name: "Playlist"),
+            repository: repository,
+            initialSongs: [makeSong(id: 1)]
+        )
+
+        XCTAssertEqual(model.visibleSongs.map(\.id), [1])
+        XCTAssertEqual(model.items.map(\.id), [1])
+
+        model.songs.append(makeSong(id: 2))
+
+        XCTAssertEqual(model.visibleSongs.map(\.id), [1, 2])
+        XCTAssertEqual(model.items.map(\.id), [1, 2])
+    }
+
+    @MainActor
     func testCloudSearchLoadsRemainingPagesBeforeFiltering() async {
         let repository = RecordingCloudRepository()
         repository.firstPage = (0..<100).map { makeCloudFile(id: UInt64($0), name: "file-\($0)") }

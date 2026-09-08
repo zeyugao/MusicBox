@@ -14,13 +14,26 @@ final class PlaylistFeatureModel {
     private let usesInitialSongs: Bool
     private let playbackSource: PlaybackSourcePlaylist?
 
-    var songs: [CloudMusicApi.Song] = []
+    var songs: [CloudMusicApi.Song] = [] {
+        didSet {
+            songsRevision &+= 1
+            cachedItems = nil
+            cachedVisibleSongs = nil
+        }
+    }
     var query = ""
     var sort: PlaylistSongSort?
     var isLoading = false
     var isLoadingMore = false
     var hasMore = false
     var errorMessage: String?
+
+    @ObservationIgnored private var songsRevision: UInt = 0
+    @ObservationIgnored private var cachedItems: [PlaylistItem]?
+    @ObservationIgnored private var cachedVisibleSongs: [CloudMusicApi.Song]?
+    @ObservationIgnored private var cachedVisibleSongsRevision: UInt = .max
+    @ObservationIgnored private var cachedVisibleSongsQuery = ""
+    @ObservationIgnored private var cachedVisibleSongsSort: PlaylistSongSort?
 
     init(
         destination: PlaylistDestination,
@@ -38,7 +51,10 @@ final class PlaylistFeatureModel {
     }
 
     var items: [PlaylistItem] {
-        songs.map { PlaylistItemFactory.make(song: $0, sourcePlaylist: playbackSource) }
+        if let cachedItems { return cachedItems }
+        let items = songs.map { PlaylistItemFactory.make(song: $0, sourcePlaylist: playbackSource) }
+        cachedItems = items
+        return items
     }
 
     var isRemotePlaylist: Bool { !usesInitialSongs }
@@ -49,13 +65,26 @@ final class PlaylistFeatureModel {
 
     var visibleSongs: [CloudMusicApi.Song] {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if cachedVisibleSongsRevision == songsRevision,
+            cachedVisibleSongsQuery == normalizedQuery,
+            cachedVisibleSongsSort == sort,
+            let cachedVisibleSongs
+        {
+            return cachedVisibleSongs
+        }
+
         var visible = normalizedQuery.isEmpty ? songs : songs.filter { song in
             song.name.lowercased().contains(normalizedQuery)
                 || song.ar.compactMap(\.name).joined(separator: ", ").lowercased().contains(normalizedQuery)
                 || song.albumName.lowercased().contains(normalizedQuery)
         }
-        guard let sort else { return visible }
-        visible.sort(using: sort.comparator)
+        if let sort {
+            visible.sort(using: sort.comparator)
+        }
+        cachedVisibleSongsRevision = songsRevision
+        cachedVisibleSongsQuery = normalizedQuery
+        cachedVisibleSongsSort = sort
+        cachedVisibleSongs = visible
         return visible
     }
 
